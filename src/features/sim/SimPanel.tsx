@@ -11,7 +11,7 @@ import { createDefaultDamageModel } from "../../simulator/damageModel";
 import type { OperatorBuild } from "../../types/operator";
 import { createSeqGenerator } from "../../shared/lib/utils";
 import { compileSkillCast } from "../../simulator/compiler";
-import type { SimEvent, SimEntity } from "../../types/sim/simulator";
+import type { SimEvent, SimEntity } from "../../types/simulator/simulator";
 import type { SkillBox } from "../../types/editor";
 
 import {

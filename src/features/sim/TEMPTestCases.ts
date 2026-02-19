@@ -1,4 +1,4 @@
-import { SimEvent } from "../../types/sim/simulator";
+import { SimEvent } from "../../types/simulator/simulator";
 import { compileSkillCast } from "../../simulator/compiler";
 
 export function TEMPgetZerothTestCaseEvents(nextSeq: () => number): SimEvent[] {

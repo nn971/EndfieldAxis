@@ -1,7 +1,7 @@
 {
   "id": "endministrator",
   "name": "Endministrator",
-  "baseAttack": 100,
+  "baseAttack": 319,
   "avatar": "ENDMINISTRATOR.png",
   "skills": {
     "normalAttack": {
@@ -17,7 +17,7 @@
         {
           "frame": 24,
           "type": "physicalHit",
-          "dmgMultiplier": 3.5,
+          "dmgMultiplier": 2.8,
           "withStatus": true,
           "statusType": "crush"
         }
@@ -36,7 +36,7 @@
         {
           "frame": 45,
           "type": "physicalHit",
-          "dmgMultiplier": 1,
+          "dmgMultiplier": 0.8,
           "withStatus": false
         }
       ]

@@ -1,7 +1,7 @@
 import { getOperator } from "../data/operators";
 import { getWeapon } from "../data/weapons";
 import type { OperatorBuild } from "../types/operator";
-import type { SimEntity } from "../types/sim/simulator";
+import type { SimEntity } from "../types/simulator/simulator";
 
 /**
  * DamageModel is a pure computation layer.
@@ -11,21 +11,21 @@ import type { SimEntity } from "../types/sim/simulator";
  *   3) apply the returned integer damage to HP
  */
 
-export type DamageKind = "physical" | "proc.lift" | "burst.crush";
+export type DamageKind = "physical" | "lift" | "crush";
 
 export type DamageBucket =
-  | "attackIncRatio"
-  | "attackIncValue"
-  | "skillMul"
-  | "outgoingIncMul"
-  | "outgoingAmpMul"
-  | "incomingIncMul"
-  | "incomingAmpMul"
-  | "defendMul"
-  | "resistanceMul"
-  | "staggerMul"
-  | "criticalHitMul"
-  | "specialMul";
+  | "attackIncRatio" // 百分比加攻
+  | "attackIncValue" // 固定值加攻
+  | "skillMul" // 技能倍率
+  | "outgoingIncMul" // 增伤
+  | "outgoingAmpMul" // 增幅
+  | "incomingIncMul" // 易伤
+  | "incomingAmpMul" // 脆弱
+  | "defendMul" // 防御
+  | "resistanceMul" // 抗性
+  | "staggerMul" // 失衡
+  | "criticalHitMul" // 暴击
+  | "specialMul"; // 特殊系数（连击、源石技艺强度）
 
 export type DamageAtom = {
   bucket: DamageBucket;
@@ -139,7 +139,7 @@ function collectAtoms(ctx: DamageContext): DamageAtom[] {
 
   // --- Built-in hooks by damage kind ---
   // User rule: lift / crush damage uses SpecialMultiplier; normal hits do not.
-  if (ctx.kind === "proc.lift") {
+  if (ctx.kind === "lift") {
     atoms.push({
       bucket: "specialMul",
       addRatio: LIFT_SPECIAL_MULTIPLIER - 1,
@@ -223,7 +223,11 @@ export function createDefaultDamageModel(params?: {
       const outgoingAmpMul = factorFromSum(sumRatio(atoms, "outgoingAmpMul"));
       const incomingIncMul = factorFromSum(sumRatio(atoms, "incomingIncMul"));
       const incomingAmpMul = factorFromSum(sumRatio(atoms, "incomingAmpMul"));
-      const defendMul = factorFromSum(sumRatio(atoms, "defendMul"));
+
+      // TODO Set enemy defend to 50 for this moment
+      // const defendMul = factorFromSum(sumRatio(atoms, "defendMul"));
+      const defendMul = 0.5;
+
       const resistanceMul = factorFromSum(sumRatio(atoms, "resistanceMul"));
       const staggerMul = factorFromSum(sumRatio(atoms, "staggerMul"));
       const criticalHitMul = factorFromSum(sumRatio(atoms, "criticalHitMul"));

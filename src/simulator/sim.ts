@@ -5,7 +5,7 @@ import {
   type SimEvent,
   type SimEnv,
   type SimWorld,
-} from "../types/sim/simulator";
+} from "../types/simulator/simulator";
 import { logDamage, pushLog } from "./log";
 import {
   resolveStatusApplication,

@@ -1,13 +1,17 @@
 import { makeId } from "../shared/lib/id";
 import type { OperatorBuild } from "../types/operator";
-import type { SimEntityId, SimWorld, SimEvent } from "../types/sim/simulator";
+import type {
+  SimEntityId,
+  SimWorld,
+  SimEvent,
+} from "../types/simulator/simulator";
 import {
   type SimStatusType,
   type SimInfliction,
   type SimInflictionType,
   type SimBuff,
   type SimBuffType,
-} from "../types/sim/infliction";
+} from "../types/simulator/infliction";
 import { pushLog } from "./log";
 import type { DamageContext, DamageModel } from "./damageModel";
 
@@ -135,7 +139,7 @@ export function resolveStatusApplication(
 
       const ctx: DamageContext = {
         frame: world.nowInFrames,
-        kind: "proc.lift",
+        kind: "lift",
         source,
         target,
         dmgSkillMultiplier: 1,
@@ -191,7 +195,7 @@ export function resolveStatusApplication(
 
       const ctx: DamageContext = {
         frame: world.nowInFrames,
-        kind: "burst.crush",
+        kind: "crush",
         source,
         target,
         // TEMP: more stacks => larger skill multiplier.

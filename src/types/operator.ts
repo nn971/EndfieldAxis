@@ -1,4 +1,4 @@
-import type { SimStatusType, SimBuffType } from "./sim/infliction";
+import type { SimStatusType, SimBuffType } from "./simulator/infliction";
 
 export type DmgType = "physical" | "heat" | "electric" | "cryo" | "nature";
 

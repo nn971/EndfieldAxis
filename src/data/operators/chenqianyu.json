@@ -1,7 +1,7 @@
 {
   "id": "chenqianyu",
   "name": "Chen Qianyu",
-  "baseAttack": 100,
+  "baseAttack": 680,
   "avatar": "CHENQIANYU.png",
   "skills": {
     "normalAttack": {
@@ -17,7 +17,7 @@
         {
           "frame": 26,
           "type": "physicalHit",
-          "dmgMultiplier": 3.8,
+          "dmgMultiplier": 2.53,
           "withStatus": true,
           "statusType": "lift"
         }
@@ -31,7 +31,7 @@
         {
           "frame": 34,
           "type": "physicalHit",
-          "dmgMultiplier": 2.7,
+          "dmgMultiplier": 1.8,
           "withStatus": true,
           "statusType": "lift"
         }

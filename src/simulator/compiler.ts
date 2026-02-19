@@ -1,7 +1,7 @@
 import { getOperator } from "../data/operators";
 import { makeId } from "../shared/lib/id";
 import { SkillOp, SkillType } from "../types/operator";
-import type { SimEvent } from "../types/sim/simulator";
+import type { SimEvent } from "../types/simulator/simulator";
 
 const EVENT_PREFIX = "SimEvent_";
 function makeEventId() {
