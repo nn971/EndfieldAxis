@@ -1,5 +1,5 @@
 import { DmgType, SkillType } from "../operator";
-import {
+import type {
   SimInfliction,
   SimBuff,
   SimStatusType,
@@ -65,7 +65,6 @@ export type SimEntity = {
   hp: number;
   inflictions: Record<string, SimInfliction>;
 
-  // timed buffs/debuffs that are NOT modeled as stackable inflictions
   buffs: Record<string, SimBuff>;
 
   type: string; //TODO implement this
@@ -75,6 +74,6 @@ export type SimEnv = { entitiesById: Record<SimEntityId, SimEntity> };
 
 export type SimWorld = {
   env: SimEnv;
-  nowInFrame: number;
+  nowInFrames: number;
   futureEvents: SimEventSequence;
 };

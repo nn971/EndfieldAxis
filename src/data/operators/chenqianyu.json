@@ -1,6 +1,7 @@
 {
   "id": "chenqianyu",
   "name": "Chen Qianyu",
+  "baseAttack": 100,
   "avatar": "CHENQIANYU.png",
   "skills": {
     "normalAttack": {

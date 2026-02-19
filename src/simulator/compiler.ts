@@ -57,8 +57,8 @@ function compileOp(
         frame: startFrame + op.frame,
         seq: nextSeq(),
 
-        sourceId,
-        targetId,
+        sourceId: sourceId,
+        targetId: targetId,
 
         buffType: op.buffType,
       });

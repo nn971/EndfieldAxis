@@ -1,10 +1,16 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useAppSelector } from "../../app/hooks";
 import { selectSkillBoxes, selectTeamOperatorIds } from "../solution/selectors";
-import { getOperator } from "../../data/operators";
-import { createSimWorld, makeQueue, runSim, schedule } from "../../sim/sim";
+import {
+  createSimWorld,
+  makeQueue,
+  runSim,
+  schedule,
+} from "../../simulator/sim";
+import { createDefaultDamageModel } from "../../simulator/damageModel";
+import type { OperatorBuild } from "../../types/operator";
 import { createSeqGenerator } from "../../shared/lib/utils";
-import { compileSkillCast } from "../../sim/compiler";
+import { compileSkillCast } from "../../simulator/compiler";
 import type { SimEvent, SimEntity } from "../../types/sim/simulator";
 import type { SkillBox } from "../../types/editor";
 
@@ -51,73 +57,88 @@ export default function SimPanel() {
   const skillBoxes = useAppSelector(selectSkillBoxes);
 
   const run = () => {
-    // const world = createSimWorld([
-    //   {
-    //     id: "endministrator",
-    //     name: "Endministrator",
-    //     type: "operator",
-    //     inflictions: {},
-    //   },
-    //   {
-    //     id: "chenqianyu",
-    //     name: "Chen Qianyu",
-    //     type: "operator",
-    //     inflictions: {},
-    //   },
-    //   { id: "enemy1", name: "Enemy1", type: "enemy", inflictions: {} },
-    // ] as SimEntity[]);
-
-    // TEMP Optional: pre-seed enemy vulnerable stacks for testing.
-    // const initialVulnStacks = 3;
-    // if (initialVulnStacks > 0) {
-    //   setStacks(world, statusLib, "enemy", "vulnerable", initialVulnStacks);
-    // }
-
-    const entities: SimEntity[] = [
-      ...teamOperatorIds.map(opId => {
-        const op = getOperator(opId);
-        return {
-          id: opId,
-          name: op?.name ?? opId,
-          type: "operator",
-          hp: 1,
-          inflictions: {},
-          buffs: {},
-        };
-      }),
-      // Just add a default enemy for now
+    const world = createSimWorld([
+      {
+        id: "endministrator",
+        name: "Endministrator",
+        type: "operator",
+        hp: 999999,
+        inflictions: {},
+        buffs: {},
+      },
+      {
+        id: "chenqianyu",
+        name: "Chen Qianyu",
+        type: "operator",
+        hp: 999999,
+        inflictions: {},
+        buffs: {},
+      },
       {
         id: "enemy1",
         name: "Enemy1",
         type: "enemy",
-        hp: 1,
+        hp: 999999,
         inflictions: {},
         buffs: {},
       },
-    ];
-
-    const world = createSimWorld(entities);
+    ] as SimEntity[]);
 
     const queue = makeQueue();
     const nextSeq = createSeqGenerator(1);
 
-    // const events = TEMPgetSecondTestCaseEvents(nextSeq);
-    const events = compileSkillBoxes({
-      skillBoxes,
-      targetId: "enemy1",
-      nextSeq,
-    });
+    const events = TEMPgetSecondTestCaseEvents(nextSeq);
+
     for (const ev of events) schedule(queue, ev);
 
-    const { world: finalWorld, log } = runSim({ world, queue, nextSeq });
+    // TEMP: build snapshot for damage formula (normally comes from Redux).
+    const buildByOperatorId: Record<string, OperatorBuild> = {
+      endministrator: {
+        level: 90,
+        mainAttributePoints: 0,
+        secondaryAttributePoints: 0,
+        potentialRank: 0,
+        skillRanks: {},
+        talentRanks: {},
+        weapon: { weaponId: "w1", level: 1, skillRanks: {} },
+        gears: {
+          armor: { gearId: null, ranks: [0, 0, 0] },
+          gloves: { gearId: null, ranks: [0, 0, 0] },
+          kit1: { gearId: null, ranks: [0, 0, 0] },
+          kit2: { gearId: null, ranks: [0, 0, 0] },
+        },
+      },
+      chenqianyu: {
+        level: 90,
+        mainAttributePoints: 0,
+        secondaryAttributePoints: 0,
+        potentialRank: 0,
+        skillRanks: {},
+        talentRanks: {},
+        weapon: { weaponId: "w1", level: 1, skillRanks: {} },
+        gears: {
+          armor: { gearId: null, ranks: [0, 0, 0] },
+          gloves: { gearId: null, ranks: [0, 0, 0] },
+          kit1: { gearId: null, ranks: [0, 0, 0] },
+          kit2: { gearId: null, ranks: [0, 0, 0] },
+        },
+      },
+    };
 
-    // const finalStacks =
-    //   finalWorld.env.entitiesById["enemy1"].inflictions["vulnerable"]?.stacks ??
-    //   0;
-    // const tail = `\n[----] FINAL enemy.vulnerable=${finalStacks}`;
+    const damageModel = createDefaultDamageModel();
 
-    const finalWorldDescription = finalWorld.env.toString();
-    setLogText(log.join("\n") + `final world: ${finalWorldDescription}`);
+    const { world: finalWorld, log } = runSim({
+      world,
+      queue,
+      nextSeq,
+      buildByOperatorId,
+      damageModel,
+    });
+
+    // const finalWorldDescription = finalWorld.env.toString();
+    // setLogText(log.join("\n") + `final world: ${finalWorldDescription}`);
+
+    setLogText(log.join("\n"));
   };
 
   return (

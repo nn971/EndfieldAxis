@@ -1,4 +1,4 @@
-import { SimBuffType, SimStatusType } from "./sim/infliction";
+import type { SimStatusType, SimBuffType } from "./sim/infliction";
 
 export type DmgType = "physical" | "heat" | "electric" | "cryo" | "nature";
 
@@ -14,22 +14,21 @@ export type SkillOpType =
   | "applyBuff"; // apply a timed buff/debuff (e.g. enemy gets "crystal")
 // | string;
 
-export type SkillOpPhysicalHit = {
-  frame: number;
-  type: "physicalHit";
-  dmgType?: DmgType;
-  dmgMultiplier?: number;
-  withStatus: boolean;
-  statusType?: SimStatusType;
-};
+export type SkillOp =
+  | {
+      frame: number;
+      type: "physicalHit";
+      dmgType?: DmgType;
+      dmgMultiplier?: number;
+      withStatus: boolean;
+      statusType?: SimStatusType;
+    }
+  | {
+      frame: number;
+      type: "applyBuff";
+      buffType: SimBuffType;
+    };
 
-export type SkillOpApplyBuff = {
-  frame: number;
-  type: "applyBuff";
-  buffType: SimBuffType;
-};
-
-export type SkillOp = SkillOpPhysicalHit | SkillOpApplyBuff;
 export interface SkillDef {
   name: SkillType;
   durationFrames: number;
@@ -44,6 +43,10 @@ export interface OperatorDef {
   name: string;
   avatar: string;
 
+  // Base attack used by DamageModel (Endfield: "OperatorAttack").
+  // TODO: Confirm whether level scaling applies in-game; for now this is a direct value.
+  baseAttack?: number;
+
   // skillDurationsFrames: Record<SkillType, number>; // TEMP
 
   skills: {
@@ -53,6 +56,11 @@ export interface OperatorDef {
 
 export interface OperatorBuild {
   level: number; // 1..90
+
+  // Endfield damage formula inputs (static during combat).
+  mainAttributePoints?: number;
+  secondaryAttributePoints?: number;
+
   potentialRank: number; // 0..5
   skillRanks: Record<string, number>;
   talentRanks: Record<string, number>;

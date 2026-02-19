@@ -1,5 +1,5 @@
 import { SimEvent } from "../../types/sim/simulator";
-import { compileSkillCast } from "../../sim/compiler";
+import { compileSkillCast } from "../../simulator/compiler";
 
 export function TEMPgetZerothTestCaseEvents(nextSeq: () => number): SimEvent[] {
   const firstSkill = compileSkillCast({

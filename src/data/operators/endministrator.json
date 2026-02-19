@@ -1,6 +1,7 @@
 {
   "id": "endministrator",
   "name": "Endministrator",
+  "baseAttack": 100,
   "avatar": "ENDMINISTRATOR.png",
   "skills": {
     "normalAttack": {

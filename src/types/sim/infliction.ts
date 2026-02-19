@@ -6,9 +6,8 @@ export type SimInflictionType =
   | "nature";
 export type SimStatusType = "lift" | "knockDown" | "crush" | "breach";
 
-// "Buff" here means a timed effect that is NOT one of the stackable inflictions above.
-// For now we only need one: "crystal".
-// NOTE: This is intentionally data-driven and extendible.
+// Buffs are non-stacking time-based modifiers (e.g. crystal).
+// NOTE: We keep buffs in this file for now to minimize file count.
 export type SimBuffType = "crystal";
 
 export type SimBuff = {
