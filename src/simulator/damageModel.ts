@@ -1,6 +1,10 @@
 import { getOperator } from "../data/operators";
 import { getWeapon } from "../data/weapons";
-import type { OperatorBuild } from "../types/operator";
+import type {
+  OperatorAttributeType,
+  OperatorBuild,
+  OperatorStatSnapshot,
+} from "../types/operator";
 import type { SimEntity } from "../types/simulator/simulator";
 
 /**
@@ -103,11 +107,15 @@ export type DamageResult = {
 export type RoundingPolicy = {
   // Round a floating-point raw damage into an integer final damage.
   roundFinal: (rawDamage: number) => number;
+
+  // Round interpolated operator attack/attribute values from level scaling.
+  roundScaledStat: (scaledValue: number) => number;
 };
 
 export const defaultRoundingPolicy: RoundingPolicy = {
-  // TODO: Endfield rounding policy is unknown. We start with floor-at-end.
-  roundFinal: raw => Math.max(0, Math.floor(raw)),
+  // TODO: Endfield rounding policy is unknown. Keep easy to tweak later.
+  roundFinal: raw => Math.max(0, Math.round(raw)),
+  roundScaledStat: scaled => Math.max(0, Math.round(scaled)),
 };
 
 export type DamageModel = {
@@ -116,6 +124,14 @@ export type DamageModel = {
 
 // TEMP constants (placeholders while reverse-engineering exact in-game formulas).
 export const LIFT_SPECIAL_MULTIPLIER = 1.2;
+
+const DEFAULT_STAT_SNAPSHOT: OperatorStatSnapshot = {
+  attack: 0,
+  strength: 0,
+  agility: 0,
+  intellect: 0,
+  will: 0,
+};
 
 function sumRatio(atoms: DamageAtom[], bucket: DamageBucket): number {
   let s = 0;
@@ -132,6 +148,76 @@ function sumValue(atoms: DamageAtom[], bucket: DamageBucket): number {
 function factorFromSum(sum: number): number {
   // "Each multiplier is additive within itself." We encode buckets as 1 + sum.
   return 1 + sum;
+}
+
+function clampOperatorLevel(level: number): number {
+  if (!Number.isFinite(level)) return 1;
+  if (level < 1) return 1;
+  if (level > 90) return 90;
+  return level;
+}
+
+function interpolateLevelStat(
+  level: number,
+  lv1: number,
+  lv90: number,
+  roundingPolicy: RoundingPolicy,
+): number {
+  const clamped = clampOperatorLevel(level);
+  const t = (clamped - 1) / 89;
+  const raw = lv1 + (lv90 - lv1) * t;
+  return roundingPolicy.roundScaledStat(raw);
+}
+
+function getLevelStats(params: {
+  level: number;
+  roundingPolicy: RoundingPolicy;
+  level1?: OperatorStatSnapshot;
+  level90?: OperatorStatSnapshot;
+}): OperatorStatSnapshot {
+  const lv1 = params.level1 ?? DEFAULT_STAT_SNAPSHOT;
+  const lv90 = params.level90 ?? lv1;
+
+  return {
+    attack: interpolateLevelStat(
+      params.level,
+      lv1.attack,
+      lv90.attack,
+      params.roundingPolicy,
+    ),
+    strength: interpolateLevelStat(
+      params.level,
+      lv1.strength,
+      lv90.strength,
+      params.roundingPolicy,
+    ),
+    agility: interpolateLevelStat(
+      params.level,
+      lv1.agility,
+      lv90.agility,
+      params.roundingPolicy,
+    ),
+    intellect: interpolateLevelStat(
+      params.level,
+      lv1.intellect,
+      lv90.intellect,
+      params.roundingPolicy,
+    ),
+    will: interpolateLevelStat(
+      params.level,
+      lv1.will,
+      lv90.will,
+      params.roundingPolicy,
+    ),
+  };
+}
+
+function getAttributeValue(
+  stats: OperatorStatSnapshot,
+  attributeType?: OperatorAttributeType,
+): number {
+  if (!attributeType) return 0;
+  return Number(stats[attributeType] ?? 0);
 }
 
 function collectAtoms(ctx: DamageContext): DamageAtom[] {
@@ -191,7 +277,14 @@ export function createDefaultDamageModel(params?: {
       // if (!ctx.source) throw new Error(`unhandled case: damage with no source`);
       // --- Attack stage ---
       const opDef = getOperator(ctx.source.id);
-      const operatorAttack = Number(opDef?.baseAttack ?? 0);
+      const operatorLevel = clampOperatorLevel(Number(ctx.sourceBuild?.level ?? 1));
+      const levelStats = getLevelStats({
+        level: operatorLevel,
+        roundingPolicy,
+        level1: opDef?.stats?.level1,
+        level90: opDef?.stats?.level90,
+      });
+      const operatorAttack = Number(levelStats.attack ?? 0);
 
       const weaponId = ctx.sourceBuild?.weapon?.weaponId;
       const weaponAttack = Number(
@@ -201,11 +294,10 @@ export function createDefaultDamageModel(params?: {
       const attackIncRatio = sumRatio(atoms, "attackIncRatio");
       const attackIncValue = sumValue(atoms, "attackIncValue");
 
-      const mainAttributePoints = Number(
-        ctx.sourceBuild?.mainAttributePoints ?? 0,
-      );
-      const secondaryAttributePoints = Number(
-        ctx.sourceBuild?.secondaryAttributePoints ?? 0,
+      const mainAttributePoints = getAttributeValue(levelStats, opDef?.attributes?.main);
+      const secondaryAttributePoints = getAttributeValue(
+        levelStats,
+        opDef?.attributes?.sub,
       );
       const attributeRatio =
         mainAttributePoints * 0.005 + secondaryAttributePoints * 0.002;

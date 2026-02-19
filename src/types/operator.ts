@@ -38,28 +38,44 @@ export interface SkillDef {
 
 export type OperatorId = string;
 
+export type OperatorAttributeType =
+  | "strength"
+  | "agility"
+  | "intellect"
+  | "will";
+
+export interface OperatorStatSnapshot {
+  attack: number;
+  strength: number;
+  agility: number;
+  intellect: number;
+  will: number;
+}
+
 export interface OperatorDef {
   id: OperatorId;
   name: string;
   avatar: string;
 
-  // Base attack used by DamageModel (Endfield: "OperatorAttack").
-  // TODO: Confirm whether level scaling applies in-game; for now this is a direct value.
-  baseAttack?: number;
+  attributes?: {
+    main: OperatorAttributeType;
+    sub: OperatorAttributeType;
+  };
+
+  stats?: {
+    level1: OperatorStatSnapshot;
+    level90: OperatorStatSnapshot;
+  };
 
   // skillDurationsFrames: Record<SkillType, number>; // TEMP
 
-  skills: {
+  skills?: {
     [key in SkillType]?: SkillDef;
   };
 }
 
 export interface OperatorBuild {
   level: number; // 1..90
-
-  // Endfield damage formula inputs (static during combat).
-  mainAttributePoints?: number;
-  secondaryAttributePoints?: number;
 
   potentialRank: number; // 0..5
   skillRanks: Record<string, number>;

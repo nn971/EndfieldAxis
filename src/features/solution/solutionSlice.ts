@@ -25,10 +25,6 @@ function makeDefaultBuild(): OperatorBuild {
   return {
     level: 90,
 
-    // TODO: These are Endfield damage formula inputs. Fill with real defaults later.
-    mainAttributePoints: 0,
-    secondaryAttributePoints: 0,
-
     potentialRank: 2,
     skillRanks: {
       normalAttack: 6,

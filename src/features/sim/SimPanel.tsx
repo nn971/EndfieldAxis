@@ -95,8 +95,6 @@ export default function SimPanel() {
     const buildByOperatorId: Record<string, OperatorBuild> = {
       endministrator: {
         level: 90,
-        mainAttributePoints: 0,
-        secondaryAttributePoints: 0,
         potentialRank: 0,
         skillRanks: {},
         talentRanks: {},
@@ -110,8 +108,6 @@ export default function SimPanel() {
       },
       chenqianyu: {
         level: 90,
-        mainAttributePoints: 0,
-        secondaryAttributePoints: 0,
         potentialRank: 0,
         skillRanks: {},
         talentRanks: {},
