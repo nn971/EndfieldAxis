@@ -1,7 +1,6 @@
 {
   "id": "chenqianyu",
   "name": "Chen Qianyu",
-  "baseAttack": 680,
   "avatar": "CHENQIANYU.png",
   "skills": {
     "normalAttack": {
@@ -41,6 +40,26 @@
       "name": "Blade Gale",
       "durationFrames": 224,
       "icon": "CHENQIANYU_ULT.png"
+    }
+  },
+  "attributes": {
+    "main": "strength",
+    "sub": "agility"
+  },
+  "stats": {
+    "level1": {
+      "attack": 680,
+      "strength": 0,
+      "agility": 0,
+      "intellect": 0,
+      "will": 0
+    },
+    "level90": {
+      "attack": 680,
+      "strength": 0,
+      "agility": 0,
+      "intellect": 0,
+      "will": 0
     }
   }
 }
