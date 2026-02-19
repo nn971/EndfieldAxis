@@ -1,0 +1,11 @@
+{
+  "id": "alesh",
+  "name": "Alesh",
+  "avatar": "ALESH.png",
+  "skillDurationsFrames": {
+    "normalAttack": 192,
+    "normalSkill": 100,
+    "comboSkill": 78,
+    "ultimate": 192
+  }
+}

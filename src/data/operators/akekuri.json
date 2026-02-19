@@ -1,0 +1,11 @@
+{
+  "id": "akekuri",
+  "name": "Akekuri",
+  "avatar": "AKEKURI.png",
+  "skillDurationsFrames": {
+    "normalAttack": 192,
+    "normalSkill": 80,
+    "comboSkill": 76,
+    "ultimate": 258
+  }
+}

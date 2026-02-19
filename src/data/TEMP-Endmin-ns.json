@@ -1,0 +1,14 @@
+{
+  "id": "endministrator.normalSkill",
+  "name": "Normal Skill",
+  "durationFrames": 48,
+  "timeline": [
+    {
+      "frame": 24,
+      "op": "physicalStatusHit",
+      "kind": "crush",
+      "baseDamage": 100,
+      "baseCrushBurst": 500
+    }
+  ]
+}

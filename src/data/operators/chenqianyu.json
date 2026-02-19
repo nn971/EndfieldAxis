@@ -1,0 +1,45 @@
+{
+  "id": "chenqianyu",
+  "name": "Chen Qianyu",
+  "avatar": "CHENQIANYU.png",
+  "skills": {
+    "normalAttack": {
+      "name": "Soaring Break",
+      "durationFrames": 300,
+      "icon": "CHENQIANYU_NA.png"
+    },
+    "normalSkill": {
+      "name": "Ascending Strike",
+      "durationFrames": 50,
+      "icon": "CHENQIANYU_NS.png",
+      "timeline": [
+        {
+          "frame": 26,
+          "type": "physicalHit",
+          "dmgMultiplier": 3.8,
+          "withStatus": true,
+          "statusType": "lift"
+        }
+      ]
+    },
+    "comboSkill": {
+      "name": "Soar to the Stars",
+      "durationFrames": 46,
+      "icon": "CHENQIANYU_CS.png",
+      "timeline": [
+        {
+          "frame": 34,
+          "type": "physicalHit",
+          "dmgMultiplier": 2.7,
+          "withStatus": true,
+          "statusType": "lift"
+        }
+      ]
+    },
+    "ultimate": {
+      "name": "Blade Gale",
+      "durationFrames": 224,
+      "icon": "CHENQIANYU_ULT.png"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "id": "string id",
+  "name": "name to display",
+  "avatar": "file name for avatar, stored in src/assets/avatars/",
+  "skillDurationsFrames": {
+    "normalAttack": 300,
+    "normalSkill": 48,
+    "comboSkill": 46,
+    "ultimate": 110
+  }
+}

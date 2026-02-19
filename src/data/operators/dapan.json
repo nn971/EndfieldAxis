@@ -1,0 +1,11 @@
+{
+  "id": "dapan",
+  "name": "Da Pan",
+  "avatar": "DAPAN.png",
+  "skillDurationsFrames": {
+    "normalAttack": 218,
+    "normalSkill": 130,
+    "comboSkill": 48,
+    "ultimate": 172
+  }
+}

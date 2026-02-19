@@ -1,0 +1,49 @@
+{
+  "id": "endministrator",
+  "name": "Endministrator",
+  "avatar": "ENDMINISTRATOR.png",
+  "skills": {
+    "normalAttack": {
+      "name": "Destructive Sequence",
+      "durationFrames": 300,
+      "icon": "ENDMINISTRATOR_NA.png"
+    },
+    "normalSkill": {
+      "name": "Constructive Sequence",
+      "durationFrames": 48,
+      "icon": "ENDMINISTRATOR_NS.png",
+      "timeline": [
+        {
+          "frame": 24,
+          "type": "physicalHit",
+          "dmgMultiplier": 3.5,
+          "withStatus": true,
+          "statusType": "crush"
+        }
+      ]
+    },
+    "comboSkill": {
+      "name": "Sealing Sequence",
+      "durationFrames": 46,
+      "icon": "ENDMINISTRATOR_CS.png",
+      "timeline": [
+        {
+          "frame": 45,
+          "type": "applyBuff",
+          "buffType": "crystal"
+        },
+        {
+          "frame": 45,
+          "type": "physicalHit",
+          "dmgMultiplier": 1,
+          "withStatus": false
+        }
+      ]
+    },
+    "ultimate": {
+      "name": "Bombardment Sequence",
+      "durationFrames": 110,
+      "icon": "ENDMINISTRATOR_ULT.png"
+    }
+  }
+}

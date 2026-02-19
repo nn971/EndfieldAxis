@@ -1,0 +1,11 @@
+{
+  "id": "estella",
+  "name": "Estella",
+  "avatar": "ESTELLA.png",
+  "skillDurationsFrames": {
+    "normalAttack": 214,
+    "normalSkill": 90,
+    "comboSkill": 40,
+    "ultimate": 120
+  }
+}
