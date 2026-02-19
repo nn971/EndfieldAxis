@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { useAppSelector } from "../../app/hooks";
-import { selectSkillBoxes, selectTeamOperatorIds } from "../solution/selectors";
+import {
+  selectBuildByOperatorId,
+  selectSkillBoxes,
+  selectTeamOperatorIds,
+} from "../solution/selectors";
 import {
   createSimWorld,
   makeQueue,
@@ -8,17 +12,11 @@ import {
   schedule,
 } from "../../simulator/sim";
 import { createDefaultDamageModel } from "../../simulator/damageModel";
-import type { OperatorBuild } from "../../types/operator";
 import { createSeqGenerator } from "../../shared/lib/utils";
 import { compileSkillCast } from "../../simulator/compiler";
 import type { SimEvent, SimEntity } from "../../types/simulator/simulator";
 import type { SkillBox } from "../../types/editor";
-
-import {
-  TEMPgetZerothTestCaseEvents,
-  TEMPgetFirstTestCaseEvents,
-  TEMPgetSecondTestCaseEvents,
-} from "./TEMPTestCases";
+import { operatorsById } from "../../data/operators";
 
 function compileSkillBoxes(params: {
   skillBoxes: SkillBox[];
@@ -55,75 +53,51 @@ export default function SimPanel() {
   const [logText, setLogText] = useState("");
   const teamOperatorIds = useAppSelector(selectTeamOperatorIds);
   const skillBoxes = useAppSelector(selectSkillBoxes);
+  const buildByOperatorId = useAppSelector(selectBuildByOperatorId);
 
   const run = () => {
-    const world = createSimWorld([
-      {
-        id: "endministrator",
-        name: "Endministrator",
-        type: "operator",
+    const targetId = "enemy1";
+
+    const allOperatorIds = new Set<string>(teamOperatorIds);
+    for (const box of skillBoxes) {
+      allOperatorIds.add(box.operatorId);
+    }
+
+    const entities: SimEntity[] = [
+      ...Array.from(allOperatorIds).map(operatorId => ({
+        id: operatorId,
+        name: operatorsById[operatorId]?.name ?? operatorId,
+        type: "operator" as const,
         hp: 999999,
         inflictions: {},
         buffs: {},
-      },
+      })),
       {
-        id: "chenqianyu",
-        name: "Chen Qianyu",
-        type: "operator",
-        hp: 999999,
-        inflictions: {},
-        buffs: {},
-      },
-      {
-        id: "enemy1",
+        id: targetId,
         name: "Enemy1",
         type: "enemy",
         hp: 999999,
         inflictions: {},
         buffs: {},
       },
-    ] as SimEntity[]);
+    ];
+
+    const world = createSimWorld(entities);
 
     const queue = makeQueue();
     const nextSeq = createSeqGenerator(1);
 
-    const events = TEMPgetSecondTestCaseEvents(nextSeq);
+    const events = compileSkillBoxes({
+      skillBoxes,
+      targetId,
+      nextSeq,
+    });
 
     for (const ev of events) schedule(queue, ev);
 
-    // TEMP: build snapshot for damage formula (normally comes from Redux).
-    const buildByOperatorId: Record<string, OperatorBuild> = {
-      endministrator: {
-        level: 90,
-        potentialRank: 0,
-        skillRanks: {},
-        talentRanks: {},
-        weapon: { weaponId: "w1", level: 1, skillRanks: {} },
-        gears: {
-          armor: { gearId: null, ranks: [0, 0, 0] },
-          gloves: { gearId: null, ranks: [0, 0, 0] },
-          kit1: { gearId: null, ranks: [0, 0, 0] },
-          kit2: { gearId: null, ranks: [0, 0, 0] },
-        },
-      },
-      chenqianyu: {
-        level: 90,
-        potentialRank: 0,
-        skillRanks: {},
-        talentRanks: {},
-        weapon: { weaponId: "w1", level: 1, skillRanks: {} },
-        gears: {
-          armor: { gearId: null, ranks: [0, 0, 0] },
-          gloves: { gearId: null, ranks: [0, 0, 0] },
-          kit1: { gearId: null, ranks: [0, 0, 0] },
-          kit2: { gearId: null, ranks: [0, 0, 0] },
-        },
-      },
-    };
-
     const damageModel = createDefaultDamageModel();
 
-    const { world: finalWorld, log } = runSim({
+    const { log } = runSim({
       world,
       queue,
       nextSeq,
