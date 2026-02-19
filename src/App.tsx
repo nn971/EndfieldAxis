@@ -16,6 +16,7 @@ import {
   selectSkillBoxes,
   selectTeamOperatorIds,
 } from "./features/solution/selectors";
+import SolutionSLPanel from "./features/solution/SolutionSLPanel";
 
 function remapSelectedLane(
   selectedLane: number | null,
@@ -81,6 +82,7 @@ export default function App() {
             />
 
             <SimPanel />
+            <SolutionSLPanel />
           </div>
         </div>
       </div>

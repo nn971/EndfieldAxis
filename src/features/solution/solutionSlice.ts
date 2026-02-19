@@ -71,6 +71,7 @@ function initState(): SolutionState {
   const initialSkillBoxes: SkillBox[] = [];
 
   return {
+    version: 1,
     teamOperatorIds,
     skillBoxes: initialSkillBoxes,
     buildByOperatorId,
@@ -83,6 +84,13 @@ export const solutionSlice = createSlice({
   name: "solution",
   initialState,
   reducers: {
+    /**
+     * Replace the entire solution state (used by Load).
+     * NOTE: reducers in createSlice may either mutate OR return a new state.
+     */
+    solutionReplaced(_state, action: PayloadAction<SolutionState>) {
+      return action.payload;
+    },
     laneReordered(state, action: PayloadAction<{ from: number; to: number }>) {
       const { from, to } = action.payload;
       state.teamOperatorIds = moveItem(state.teamOperatorIds, from, to);
@@ -152,6 +160,7 @@ export const solutionSlice = createSlice({
 });
 
 export const {
+  solutionReplaced,
   laneReordered,
   teammateAssigned,
   skillBoxPatched,

@@ -27,10 +27,10 @@ export function createSimWorld(
 ): SimWorld {
   // Normalize entities so callers can stay lightweight.
   const normalized: SimEntity[] = entities.map(e => ({
+    ...e,
     hp: Number((e as any).hp ?? 999999),
     inflictions: (e as any).inflictions ?? {},
     buffs: (e as any).buffs ?? {},
-    ...e,
   }));
 
   const entitiesById: Record<SimEntityId, SimEntity> = Object.fromEntries(
