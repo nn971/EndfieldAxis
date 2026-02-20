@@ -1,23 +1,18 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAppSelector } from "../../app/hooks";
 import {
   selectBuildByOperatorId,
   selectSkillBoxes,
   selectTeamOperatorIds,
 } from "../solution/selectors";
-import {
-  createSimWorld,
-  makeQueue,
-  runSim,
-  schedule,
-} from "../../simulator/sim";
 import { createDefaultDamageModel } from "../../simulator/damageModel";
-import { createSeqGenerator } from "../../shared/lib/utils";
 import { compileSkillCast } from "../../simulator/compiler";
 import type { SimEvent, SimEntity } from "../../types/simulator/simulator";
 import type { SkillBox } from "../../types/editor";
 import { operatorsById } from "../../data/operators";
 import { summarizeLog } from "../../simulator/log";
+import { loadSimRegistry } from "../../simulator/listener/loadSimRegistry";
+import { SimWorld } from "../../simulator/simulator";
 
 function compileSkillBoxes(params: {
   skillBoxes: SkillBox[];
@@ -56,6 +51,8 @@ export default function SimPanel() {
   const skillBoxes = useAppSelector(selectSkillBoxes);
   const buildByOperatorId = useAppSelector(selectBuildByOperatorId);
 
+  const registry = useMemo(() => loadSimRegistry(), []);
+
   const run = () => {
     const targetId = "enemy1";
 
@@ -83,34 +80,29 @@ export default function SimPanel() {
       },
     ];
 
-    const world = createSimWorld(entities);
-
-    const queue = makeQueue();
-    const nextSeq = createSeqGenerator(1);
+    const world = new SimWorld({
+      entities,
+      buildByOperatorId,
+      nowInFrames: 0,
+      futureEvents: [],
+      registry,
+      damageModel: createDefaultDamageModel(),
+    });
 
     const events = compileSkillBoxes({
       skillBoxes,
       targetId,
-      nextSeq,
+      nextSeq: world.ops.nextSeq,
     });
+    for (const ev of events) world.ops.schedule(ev);
 
-    for (const ev of events) schedule(queue, ev);
+    world.runSim();
 
-    const damageModel = createDefaultDamageModel();
-
-    const { finalWorld } = runSim({
-      world,
-      queue,
-      nextSeq,
-      buildByOperatorId,
-      damageModel,
-    });
-
-    // const finalWorldDescription = finalWorld.env.toString();
-    // setLogText(log.join("\n") + `final world: ${finalWorldDescription}`);
-
+    const finalWorldDescription = JSON.stringify(world.env, null, 2);
     setLogText(
-      summarizeLog(finalWorld.log, ["sim", "act", "buff&stat", "dmg", "dev"]),
+      summarizeLog(world.log, ["sim", "act", "buff", "stat", "dmg", "dev"]) +
+        "\n\n" +
+        `Final world state:\n${finalWorldDescription}`,
     );
   };
 

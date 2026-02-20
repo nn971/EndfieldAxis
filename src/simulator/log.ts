@@ -1,7 +1,7 @@
 import { SimEnv } from "../types/simulator/simulator";
 import type { DamageContext } from "./damageModel";
 
-export type SimLogEntryCat = "sim" | "act" | "buff&stat" | "dmg" | "dev";
+export type SimLogEntryCat = "sim" | "act" | "buff" | "stat" | "dmg" | "dev";
 type SimLogEntryBase = {
   frame: number;
   env: SimEnv;
@@ -14,7 +14,7 @@ export type SimLogEntry =
       amount: number;
     })
   | (SimLogEntryBase & {
-      cat: "sim" | "act" | "buff&stat" | "dev";
+      cat: "sim" | "act" | "buff" | "stat" | "dev";
     });
 export type SimLog = SimLogEntry[];
 
@@ -69,9 +69,9 @@ export function summarizeLog(
       const tag = `[${entry.cat.toUpperCase()}]`;
       if (entry.cat === "dmg") {
         serialized.push(`${fmtFrame(entry.frame)} ${tag} ${entry.message}`);
-        serialized.push(
-          `breakdown: ${JSON.stringify(entry.ctx, null, 2)} | amount: ${entry.amount}`,
-        );
+        // serialized.push(
+        //   `breakdown: ${JSON.stringify(entry.ctx, null, 2)} | amount: ${entry.amount}`,
+        // );
       } else {
         serialized.push(`${fmtFrame(entry.frame)} ${tag} ${entry.message}`);
       }

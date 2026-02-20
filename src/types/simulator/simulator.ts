@@ -1,4 +1,3 @@
-import { SimLog } from "../../simulator/log";
 import { DmgType, SkillType } from "../operator";
 import type {
   SimInfliction,
@@ -49,6 +48,8 @@ export type SimEvent =
       sourceId: SimEntityId;
       targetId: SimEntityId;
       hitType: DmgType;
+      /** If this hit was produced by compiling a skill cast, the originating skillType. */
+      skillType?: SkillType;
       dmgMultiplier?: number; // TODO
     })
   | (SimEventBase & {
@@ -100,9 +101,6 @@ export type SimEntity = {
 
 export type SimEnv = { entitiesById: Record<SimEntityId, SimEntity> };
 
-export type SimWorld = {
-  env: SimEnv;
-  nowInFrames: number;
-  futureEvents: SimEventSequence;
-  log: SimLog;
-};
+// Runtime simulation world is implemented as a class in simulator layer.
+// Re-export as a type so other layers can refer to it without importing runtime values.
+export type SimWorld = import("../../simulator/simulator").SimWorld;

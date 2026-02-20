@@ -8,11 +8,14 @@ export type SimStatusType = "lift" | "knockDown" | "crush" | "breach";
 
 // Buffs are non-stacking time-based modifiers (e.g. crystal).
 // NOTE: We keep buffs in this file for now to minimize file count.
-export type SimBuffType = "crystal";
+export type SimBuffType = "crystal" | "chenqianyuAtk";
 
 export type SimBuff = {
   type: SimBuffType;
   lastApplyFrame: number;
+
+  /** Optional stacks for stackable buffs (e.g. Chen Qianyu self buff). */
+  stacks?: number;
 };
 
 export type SimInflictionDef = {

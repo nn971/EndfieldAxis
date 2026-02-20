@@ -6,6 +6,10 @@ import type {
   OperatorStatSnapshot,
 } from "../types/operator";
 import type { SimEntity } from "../types/simulator/simulator";
+import type {
+  DamageBonusLogEntry,
+  DamageBonusSnapshot,
+} from "./damageBonuses";
 
 /**
  * DamageModel is a pure computation layer.
@@ -17,33 +21,6 @@ import type { SimEntity } from "../types/simulator/simulator";
 
 export type DamageKind = "physical" | "lift" | "crush";
 
-export type DamageBucket =
-  | "attackIncMul" // 百分比加攻
-  | "attackIncValue" // 固定值加攻
-  | "skillMul" // 技能倍率
-  | "outgoingIncMul" // 增伤
-  | "outgoingAmpMul" // 增幅
-  | "incomingIncMul" // 易伤
-  | "incomingAmpMul" // 脆弱
-  | "defendMul" // 防御
-  | "resistanceMul" // 抗性
-  | "staggerMul" // 失衡
-  | "criticalHitMul" // 暴击
-  | "specialMul"; // 特殊系数（连击、源石技艺强度）
-
-export type DamageAtom = {
-  bucket: DamageBucket;
-
-  /** Additive ratio within the same bucket, e.g. +0.2 means +20%. */
-  addRatio?: number;
-
-  /** Additive flat value within the same bucket (mostly for attack). */
-  addValue?: number;
-
-  /** Debug label shown in breakdown. */
-  note?: string;
-};
-
 export type DamageContext = {
   frame: number;
   kind: DamageKind;
@@ -54,6 +31,13 @@ export type DamageContext = {
   // Skill multiplier shown in your Endfield formula as DmgSkillMultiplier.
   // For status proc damage we usually pass 1.
   dmgSkillMultiplier: number;
+
+  /**
+   * Final aggregated bonuses (bucket totals + breakdown log).
+   * The simulator is responsible for running listeners (buffs / talents / etc.)
+   * and filling this snapshot.
+   */
+  bonuses: DamageBonusSnapshot;
 
   // Optional snapshot of the operator build. If absent, DamageModel will fall back
   // to neutral values (attributes = 0, weaponAttack = 0).
@@ -93,7 +77,7 @@ export type DamageBreakdown = {
   specialMul: number;
 
   // Debug atoms used
-  atoms: DamageAtom[];
+  bonusLog: DamageBonusLogEntry[];
 
   // Final
   rawDamage: number;
@@ -122,9 +106,6 @@ export type DamageModel = {
   compute: (ctx: DamageContext) => DamageResult;
 };
 
-// TEMP constants (placeholders while reverse-engineering exact in-game formulas).
-export const LIFT_SPECIAL_MULTIPLIER = 1.2;
-
 const DEFAULT_STAT_SNAPSHOT: OperatorStatSnapshot = {
   attack: 0,
   strength: 0,
@@ -132,18 +113,6 @@ const DEFAULT_STAT_SNAPSHOT: OperatorStatSnapshot = {
   intellect: 0,
   will: 0,
 };
-
-function sumRatio(atoms: DamageAtom[], bucket: DamageBucket): number {
-  let s = 0;
-  for (const a of atoms) if (a.bucket === bucket) s += a.addRatio ?? 0;
-  return s;
-}
-
-function sumValue(atoms: DamageAtom[], bucket: DamageBucket): number {
-  let s = 0;
-  for (const a of atoms) if (a.bucket === bucket) s += a.addValue ?? 0;
-  return s;
-}
 
 function factorFromSum(sum: number): number {
   // "Each multiplier is additive within itself." We encode buckets as 1 + sum.
@@ -220,51 +189,6 @@ function getAttributeValue(
   return Number(stats[attributeType] ?? 0);
 }
 
-function collectAtoms(ctx: DamageContext): DamageAtom[] {
-  const atoms: DamageAtom[] = [];
-
-  // --- Built-in hooks by damage kind ---
-  // User rule: lift / crush damage uses SpecialMultiplier; normal hits do not.
-  if (ctx.kind === "lift") {
-    atoms.push({
-      bucket: "specialMul",
-      addRatio: LIFT_SPECIAL_MULTIPLIER - 1,
-      note: "lift.special(1.2)",
-    });
-  }
-
-  // --- Target buffs / debuffs ---
-  // crystal: debuff on enemy, lasts 300 frames, increases physical damage suffered by 20%.
-  // IMPORTANT (user correction): crystal affects incomingIncMul, NOT incomingAmpMul.
-  if (ctx.target.buffs?.crystal) {
-    atoms.push({
-      bucket: "incomingIncMul",
-      addRatio: 0.2,
-      note: "buff.crystal(+20% incomingInc)",
-    });
-  }
-
-  // --- Future hooks ---
-  if (ctx.isTargetStaggered) {
-    atoms.push({
-      bucket: "staggerMul",
-      addRatio: 0.3,
-      note: "hook.stagger(+0.3)",
-    });
-  }
-
-  if (ctx.isCriticalHit) {
-    // Placeholder. We don't know crit formula yet.
-    atoms.push({
-      bucket: "criticalHitMul",
-      addRatio: 0,
-      note: "hook.crit(TODO)",
-    });
-  }
-
-  return atoms;
-}
-
 export function createDefaultDamageModel(params?: {
   roundingPolicy?: RoundingPolicy;
 }): DamageModel {
@@ -272,7 +196,7 @@ export function createDefaultDamageModel(params?: {
 
   return {
     compute(ctx: DamageContext): DamageResult {
-      const atoms = collectAtoms(ctx);
+      const bonuses = ctx.bonuses;
 
       // if (!ctx.source) throw new Error(`unhandled case: damage with no source`);
       // --- Attack stage ---
@@ -293,8 +217,8 @@ export function createDefaultDamageModel(params?: {
         (weaponId ? getWeapon(weaponId)?.attack : 0) ?? 0,
       );
 
-      const attackIncRatio = sumRatio(atoms, "attackIncMul");
-      const attackIncValue = sumValue(atoms, "attackIncValue");
+      const attackIncRatio = bonuses.ratio.attackIncMul;
+      const attackIncValue = bonuses.value.attackIncValue;
 
       const mainAttributePoints = getAttributeValue(
         levelStats,
@@ -316,24 +240,24 @@ export function createDefaultDamageModel(params?: {
       const dmgSkillMultiplier = Number(ctx.dmgSkillMultiplier ?? 1);
 
       // ratio buckets
-      const outgoingIncMul = factorFromSum(sumRatio(atoms, "outgoingIncMul"));
-      const outgoingAmpMul = factorFromSum(sumRatio(atoms, "outgoingAmpMul"));
-      const incomingIncMul = factorFromSum(sumRatio(atoms, "incomingIncMul"));
-      const incomingAmpMul = factorFromSum(sumRatio(atoms, "incomingAmpMul"));
+      const outgoingIncMul = factorFromSum(bonuses.ratio.outgoingIncMul);
+      const outgoingAmpMul = factorFromSum(bonuses.ratio.outgoingAmpMul);
+      const incomingIncMul = factorFromSum(bonuses.ratio.incomingIncMul);
+      const incomingAmpMul = factorFromSum(bonuses.ratio.incomingAmpMul);
 
       // TODO Set enemy defend to 50 for this moment
       // const defendMul = factorFromSum(sumRatio(atoms, "defendMul"));
       const defendMul = 0.5;
 
-      const resistanceMul = factorFromSum(sumRatio(atoms, "resistanceMul"));
-      const staggerMul = factorFromSum(sumRatio(atoms, "staggerMul"));
-      const criticalHitMul = factorFromSum(sumRatio(atoms, "criticalHitMul"));
+      const resistanceMul = factorFromSum(bonuses.ratio.resistanceMul);
+      const staggerMul = factorFromSum(bonuses.ratio.staggerMul);
+      const criticalHitMul = factorFromSum(bonuses.ratio.criticalHitMul);
 
       // SpecialMultiplier only applies to lift / crush damage kinds.
       const specialMul =
         ctx.kind === "physical"
           ? 1
-          : factorFromSum(sumRatio(atoms, "specialMul"));
+          : factorFromSum(bonuses.ratio.specialMul);
 
       const rawDamage =
         attackFinal *
@@ -373,7 +297,7 @@ export function createDefaultDamageModel(params?: {
           criticalHitMul,
           specialMul,
 
-          atoms,
+          bonusLog: bonuses.log,
           rawDamage,
         },
       };
