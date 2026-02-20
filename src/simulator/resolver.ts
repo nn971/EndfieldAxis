@@ -1,10 +1,5 @@
 import { makeId } from "../shared/lib/id";
-import type { OperatorBuild } from "../types/operator";
-import type {
-  SimEntityId,
-  SimWorld,
-  SimEvent,
-} from "../types/simulator/simulator";
+import type { SimEntityId, SimEvent } from "../types/simulator/simulator";
 import {
   type SimStatusType,
   type SimInfliction,
@@ -12,28 +7,14 @@ import {
   type SimBuff,
   type SimBuffType,
 } from "../types/simulator/infliction";
-import { pushLog, SimLog } from "./log";
-import type { DamageContext, DamageModel } from "./damageModel";
-
-// Local scheduler to avoid circular imports between resolver <-> sim.
-function schedule(queue: SimEvent[], ev: SimEvent): void {
-  let lo = 0,
-    hi = queue.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    const m = queue[mid];
-    if (m.frame < ev.frame || (m.frame === ev.frame && m.seq <= ev.seq))
-      lo = mid + 1;
-    else hi = mid;
-  }
-  queue.splice(lo, 0, ev);
-}
+import { buildDamageContext } from "./damageEngine";
+import { SimWorld } from "./simulator";
 
 // TODO: load from data file (inflictions.json) instead of hardcoding.
 const DEFAULT_INFLICTION_DURATION_FRAMES = 1800;
 
 // crystal debuff lasts 300 frames.
-const BUFF_DURATION_FRAMES: Record<SimBuffType, number> = {
+const BUFF_DURATION_FRAMES: Partial<Record<SimBuffType, number>> = {
   crystal: 300,
 };
 
@@ -50,17 +31,16 @@ function scheduleInflictionExpire(
   world: SimWorld,
   targetId: SimEntityId,
   inflictionType: SimInflictionType,
-  nextSeq: () => number,
 ): void {
-  schedule(world.futureEvents, {
+  world.ops.schedule({
     id: makeEventId(),
     type: "inflictionExpire",
-    frame: world.nowInFrames + DEFAULT_INFLICTION_DURATION_FRAMES,
-    seq: nextSeq(),
-
-    // sourceId = entity who owns the infliction
+    frame: world.read.nowInFrames + DEFAULT_INFLICTION_DURATION_FRAMES,
+    seq: world.ops.nextSeq(),
     sourceId: targetId,
+    targetId,
     inflictionType,
+    ref: "auto",
   } as SimEvent);
 }
 
@@ -68,167 +48,148 @@ function scheduleBuffExpire(
   world: SimWorld,
   targetId: SimEntityId,
   buffType: SimBuffType,
-  nextSeq: () => number,
 ): void {
-  schedule(world.futureEvents, {
+  const duration = BUFF_DURATION_FRAMES[buffType] ?? 0;
+  if (duration <= 0) return;
+  world.ops.schedule({
     id: makeEventId(),
     type: "buffExpire",
-    frame: world.nowInFrames + (BUFF_DURATION_FRAMES[buffType] ?? 0),
-    seq: nextSeq(),
-
-    // sourceId = entity who owns the buff
+    frame: world.read.nowInFrames + duration,
+    seq: world.ops.nextSeq(),
     sourceId: targetId,
     buffType,
+    ref: "auto",
   } as SimEvent);
 }
 
 export function resolveStatusApplication(
-  world: SimWorld, // mutable
+  self: SimWorld,
   sourceId: SimEntityId,
   targetId: SimEntityId,
   statusType: SimStatusType,
-  nextSeq: () => number,
-  damageModel: DamageModel,
-  buildByOperatorId?: Record<string, OperatorBuild>,
 ) {
-  /* directly mutate world, target and log via reference */
-
-  const source = world.env.entitiesById[sourceId];
+  const source = self.read.getEntity(sourceId);
   if (!source) throw new Error(`Unknown source with sourceId=${sourceId}`);
 
-  const target = world.env.entitiesById[targetId];
+  const target = self.read.getEntity(targetId);
   if (!target) throw new Error(`Unknown target with targetId=${targetId}`);
 
   switch (statusType) {
     case "lift": {
-      const current = target.inflictions.vulnerable?.stacks ?? 0;
+      const current = (target as any).inflictions.vulnerable?.stacks ?? 0;
 
       if (current <= 0) {
-        target.inflictions.vulnerable = {
+        self.ops.upsertInfliction(targetId, {
           type: "vulnerable",
           stacks: 1,
-          lastApplyFrame: world.nowInFrames,
-        } as SimInfliction;
+          lastApplyFrame: self.read.nowInFrames,
+        } as SimInfliction);
 
-        scheduleInflictionExpire(world, targetId, "vulnerable", nextSeq);
-        pushLog(
-          world.log,
-          "buff&stat",
-          world.nowInFrames,
-          world.env,
-          `INFLICTION vulnerable apply (by LIFT, target=${target.name})`,
+        scheduleInflictionExpire(self, targetId, "vulnerable");
+        self.ops.log(
+          "buff",
+          `INFLICTION vulnerable apply (by LIFT, target=${(target as any).name})`,
         );
         return true;
+      } else {
+        // Has vulnerable: add 1 stack (cap 4) and trigger lift proc damage.
+        const before = current;
+        const after = Math.min(4, before + 1);
+        self.ops.upsertInfliction(targetId, {
+          type: "vulnerable",
+          stacks: after,
+          lastApplyFrame: self.read.nowInFrames,
+        } as SimInfliction);
+
+        scheduleInflictionExpire(self, targetId, "vulnerable");
+
+        self.ops.log(
+          "buff",
+          `LIFT: vulnerable stacks ${before} -> ${after} (target=${(target as any).name})`,
+        );
+
+        const ctx = buildDamageContext({
+          registry: self.registry,
+          read: self.read,
+          frame: self.read.nowInFrames,
+          kind: "lift",
+          sourceId,
+          targetId,
+          dmgSkillMultiplier: 1,
+          meta: {
+            note: `liftProc stacksBefore=${before} stacksAfter=${after}`,
+          },
+        });
+
+        const res = self.damageModel.compute(ctx);
+        self.ops.applyDamage(targetId, res.amount);
+        const targetAfter = self.read.getEntity(targetId);
+
+        // TODO: replace debug log with exact breakdown UI.
+        self.ops.log(
+          "dmg",
+          `  DMG(liftProc)=${res.amount} incomingInc=${res.breakdown.incomingIncMul.toFixed(
+            2,
+          )} special=${res.breakdown.specialMul.toFixed(2)} hp=${(targetAfter as any).hp}`,
+          ctx,
+          res.amount,
+        );
+
+        return true;
       }
-
-      // Has vulnerable: add 1 stack (cap 4) and trigger lift proc damage.
-      const before = current;
-      const after = Math.min(4, before + 1);
-      target.inflictions.vulnerable = {
-        type: "vulnerable",
-        stacks: after,
-        lastApplyFrame: world.nowInFrames,
-      } as SimInfliction;
-
-      scheduleInflictionExpire(world, targetId, "vulnerable", nextSeq);
-
-      pushLog(
-        world.log,
-        "buff&stat",
-        world.nowInFrames,
-        world.env,
-        `LIFT: vulnerable stacks ${before} -> ${after} (target=${target.name})`,
-      );
-
-      const ctx: DamageContext = {
-        frame: world.nowInFrames,
-        kind: "lift",
-        source,
-        target,
-        dmgSkillMultiplier: 1,
-        sourceBuild: buildByOperatorId?.[sourceId],
-        meta: {
-          note: `liftProc stacksBefore=${before} stacksAfter=${after}`,
-        },
-      };
-
-      const res = damageModel.compute(ctx);
-      target.hp -= res.amount;
-
-      // TODO: replace debug log with exact breakdown UI.
-      pushLog(
-        world.log,
-        "dmg",
-        world.nowInFrames,
-        world.env,
-        `  DMG(liftProc)=${res.amount} incomingInc=${res.breakdown.incomingIncMul.toFixed(
-          2,
-        )} special=${res.breakdown.specialMul.toFixed(2)} hp=${target.hp}`,
-        ctx,
-        res.amount,
-      );
-
-      return true;
     }
 
     case "crush": {
-      const current = target.inflictions.vulnerable?.stacks ?? 0;
+      const current = (target as any).inflictions.vulnerable?.stacks ?? 0;
 
       if (current <= 0) {
-        target.inflictions.vulnerable = {
+        self.ops.upsertInfliction(targetId, {
           type: "vulnerable",
           stacks: 1,
-          lastApplyFrame: world.nowInFrames,
-        } as SimInfliction;
+          lastApplyFrame: self.read.nowInFrames,
+        } as SimInfliction);
 
-        scheduleInflictionExpire(world, targetId, "vulnerable", nextSeq);
-        pushLog(
-          world.log,
-          "buff&stat",
-          world.nowInFrames,
-          world.env,
-          `INFLICTION vulnerable apply (by CRUSH, target=${target.name})`,
+        scheduleInflictionExpire(self, targetId, "vulnerable");
+        self.ops.log(
+          "buff",
+          `INFLICTION vulnerable apply (by CRUSH, target=${(target as any).name})`,
         );
         return true;
       }
 
       // Has vulnerable: consume all stacks and trigger crush burst damage.
       const consumed = current;
-      delete target.inflictions.vulnerable;
+      self.ops.removeInfliction(targetId, "vulnerable");
 
-      pushLog(
-        world.log,
-        "buff&stat",
-        world.nowInFrames,
-        world.env,
-        `CRUSHED: vulnerable consumed=${consumed} (target=${target.name})`,
+      self.ops.log(
+        "buff",
+        `CRUSHED: vulnerable consumed=${consumed} (target=${(target as any).name})`,
       );
 
-      const ctx: DamageContext = {
-        frame: world.nowInFrames,
+      const ctx = buildDamageContext({
+        registry: self.registry,
+        read: self.read,
+        frame: self.read.nowInFrames,
         kind: "crush",
-        source,
-        target,
+        sourceId,
+        targetId,
         // TEMP: more stacks => larger skill multiplier.
         dmgSkillMultiplier: consumed * CRUSH_BURST_SKILL_MUL_PER_STACK,
-        sourceBuild: buildByOperatorId?.[sourceId],
         meta: {
           note: `crushBurst consumed=${consumed}`,
         },
-      };
+      });
 
-      const res = damageModel.compute(ctx);
-      target.hp -= res.amount;
+      const res = self.damageModel.compute(ctx);
+      self.ops.applyDamage(targetId, res.amount);
+      const targetAfter = self.read.getEntity(targetId);
 
       // TODO: exact crush scaling & rounding
-      pushLog(
-        world.log,
+      self.ops.log(
         "dmg",
-        world.nowInFrames,
-        world.env,
         `  DMG(crushBurst)=${res.amount} incomingInc=${res.breakdown.incomingIncMul.toFixed(
           2,
-        )} special=${res.breakdown.specialMul.toFixed(2)} hp=${target.hp}`,
+        )} special=${res.breakdown.specialMul.toFixed(2)} hp=${(targetAfter as any).hp}`,
         ctx,
         res.amount,
       );
@@ -243,60 +204,69 @@ export function resolveStatusApplication(
 }
 
 export function resolveBuffApplication(
-  world: SimWorld,
+  self: SimWorld,
   sourceId: SimEntityId,
   targetId: SimEntityId,
   buffType: SimBuffType,
-  nextSeq: () => number,
 ) {
-  const source = world.env.entitiesById[sourceId];
+  const source = self.read.getEntity(sourceId);
   if (!source) throw new Error(`Unknown source with sourceId=${sourceId}`);
 
-  const target = world.env.entitiesById[targetId];
+  const target = self.read.getEntity(targetId);
   if (!target) throw new Error(`Unknown target with targetId=${targetId}`);
 
-  const had = Boolean(target.buffs?.[buffType]);
+  const existing = (target as any).buffs?.[buffType];
 
-  target.buffs[buffType] = {
+  if (buffType === "crystal") {
+    const had = Boolean(existing);
+    self.ops.upsertBuff(targetId, {
+      type: buffType,
+      lastApplyFrame: self.read.nowInFrames,
+      stacks: 1,
+    } as SimBuff);
+    scheduleBuffExpire(self, targetId, buffType);
+    self.ops.log(
+      "buff",
+      `BUFF ${buffType} ${had ? "refresh" : "apply"} (source=${(source as any).name} target=${(target as any).name})`,
+    );
+    return true;
+  }
+
+  // Default fallback: apply as a non-stacking, possibly-expiring buff.
+  const had = Boolean(existing);
+  self.ops.upsertBuff(targetId, {
     type: buffType,
-    lastApplyFrame: world.nowInFrames,
-  } as SimBuff;
-
-  scheduleBuffExpire(world, targetId, buffType, nextSeq);
-
-  pushLog(
-    world.log,
-    "buff&stat",
-    world.nowInFrames,
-    world.env,
-    `BUFF ${buffType} ${had ? "refresh" : "apply"} (source=${source.name} target=${target.name})`,
+    lastApplyFrame: self.read.nowInFrames,
+    stacks: 1,
+  } as SimBuff);
+  scheduleBuffExpire(self, targetId, buffType);
+  self.ops.log(
+    "buff",
+    `BUFF ${buffType} ${had ? "refresh" : "apply"} (source=${(source as any).name} target=${(target as any).name})`,
   );
-
   return true;
 }
 
 export function resolveBuffExpiration(
-  world: SimWorld,
+  self: SimWorld,
   entityId: SimEntityId,
   buffType: SimBuffType,
 ) {
   // return false if expiration event is stale
 
-  const ent = world.env.entitiesById[entityId];
+  const ent = self.read.getEntity(entityId);
   if (!ent) throw new Error(`Unknown entity with entityId ${entityId}`);
 
-  const buff = ent.buffs?.[buffType];
+  const buff = (ent as any).buffs?.[buffType];
   if (!buff) return false; // already removed or consumed
 
   const duration = BUFF_DURATION_FRAMES[buffType] ?? 0;
-  if (world.nowInFrames >= buff.lastApplyFrame + duration) {
-    delete ent.buffs[buffType];
-    pushLog(
-      world.log,
-      "buff&stat",
-      world.nowInFrames,
-      world.env,
-      `BUFF ${buffType} expire (entity=${ent.name})`,
+  if (duration <= 0) return false;
+  if (self.read.nowInFrames >= buff.lastApplyFrame + duration) {
+    self.ops.removeBuff(entityId, buffType);
+    self.ops.log(
+      "buff",
+      `BUFF ${buffType} expire (entity=${(ent as any).name})`,
     );
     return true;
   }
@@ -305,30 +275,27 @@ export function resolveBuffExpiration(
 }
 
 export function resolveInflictionExpiration(
-  world: SimWorld,
+  self: SimWorld,
   sourceId: SimEntityId,
   inflictionType: SimInflictionType,
 ) {
   // return false if expiration event is stale
 
-  const ent = world.env.entitiesById[sourceId];
+  const ent = self.read.getEntity(sourceId);
   if (!ent) throw new Error(`Unknown entity with entityId ${sourceId}`);
 
-  const inf = ent.inflictions?.[inflictionType];
+  const inf = (ent as any).inflictions?.[inflictionType];
   if (!inf) return false; // already removed or consumed
 
   // check if expiration event is stale
   if (
-    world.nowInFrames >=
+    self.read.nowInFrames >=
     inf.lastApplyFrame + DEFAULT_INFLICTION_DURATION_FRAMES
   ) {
-    delete ent.inflictions[inflictionType];
-    pushLog(
-      world.log,
-      "buff&stat",
-      world.nowInFrames,
-      world.env,
-      `INFLICTION ${inflictionType} expire (entity=${ent.name})`,
+    self.ops.removeInfliction(sourceId, inflictionType);
+    self.ops.log(
+      "buff",
+      `INFLICTION ${inflictionType} expire (entity=${(ent as any).name})`,
     );
     return true;
   }

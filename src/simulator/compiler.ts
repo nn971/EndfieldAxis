@@ -13,6 +13,7 @@ function compileOp(
   sourceId: string,
   targetId: string,
   startFrame: number,
+  skillType: SkillType,
   nextSeq: () => number,
 ): SimEvent[] {
   const events: SimEvent[] = [];
@@ -28,6 +29,7 @@ function compileOp(
         targetId: targetId,
 
         hitType: "physical",
+        skillType,
         dmgMultiplier: op.dmgMultiplier,
       });
 
@@ -111,7 +113,14 @@ export function compileSkillCast(params: {
 
   // events for skill ops
   for (const op of skill?.timeline ?? []) {
-    const eventsToAdd = compileOp(op, sourceId, targetId, startFrame, nextSeq);
+    const eventsToAdd = compileOp(
+      op,
+      sourceId,
+      targetId,
+      startFrame,
+      skillType,
+      nextSeq,
+    );
     if (!eventsToAdd || eventsToAdd.length === 0) continue; // should not happen
 
     for (const ev of eventsToAdd) {
