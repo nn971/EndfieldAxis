@@ -18,7 +18,7 @@ import type { SimEntity } from "../types/simulator/simulator";
 export type DamageKind = "physical" | "lift" | "crush";
 
 export type DamageBucket =
-  | "attackIncRatio" // 百分比加攻
+  | "attackIncMul" // 百分比加攻
   | "attackIncValue" // 固定值加攻
   | "skillMul" // 技能倍率
   | "outgoingIncMul" // 增伤
@@ -73,7 +73,7 @@ export type DamageBreakdown = {
   // Attack stage
   operatorAttack: number;
   weaponAttack: number;
-  attackIncRatio: number;
+  attackIncMul: number;
   attackIncValue: number;
   mainAttributePoints: number;
   secondaryAttributePoints: number;
@@ -277,7 +277,9 @@ export function createDefaultDamageModel(params?: {
       // if (!ctx.source) throw new Error(`unhandled case: damage with no source`);
       // --- Attack stage ---
       const opDef = getOperator(ctx.source.id);
-      const operatorLevel = clampOperatorLevel(Number(ctx.sourceBuild?.level ?? 1));
+      const operatorLevel = clampOperatorLevel(
+        Number(ctx.sourceBuild?.level ?? 1),
+      );
       const levelStats = getLevelStats({
         level: operatorLevel,
         roundingPolicy,
@@ -291,10 +293,13 @@ export function createDefaultDamageModel(params?: {
         (weaponId ? getWeapon(weaponId)?.attack : 0) ?? 0,
       );
 
-      const attackIncRatio = sumRatio(atoms, "attackIncRatio");
+      const attackIncRatio = sumRatio(atoms, "attackIncMul");
       const attackIncValue = sumValue(atoms, "attackIncValue");
 
-      const mainAttributePoints = getAttributeValue(levelStats, opDef?.attributes?.main);
+      const mainAttributePoints = getAttributeValue(
+        levelStats,
+        opDef?.attributes?.main,
+      );
       const secondaryAttributePoints = getAttributeValue(
         levelStats,
         opDef?.attributes?.sub,
@@ -350,7 +355,7 @@ export function createDefaultDamageModel(params?: {
         breakdown: {
           operatorAttack,
           weaponAttack,
-          attackIncRatio,
+          attackIncMul: attackIncRatio,
           attackIncValue,
           mainAttributePoints,
           secondaryAttributePoints,

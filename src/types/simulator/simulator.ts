@@ -1,3 +1,4 @@
+import { SimLog } from "../../simulator/log";
 import { DmgType, SkillType } from "../operator";
 import type {
   SimInfliction,
@@ -18,7 +19,8 @@ export type SimEventType =
   | "buffApply" // apply a timed buff/debuff (e.g. enemy crystal)
   | "buffExpire"; // expire a timed buff/debuff
 // | string;
-export type SimEvent = {
+
+export type SimEventBase = {
   id: string; // unique id within a simulation, for endding events to refer to
   type: SimEventType;
   frame: number;
@@ -26,36 +28,62 @@ export type SimEvent = {
 
   sourceId?: SimEntityId;
   targetId?: SimEntityId;
-
-  // field for endding events
-  ref?: string; // id of the event being referred to
-
-  // fields for castStart and castEnd
-  skillType?: SkillType;
-
-  // fields for hit
-  hitType?: DmgType;
-  dmgMultiplier?: number; // TODO
-
-  //fields for statusApply
-  statusType?: SimStatusType;
-
-  //fields for inflictionApply, inflictionExpire
-  inflictionType?: SimInflictionType;
-  inflictionStacks?: number;
-
-  // fields for buffApply, buffExpire
-  buffType?: SimBuffType;
-
-  // TEMP, TO BE REMOVED
-  skillId?: string;
-  skillName?: string;
-  opName?: string;
-
-  durationFrames?: number;
-  op?: any;
-  // [key: string]: any; // for extensibility
 };
+
+export type SimEvent =
+  | (SimEventBase & {
+      type: "castStart";
+      sourceId: SimEntityId;
+      targetId?: SimEntityId;
+      skillType: SkillType;
+    })
+  | (SimEventBase & {
+      type: "castEnd";
+      sourceId: SimEntityId;
+      targetId?: SimEntityId;
+      skillType: SkillType;
+      ref: string; // id of the castStart event
+    })
+  | (SimEventBase & {
+      type: "hit";
+      sourceId: SimEntityId;
+      targetId: SimEntityId;
+      hitType: DmgType;
+      dmgMultiplier?: number; // TODO
+    })
+  | (SimEventBase & {
+      type: "statusApply";
+      sourceId: SimEntityId;
+      targetId: SimEntityId;
+      statusType: SimStatusType;
+    })
+  | (SimEventBase & {
+      type: "inflictionApply";
+      sourceId: SimEntityId;
+      targetId: SimEntityId;
+      inflictionType: SimInflictionType;
+      inflictionStacks: number;
+    })
+  | (SimEventBase & {
+      type: "inflictionExpire";
+      sourceId: SimEntityId;
+      targetId: SimEntityId;
+      inflictionType: SimInflictionType;
+      ref: string;
+    })
+  | (SimEventBase & {
+      type: "buffApply";
+      sourceId?: SimEntityId;
+      targetId: SimEntityId;
+      buffType: SimBuffType;
+    })
+  | (SimEventBase & {
+      type: "buffExpire";
+      sourceId: SimEntityId; // entity who owns the buff
+      buffType: SimBuffType;
+      ref: string;
+    });
+
 export type SimEventSequence = SimEvent[];
 
 export type SimEntityId = string;
@@ -76,4 +104,5 @@ export type SimWorld = {
   env: SimEnv;
   nowInFrames: number;
   futureEvents: SimEventSequence;
+  log: SimLog;
 };

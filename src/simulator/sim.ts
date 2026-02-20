@@ -6,7 +6,7 @@ import {
   type SimEnv,
   type SimWorld,
 } from "../types/simulator/simulator";
-import { logDamage, pushLog } from "./log";
+import { SimLog, pushLog } from "./log";
 import {
   resolveStatusApplication,
   resolveInflictionExpiration,
@@ -42,6 +42,7 @@ export function createSimWorld(
     env,
     nowInFrames,
     futureEvents,
+    log: [] as SimLog,
   };
 }
 
@@ -87,8 +88,7 @@ export type RunSimInput = {
 };
 
 export type RunSimResult = {
-  world: SimWorld;
-  log: string[];
+  finalWorld: SimWorld;
 };
 
 export function runSim(input: RunSimInput): RunSimResult {
@@ -96,16 +96,21 @@ export function runSim(input: RunSimInput): RunSimResult {
   world.futureEvents = queue;
   const damageModel = input.damageModel ?? DEFAULT_DAMAGE_MODEL;
   const buildByOperatorId = input.buildByOperatorId;
-  const log: string[] = [];
 
-  pushLog(log, world.nowInFrames, "SIM start");
+  pushLog(world.log, "sim", world.nowInFrames, world.env, "SIM start");
 
   let steps = 0;
   const maxSteps = input.maxSteps ?? 10000; // TODO: tune
 
   while (true) {
     if (steps++ > maxSteps) {
-      pushLog(log, world.nowInFrames, `ABORT: exceeded maxSteps=${maxSteps}`);
+      pushLog(
+        world.log,
+        "sim",
+        world.nowInFrames,
+        world.env,
+        `ABORT: exceeded maxSteps=${maxSteps}`,
+      );
       break;
     }
 
@@ -121,15 +126,23 @@ export function runSim(input: RunSimInput): RunSimResult {
     switch (ev.type) {
       case "castStart": {
         pushLog(
-          log,
+          world.log,
+          "act",
           ev.frame,
-          `CAST start: ${ev.skillType} of ${source?.name} (target=${target?.name})`,
+          world.env,
+          `"${source?.name}" cast "${ev.skillType}" on "${target?.name}"`,
         );
         break;
       }
 
       case "castEnd": {
-        pushLog(log, ev.frame, `CAST end: ${ev.skillType} of ${source?.name}`);
+        pushLog(
+          world.log,
+          "act",
+          ev.frame,
+          world.env,
+          `"${source?.name}" finished casting "${ev.skillType}" on "${target?.name}"`,
+        );
         break;
       }
 
@@ -155,22 +168,14 @@ export function runSim(input: RunSimInput): RunSimResult {
         target.hp -= res.amount;
 
         pushLog(
-          log,
+          world.log,
+          "dmg",
           ev.frame,
-          `HIT: dmgMul=${dmgSkillMultiplier} (source=${source.name} target=${target.name})`,
+          world.env,
+          `"${source.name}" hit "${target.name}" for ${res.amount} damage (hp left: ${target.hp})`,
+          ctx,
+          res.amount,
         );
-        logDamage(log, ev.frame, ctx, res.amount);
-
-        // Showy debug hook: you asked to leave hooks for future exact damage computation.
-        // TODO: Replace with exact Endfield rounding / defenses / resistances / crit.
-        pushLog(
-          log,
-          ev.frame,
-          `  breakdown: atk=${res.breakdown.attackFinal.toFixed(2)} incomingInc=${res.breakdown.incomingIncMul.toFixed(
-            2,
-          )} special=${res.breakdown.specialMul.toFixed(2)} raw=${res.breakdown.rawDamage.toFixed(2)} hp=${target.hp}`,
-        );
-
         break;
       }
 
@@ -179,7 +184,6 @@ export function runSim(input: RunSimInput): RunSimResult {
         if (!source) throw new Error(`undefined source`);
         resolveStatusApplication(
           world,
-          log,
           source.id,
           target.id,
           ev.statusType!,
@@ -195,7 +199,6 @@ export function runSim(input: RunSimInput): RunSimResult {
         if (!source) throw new Error(`undefined source`);
         resolveBuffApplication(
           world,
-          log,
           source.id,
           target.id,
           ev.buffType!,
@@ -208,19 +211,14 @@ export function runSim(input: RunSimInput): RunSimResult {
         // sourceId holds the entity who owns the buff.
         if (!ev.sourceId)
           throw new Error(`event with type buffExpire but no sourceId`);
-        resolveBuffExpiration(world, log, ev.sourceId, ev.buffType!);
+        resolveBuffExpiration(world, ev.sourceId, ev.buffType!);
         break;
       }
 
       case "inflictionExpire": {
         if (!ev.sourceId)
           throw new Error(`event with type inflictionExpire but no sourceId`);
-        resolveInflictionExpiration(
-          world,
-          log,
-          ev.sourceId,
-          ev.inflictionType!,
-        );
+        resolveInflictionExpiration(world, ev.sourceId, ev.inflictionType!);
         break;
       }
 
@@ -228,14 +226,16 @@ export function runSim(input: RunSimInput): RunSimResult {
         // Exhaustiveness guard (runtime)
         const _never: never = ev as never;
         pushLog(
-          log,
+          world.log,
+          "dev",
           world.nowInFrames,
+          world.env,
           `WARN: unknown event ${(_never as any)?.type}`,
         );
       }
     }
   }
 
-  pushLog(log, world.nowInFrames, "SIM end");
-  return { world, log };
+  pushLog(world.log, "sim", world.nowInFrames, world.env, "SIM end");
+  return { finalWorld: world };
 }

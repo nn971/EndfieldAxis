@@ -17,6 +17,7 @@ import { compileSkillCast } from "../../simulator/compiler";
 import type { SimEvent, SimEntity } from "../../types/simulator/simulator";
 import type { SkillBox } from "../../types/editor";
 import { operatorsById } from "../../data/operators";
+import { summarizeLog } from "../../simulator/log";
 
 function compileSkillBoxes(params: {
   skillBoxes: SkillBox[];
@@ -97,7 +98,7 @@ export default function SimPanel() {
 
     const damageModel = createDefaultDamageModel();
 
-    const { log } = runSim({
+    const { finalWorld } = runSim({
       world,
       queue,
       nextSeq,
@@ -108,7 +109,9 @@ export default function SimPanel() {
     // const finalWorldDescription = finalWorld.env.toString();
     // setLogText(log.join("\n") + `final world: ${finalWorldDescription}`);
 
-    setLogText(log.join("\n"));
+    setLogText(
+      summarizeLog(finalWorld.log, ["sim", "act", "buff&stat", "dmg", "dev"]),
+    );
   };
 
   return (
