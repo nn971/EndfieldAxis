@@ -57,19 +57,17 @@ export interface OperatorDef {
   name: string;
   avatar: string;
 
-  attributes?: {
+  attributes: {
     main: OperatorAttributeType;
     sub: OperatorAttributeType;
   };
 
-  stats?: {
+  stats: {
     level1: OperatorStatSnapshot;
     level90: OperatorStatSnapshot;
   };
 
-  // skillDurationsFrames: Record<SkillType, number>; // TEMP
-
-  skills?: {
+  skills: {
     [key in SkillType]?: SkillDef;
   };
 }

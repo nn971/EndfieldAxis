@@ -12,7 +12,7 @@ import {
   type SimBuff,
   type SimBuffType,
 } from "../types/simulator/infliction";
-import { pushLog } from "./log";
+import { pushLog, SimLog } from "./log";
 import type { DamageContext, DamageModel } from "./damageModel";
 
 // Local scheduler to avoid circular imports between resolver <-> sim.
@@ -84,7 +84,6 @@ function scheduleBuffExpire(
 
 export function resolveStatusApplication(
   world: SimWorld, // mutable
-  log: string[],
   sourceId: SimEntityId,
   targetId: SimEntityId,
   statusType: SimStatusType,
@@ -113,8 +112,10 @@ export function resolveStatusApplication(
 
         scheduleInflictionExpire(world, targetId, "vulnerable", nextSeq);
         pushLog(
-          log,
+          world.log,
+          "buff&stat",
           world.nowInFrames,
+          world.env,
           `INFLICTION vulnerable apply (by LIFT, target=${target.name})`,
         );
         return true;
@@ -132,8 +133,10 @@ export function resolveStatusApplication(
       scheduleInflictionExpire(world, targetId, "vulnerable", nextSeq);
 
       pushLog(
-        log,
+        world.log,
+        "buff&stat",
         world.nowInFrames,
+        world.env,
         `LIFT: vulnerable stacks ${before} -> ${after} (target=${target.name})`,
       );
 
@@ -154,11 +157,15 @@ export function resolveStatusApplication(
 
       // TODO: replace debug log with exact breakdown UI.
       pushLog(
-        log,
+        world.log,
+        "dmg",
         world.nowInFrames,
+        world.env,
         `  DMG(liftProc)=${res.amount} incomingInc=${res.breakdown.incomingIncMul.toFixed(
           2,
         )} special=${res.breakdown.specialMul.toFixed(2)} hp=${target.hp}`,
+        ctx,
+        res.amount,
       );
 
       return true;
@@ -176,8 +183,10 @@ export function resolveStatusApplication(
 
         scheduleInflictionExpire(world, targetId, "vulnerable", nextSeq);
         pushLog(
-          log,
+          world.log,
+          "buff&stat",
           world.nowInFrames,
+          world.env,
           `INFLICTION vulnerable apply (by CRUSH, target=${target.name})`,
         );
         return true;
@@ -188,8 +197,10 @@ export function resolveStatusApplication(
       delete target.inflictions.vulnerable;
 
       pushLog(
-        log,
+        world.log,
+        "buff&stat",
         world.nowInFrames,
+        world.env,
         `CRUSHED: vulnerable consumed=${consumed} (target=${target.name})`,
       );
 
@@ -211,11 +222,15 @@ export function resolveStatusApplication(
 
       // TODO: exact crush scaling & rounding
       pushLog(
-        log,
+        world.log,
+        "dmg",
         world.nowInFrames,
+        world.env,
         `  DMG(crushBurst)=${res.amount} incomingInc=${res.breakdown.incomingIncMul.toFixed(
           2,
         )} special=${res.breakdown.specialMul.toFixed(2)} hp=${target.hp}`,
+        ctx,
+        res.amount,
       );
 
       return true;
@@ -229,7 +244,6 @@ export function resolveStatusApplication(
 
 export function resolveBuffApplication(
   world: SimWorld,
-  log: string[],
   sourceId: SimEntityId,
   targetId: SimEntityId,
   buffType: SimBuffType,
@@ -251,8 +265,10 @@ export function resolveBuffApplication(
   scheduleBuffExpire(world, targetId, buffType, nextSeq);
 
   pushLog(
-    log,
+    world.log,
+    "buff&stat",
     world.nowInFrames,
+    world.env,
     `BUFF ${buffType} ${had ? "refresh" : "apply"} (source=${source.name} target=${target.name})`,
   );
 
@@ -261,7 +277,6 @@ export function resolveBuffApplication(
 
 export function resolveBuffExpiration(
   world: SimWorld,
-  log: string[],
   entityId: SimEntityId,
   buffType: SimBuffType,
 ) {
@@ -277,8 +292,10 @@ export function resolveBuffExpiration(
   if (world.nowInFrames >= buff.lastApplyFrame + duration) {
     delete ent.buffs[buffType];
     pushLog(
-      log,
+      world.log,
+      "buff&stat",
       world.nowInFrames,
+      world.env,
       `BUFF ${buffType} expire (entity=${ent.name})`,
     );
     return true;
@@ -289,7 +306,6 @@ export function resolveBuffExpiration(
 
 export function resolveInflictionExpiration(
   world: SimWorld,
-  log: string[],
   sourceId: SimEntityId,
   inflictionType: SimInflictionType,
 ) {
@@ -308,8 +324,10 @@ export function resolveInflictionExpiration(
   ) {
     delete ent.inflictions[inflictionType];
     pushLog(
-      log,
+      world.log,
+      "buff&stat",
       world.nowInFrames,
+      world.env,
       `INFLICTION ${inflictionType} expire (entity=${ent.name})`,
     );
     return true;
