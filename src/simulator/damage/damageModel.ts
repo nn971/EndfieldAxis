@@ -198,6 +198,8 @@ export function createDefaultDamageModel(params?: {
       // if (!ctx.source) throw new Error(`unhandled case: damage with no source`);
       // --- Attack stage ---
       const opDef = OperatorsData[ctx.source.id];
+      if (!opDef)
+        throw new Error(`Operator not found: ${JSON.stringify(ctx.source.id)}`);
       const operatorLevel = clampOperatorLevel(
         Number(ctx.sourceBuild?.level ?? 1),
       );

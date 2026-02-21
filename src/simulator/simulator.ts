@@ -142,30 +142,7 @@ export class SimWorld {
 
   public readonly read: SimRead;
   public readonly ops: SimOps;
-  public readonly resolvers: SimResolvers; // should be populated by resolver imports
-
-  // public resolveStatusApplication!: (
-  //   sourceId: SimEntityId,
-  //   targetId: SimEntityId,
-  //   statusType: SimStatusType,
-  //   world: SimWorld,
-  // ) => void;
-  // public resolveBuffApplication!: (
-  //   sourceId: SimEntityId,
-  //   targetId: SimEntityId,
-  //   buffType: SimBuffType,
-  //   world: SimWorld,
-  // ) => void;
-  // public resolveBuffExpiration!: (
-  //   entityId: SimEntityId,
-  //   buffType: SimBuffType,
-  //   world: SimWorld,
-  // ) => void;
-  // public resolveInflictionExpiration!: (
-  //   sourceId: SimEntityId,
-  //   inflictionType: SimInflictionType,
-  //   world: SimWorld,
-  // ) => void;
+  public readonly resolvers: SimResolvers;
 
   constructor(init: SimWorldInit) {
     this.buildByOperatorId = init.buildByOperatorId;

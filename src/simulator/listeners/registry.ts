@@ -151,7 +151,12 @@ export class SimRegistry {
 
   runBuffDamageBonus(ctx: BuffDamageBonusListenerContext): void {
     const list = this.buffDamageBonus[ctx.buff.id];
-    if (!list || list.length === 0) return;
+    if (!list || list.length === 0) {
+      console.warn(
+        `No damage bonus listeners registered for buffId=${ctx.buff.id}`,
+      );
+      return;
+    }
     for (const e of list) e.fn(ctx);
   }
 
