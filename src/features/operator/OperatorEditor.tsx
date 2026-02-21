@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import operatorsData from "../../data/operators";
-import { getAvatarUrl } from "../../shared/registry/avatarRegistry";
+import { getAvatarUrl } from "../../shared/imgRegistry/imgRegistry";
 // import PreviewSlider from "../../shared/components/PreviewSlider";
 import type { OperatorBuild } from "../../types/operator";
 // import type { OperatorDef } from "../../data/operators/OperatorDef";

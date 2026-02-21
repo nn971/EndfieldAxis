@@ -46,7 +46,7 @@ export type SkillDef = {
 export type OperatorDefInit = {
   id: OperatorId;
   name: string;
-  avatar: string;
+  avatar?: string;
   attributes: {
     main: OperatorAttributeType;
     sub: OperatorAttributeType;
@@ -79,7 +79,7 @@ export class OperatorDef {
   protected constructor(init: OperatorDefInit) {
     this.id = init.id;
     this.name = init.name;
-    this.avatar = init.avatar;
+    this.avatar = init.avatar ?? "";
     this.attributes = init.attributes;
     this.stats = init.stats;
     this.skills = init.skills;
