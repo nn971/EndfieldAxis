@@ -1,5 +1,7 @@
 import operatorsData from "../data/operators";
+import operatorsData from "../data/operators";
 import { makeId } from "../shared/lib/id";
+import { SkillType } from "../data/operators/OperatorDef";
 import { SkillType } from "../data/operators/OperatorDef";
 import type { SimEvent } from "../types/simulator/simulator";
 
@@ -17,9 +19,19 @@ export function compileSkillCast(params: {
 }): SimEvent[] {
   const { sourceId, skillType, targetId, startFrame, nextSeq } = params;
   const operator = operatorsData[sourceId];
-  if (!operator) return [];
+  if (!operator) {
+    console.warn(
+      `Unknown operator with id ${sourceId} while compiling skill cast`,
+    );
+    return [];
+  }
   const skill = operator.skills[skillType];
-  if (!skill) return [];
+  if (!skill) {
+    console.warn(
+      `Unknown skill type ${skillType} for operator ${sourceId} while compiling skill cast`,
+    );
+    return [];
+  }
 
   const events: SimEvent[] = [];
 

@@ -9,14 +9,10 @@ import {
 import { BuffId } from "../data/buffs/BuffDef";
 import { buildDamageContext } from "./damage/damageEngine";
 import { SimWorld } from "./simulator";
+import buffsData from "../data/buffs";
 
 // TODO: load from data file (inflictions.json) instead of hardcoding.
 const DEFAULT_INFLICTION_DURATION_FRAMES = 1800;
-
-// crystal debuff lasts 300 frames.
-const BUFF_DURATION_FRAMES: Partial<Record<BuffId, number>> = {
-  crystal: 300,
-};
 
 // Placeholder while reverse-engineering crush scaling.
 // TODO: replace with real scaling from gameplay data.
@@ -49,8 +45,19 @@ function scheduleBuffExpire(
   targetId: SimEntityId,
   buffId: BuffId,
 ): void {
-  const duration = BUFF_DURATION_FRAMES[buffId] ?? 0;
-  if (duration <= 0) return;
+  const duration = buffsData[buffId].durationFrames;
+  if (duration === undefined) {
+    console.warn(
+      `No duration defined for buffId=${buffId}, defaulting to non-expiring`,
+    );
+    return;
+  }
+  if (duration <= 0) {
+    console.warn(
+      `BuffId=${buffId} has non-positive durationFrames=${duration}, defaulting to non-expiring`,
+    );
+    return;
+  }
   world.ops.schedule({
     id: makeEventId(),
     type: "buffExpire",
@@ -262,7 +269,7 @@ export function resolveBuffExpiration(
   const buff = (ent as any).buffs?.[buffId];
   if (!buff) return false; // already removed or consumed
 
-  const duration = BUFF_DURATION_FRAMES[buffId] ?? 0;
+  const duration = buffsData[buffId].durationFrames ?? 0;
   if (duration <= 0) return false;
   if (self.read.nowInFrames >= buff.lastApplyFrame + duration) {
     self.ops.removeBuff(entityId, buffId);

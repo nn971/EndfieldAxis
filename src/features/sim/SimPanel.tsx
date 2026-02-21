@@ -6,11 +6,13 @@ import {
   selectTeamOperatorIds,
 } from "../solution/selectors";
 import { createDefaultDamageModel } from "../../simulator/damage/damageModel";
-import { compileSkillCast } from "../../simulator/compiler";
+import { compileSkillCast } from "../../simulator/compilers";
 import type { SimEvent, SimEntity } from "../../types/simulator/simulator";
 import type { SkillBox } from "../../types/editor";
 import OperatorsData from "../../data/operators";
+import OperatorsData from "../../data/operators";
 import { summarizeLog } from "../../simulator/log";
+import { loadSimRegistry } from "../../simulator/listeners/registry";
 import { loadSimRegistry } from "../../simulator/listeners/registry";
 import { SimWorld } from "../../simulator/simulator";
 
@@ -64,6 +66,7 @@ export default function SimPanel() {
     const entities: SimEntity[] = [
       ...Array.from(allOperatorIds).map(operatorId => ({
         id: operatorId,
+        name: OperatorsData[operatorId]?.name ?? operatorId,
         name: OperatorsData[operatorId]?.name ?? operatorId,
         type: "operator" as const,
         hp: 999999,
