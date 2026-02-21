@@ -69,7 +69,7 @@ export default function SimPanel() {
         hp: 999999,
         inflictions: {},
         buffs: {},
-      },
+      })),
       {
         id: "enemy1",
         name: "Enemy1",
