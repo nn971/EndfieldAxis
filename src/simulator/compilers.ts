@@ -1,7 +1,5 @@
 import operatorsData from "../data/operators";
-import operatorsData from "../data/operators";
 import { makeId } from "../shared/lib/id";
-import { SkillType } from "../data/operators/OperatorDef";
 import { SkillType } from "../data/operators/OperatorDef";
 import type { SimEvent } from "../types/simulator/simulator";
 
