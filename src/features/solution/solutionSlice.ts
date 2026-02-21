@@ -30,11 +30,7 @@ function makeDefaultBuild(): OperatorBuild {
       talent1: 2,
       talent2: 2,
     },
-    weapon: {
-      weaponId: "w1",
-      level: 80,
-      skillRanks: { wskill1: 6, wskill2: 9, wskill3: 4 },
-    },
+    weapon: null,
     gears: {
       armor: { gearId: "g_armor_1", ranks: [1, 0, 3] },
       gloves: { gearId: "g_gloves_2", ranks: [0, 0, 0] },

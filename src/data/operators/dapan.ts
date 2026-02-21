@@ -26,6 +26,7 @@ class DaPanDef extends OperatorDef {
           will: 0,
         },
       },
+      weaponType: "sword",
       skills: {},
     } satisfies OperatorDefInit);
   }

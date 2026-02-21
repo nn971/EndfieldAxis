@@ -28,6 +28,7 @@ class ChenQianyuDef extends OperatorDef {
           will: 0,
         },
       },
+      weaponType: "sword",
       skills: {
         normalAttack: {
           name: "Soaring Break",

@@ -5,11 +5,12 @@ import { getAvatarUrl } from "../../shared/imgRegistry/imgRegistry";
 import type { OperatorBuild } from "../../types/operator";
 // import type { OperatorDef } from "../../data/operators/OperatorDef";
 import { OperatorBuildTab, WeaponTab, GearsTab } from "./Tabs";
+import { OperatorId } from "../../data/operators/OperatorDef";
 
 type OperatorPickerProps = {
-  currentId: string;
-  teamOperatorIds: string[];
-  onPick: (newId: string) => void;
+  currentId: OperatorId;
+  teamOperatorIds: OperatorId[];
+  onPick: (newId: OperatorId) => void;
   onClose: () => void;
 };
 
@@ -97,14 +98,14 @@ const tabs: { key: BuildTab; label: string }[] = [
 
 type Props = {
   laneIndex: number | null;
-  operatorId: string | null;
+  operatorId: OperatorId | null;
   operatorBuild: OperatorBuild | null;
-  teamOperatorIds: string[];
+  teamOperatorIds: OperatorId[];
   onCommitOperatorBuildPatch: (
-    operatorId: string,
+    operatorId: OperatorId,
     patch: Partial<OperatorBuild>,
   ) => void;
-  onChangeTeammateId: (laneIndex: number, newOpId: string) => void;
+  onChangeTeammateId: (laneIndex: number, newOpId: OperatorId) => void;
   onClose: () => void;
 };
 

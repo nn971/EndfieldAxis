@@ -27,6 +27,7 @@ class EndministratorDef extends OperatorDef {
           will: 0,
         },
       },
+      weaponType: "sword",
       skills: {
         normalAttack: {
           name: "Destructive Sequence",

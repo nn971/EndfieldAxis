@@ -1,4 +1,5 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
+import { WeaponType } from "../weapons/WeaponDef";
 
 /**
  * OperatorDefClass
@@ -55,6 +56,7 @@ export type OperatorDefInit = {
     level1: OperatorStatSnapshot;
     level90: OperatorStatSnapshot;
   };
+  weaponType: WeaponType;
   skills: {
     [key in SkillType]?: SkillDef;
   };
@@ -72,6 +74,7 @@ export class OperatorDef {
     level1: OperatorStatSnapshot;
     level90: OperatorStatSnapshot;
   };
+  public readonly weaponType: WeaponType;
   public readonly skills: {
     [key in SkillType]?: SkillDef;
   };
@@ -82,6 +85,7 @@ export class OperatorDef {
     this.avatar = init.avatar ?? "";
     this.attributes = init.attributes;
     this.stats = init.stats;
+    this.weaponType = init.weaponType;
     this.skills = init.skills;
   }
 

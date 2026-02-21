@@ -1,5 +1,5 @@
 import OperatorsData from "../../data/operators";
-import { getWeapon } from "../../data/weapons";
+import weaponsData from "../../data/weapons";
 import type { OperatorBuild } from "../../types/operator";
 import type {
   OperatorAttributeType,
@@ -116,10 +116,19 @@ function factorFromSum(sum: number): number {
   return 1 + sum;
 }
 
+const MAX_LEVEL = 90;
+
 function clampOperatorLevel(level: number): number {
   if (!Number.isFinite(level)) return 1;
   if (level < 1) return 1;
-  if (level > 90) return 90;
+  if (level > MAX_LEVEL) return MAX_LEVEL;
+  return level;
+}
+
+function clampWeaponLevel(level: number): number {
+  if (!Number.isFinite(level)) return 1;
+  if (level < 1) return 1;
+  if (level > MAX_LEVEL) return MAX_LEVEL;
   return level;
 }
 
@@ -211,10 +220,22 @@ export function createDefaultDamageModel(params?: {
       });
       const operatorAttack = Number(levelStats.attack ?? 0);
 
-      const weaponId = ctx.sourceBuild?.weapon?.weaponId;
-      const weaponAttack = Number(
-        (weaponId ? getWeapon(weaponId)?.attack : 0) ?? 0,
-      );
+      const weapon = ctx.sourceBuild?.weapon;
+      let weaponAttack = 0;
+      if (weapon != undefined && weapon) {
+        const weaponDef = weaponsData[weapon?.id];
+        if (!weaponDef) {
+          console.warn(`Weapon not found: ${JSON.stringify(weapon.id)}`);
+        } else {
+          const weaponLevel = clampWeaponLevel(Number(weapon.level));
+          weaponAttack = interpolateLevelStat(
+            weaponLevel,
+            weaponDef?.atkStat?.level1 ?? 0,
+            weaponDef?.atkStat?.level90 ?? 0,
+            roundingPolicy,
+          );
+        }
+      }
 
       const attackIncRatio = bonuses.ratio.attackIncMul;
       const attackIncValue = bonuses.value.attackIncValue;

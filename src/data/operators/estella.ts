@@ -26,6 +26,7 @@ class EstellaDef extends OperatorDef {
           will: 0,
         },
       },
+      weaponType: "polearm",
       skills: {},
     } satisfies OperatorDefInit);
   }

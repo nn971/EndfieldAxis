@@ -1,22 +1,17 @@
-import weaponsJson from "./weapons.json";
+import type { WeaponId, WeaponDef } from "./WeaponDef";
 
-export type WeaponId = string;
+const modules = import.meta.glob(
+  ["./**/*.ts", "!./index.ts", "!./WeaponDef.ts"],
+  {
+    eager: true,
+  },
+) as Record<string, { default: WeaponDef }>;
 
-export type WeaponDef = {
-  id: WeaponId;
-  name: string;
+const weaponsData = Object.fromEntries(
+  Object.values(modules).map(mod => {
+    const weapon = mod.default as unknown as WeaponDef;
+    return [weapon.id, weapon];
+  }),
+) as Record<WeaponId, WeaponDef>;
 
-  // Base weapon attack used by DamageModel (Endfield: "WeaponAttack").
-  // TODO: confirm level scaling. For now it's a direct value.
-  attack: number;
-};
-
-export const weaponsData = weaponsJson as WeaponDef[];
-
-const weaponsById: Record<string, WeaponDef> = Object.fromEntries(
-  weaponsData.map(w => [w.id, w]),
-);
-
-export function getWeapon(id: string): WeaponDef | null {
-  return weaponsById[id] ?? null;
-}
+export default weaponsData;
