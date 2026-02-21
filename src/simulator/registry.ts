@@ -1,8 +1,9 @@
-import type { SimBuff, SimBuffType } from "../../types/simulator/infliction";
-import type { SimEntityId, SimEvent } from "../../types/simulator/simulator";
-import type { DamageBonusCollector } from "../damageBonuses";
-import type { DamageKind } from "../damageModel";
-import type { SimOps, SimRead } from "../simulator";
+import type { SimBuff, SimBuffType } from "../types/simulator/infliction";
+import type { SimEntityId, SimEvent } from "../types/simulator/simulator";
+import type { DamageBonusCollector } from "./damageBonuses";
+import type { DamageKind } from "./damageModel";
+import type { SimOps, SimRead } from "./simulator";
+import { operatorsData } from "../data/operators";
 
 /**
  * Listener/registry layer:
@@ -162,3 +163,44 @@ export class SimRegistry {
 }
 
 export type SimPluginRegisterFn = (registry: SimRegistry) => void;
+
+/**
+ * Auto-load all plugin modules under src/content (recursive) and let them
+ * register listeners into a single SimRegistry.
+ */
+export function loadSimRegistry(): SimRegistry {
+  const registry = new SimRegistry();
+
+  // Vite will include all matching modules in the bundle.
+  // Eager import ensures registration happens immediately.
+  const modules = import.meta.glob("../../data/plugins/**/plugin.ts", {
+    eager: true,
+  });
+
+  for (const [path, mod] of Object.entries(modules)) {
+    const anyMod = mod as any;
+    const register: unknown = anyMod?.register ?? anyMod?.default;
+    if (typeof register !== "function") {
+      // Keep failures visible during development.
+      // (No throw: missing plugins should not break the whole app.)
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[simPlugins] module ${path} has no register() export; skipped`,
+      );
+      continue;
+    }
+    (register as SimPluginRegisterFn)(registry);
+  }
+
+  // Register operator-bound listeners from the operator defs themselves.
+  // This keeps each operator's runtime behavior co-located with its data.
+  for (const op of operatorsData) {
+    const anyOp = op as any;
+    if (typeof anyOp?.registerSimPlugins === "function") {
+      anyOp.registerSimPlugins(registry);
+    }
+  }
+
+  registry.finalize();
+  return registry;
+}

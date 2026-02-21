@@ -8,7 +8,7 @@ import {
   DamageBonusCollector,
   type DamageBonusSnapshot,
 } from "./damageBonuses";
-import type { SimRegistry, HitEvent } from "./listener/registry";
+import type { SimRegistry, HitEvent } from "./registry";
 import type { SimRead, SimOps } from "./simulator";
 
 /**

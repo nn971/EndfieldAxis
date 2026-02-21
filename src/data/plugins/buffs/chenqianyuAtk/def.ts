@@ -1,4 +1,3 @@
-import type { SimPluginRegisterFn } from "../../../../simulator/registry";
 import { BuffDef } from "../../../../types/simulator/BuffDef";
 import type { SimRegistry } from "../../../../simulator/registry";
 
@@ -28,8 +27,4 @@ class ChenQianyuAtkBuffDef extends BuffDef {
   }
 }
 
-const chenqianyuAtkBuffDef = new ChenQianyuAtkBuffDef();
-
-export const register: SimPluginRegisterFn = registry => {
-  chenqianyuAtkBuffDef.registerSimPlugins(registry);
-};
+export const chenqianyuAtkBuffDef = new ChenQianyuAtkBuffDef();

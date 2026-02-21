@@ -14,7 +14,7 @@ import type {
 } from "../types/simulator/simulator";
 import { pushLog, type SimLog, type SimLogEntryCat } from "./log";
 import type { DamageContext, DamageModel } from "./damageModel";
-import { SimRegistry } from "./listener/registry";
+import { SimRegistry } from "./registry";
 
 import { buildDamageContext, dispatchAfterHit } from "./damageEngine";
 import { createDefaultDamageModel } from "./damageModel";

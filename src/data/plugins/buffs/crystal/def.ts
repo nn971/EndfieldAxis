@@ -1,4 +1,3 @@
-import type { SimPluginRegisterFn } from "../../../../simulator/registry";
 import { BuffDef } from "../../../../types/simulator/BuffDef";
 import type { SimRegistry } from "../../../../simulator/registry";
 
@@ -25,8 +24,4 @@ class CrystalBuffDef extends BuffDef {
   }
 }
 
-const crystalBuffDef = new CrystalBuffDef();
-
-export const register: SimPluginRegisterFn = registry => {
-  crystalBuffDef.registerSimPlugins(registry);
-};
+export const crystalBuffDef = new CrystalBuffDef();
