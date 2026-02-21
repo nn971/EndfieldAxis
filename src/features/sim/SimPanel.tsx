@@ -11,7 +11,7 @@ import type { SimEvent, SimEntity } from "../../types/simulator/simulator";
 import type { SkillBox } from "../../types/editor";
 import { operatorsById } from "../../data/operators";
 import { summarizeLog } from "../../simulator/log";
-import { loadSimRegistry } from "../../simulator/listener/loadSimRegistry";
+import { loadSimRegistry } from "../../simulator/registry";
 import { SimWorld } from "../../simulator/simulator";
 
 function compileSkillBoxes(params: {

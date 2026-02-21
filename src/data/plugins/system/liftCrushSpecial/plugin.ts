@@ -1,4 +1,4 @@
-import type { SimPluginRegisterFn } from "../../../simulator/simPlugins/registry";
+import type { SimPluginRegisterFn } from "../../../../simulator/registry";
 
 // TEMP constant (placeholder while reverse-engineering exact in-game formulas).
 const SPECIAL_MULTIPLIER = 1.2;
