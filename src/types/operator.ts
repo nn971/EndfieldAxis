@@ -1,6 +1,7 @@
 // Simulator types are intentionally not imported here to avoid type-level cycles.
 
 import { WeaponId } from "../data/weapons/WeaponDef";
+import type { GearsId } from "../data/gears/GearsDef";
 
 export interface OperatorBuild {
   level: number; // 1..90
@@ -15,6 +16,6 @@ export interface OperatorBuild {
   } | null;
   gears: Record<
     "armor" | "gloves" | "kit1" | "kit2",
-    { gearId: string | null; ranks: [number, number, number] }
+    { gearId: GearsId | null; ranks: [number, number, number] }
   >;
 }

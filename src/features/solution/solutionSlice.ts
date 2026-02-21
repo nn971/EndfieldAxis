@@ -32,8 +32,8 @@ function makeDefaultBuild(): OperatorBuild {
     },
     weapon: null,
     gears: {
-      armor: { gearId: "g_armor_1", ranks: [1, 0, 3] },
-      gloves: { gearId: "g_gloves_2", ranks: [0, 0, 0] },
+      armor: { gearId: null, ranks: [0, 0, 0] },
+      gloves: { gearId: null, ranks: [0, 0, 0] },
       kit1: { gearId: null, ranks: [0, 0, 0] },
       kit2: { gearId: null, ranks: [0, 0, 0] },
     },
