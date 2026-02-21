@@ -1,11 +1,11 @@
-import { DmgType, SkillType } from "../operator";
+import { BuffId } from "../../data/buffs/BuffDef";
+import { DmgType, SkillType } from "../../data/operators/OperatorDef";
 import type {
   SimInfliction,
   SimBuff,
   SimStatusType,
   SimInflictionDef,
   SimInflictionType,
-  SimBuffType,
 } from "./infliction";
 
 export type SimEventType =
@@ -76,12 +76,12 @@ export type SimEvent =
       type: "buffApply";
       sourceId?: SimEntityId;
       targetId: SimEntityId;
-      buffType: SimBuffType;
+      buffId: BuffId;
     })
   | (SimEventBase & {
       type: "buffExpire";
       sourceId: SimEntityId; // entity who owns the buff
-      buffType: SimBuffType;
+      buffId: BuffId;
       ref: string;
     });
 

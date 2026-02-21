@@ -1,9 +1,11 @@
-import type { SimBuff, SimBuffType } from "../types/simulator/infliction";
-import type { SimEntityId, SimEvent } from "../types/simulator/simulator";
-import type { DamageBonusCollector } from "./damageBonuses";
-import type { DamageKind } from "./damageModel";
-import type { SimOps, SimRead } from "./simulator";
-import { operatorsData } from "../data/operators";
+import type { SimBuff } from "../../types/simulator/infliction";
+import type { SimEntityId, SimEvent } from "../../types/simulator/simulator";
+import type { DamageBonusCollector } from "../damage/damageBonuses";
+import type { DamageKind } from "../damage/damageModel";
+import type { SimOps, SimRead } from "../simulator";
+import operatorsData from "../../data/operators";
+import buffsData from "../../data/buffs";
+import { BuffId } from "../../data/buffs/BuffDef";
 
 /**
  * Listener/registry layer:
@@ -62,7 +64,7 @@ function sortEntries<TFn>(arr: ListenerEntry<TFn>[]): void {
 export class SimRegistry {
   private globalDamageBonus: ListenerEntry<GlobalDamageBonusListener>[] = [];
   private buffDamageBonus: Partial<
-    Record<SimBuffType, ListenerEntry<BuffDamageBonusListener>[]>
+    Record<BuffId, ListenerEntry<BuffDamageBonusListener>[]>
   > = {};
 
   private afterHitGlobal: ListenerEntry<AfterHitTrigger>[] = [];
@@ -86,12 +88,11 @@ export class SimRegistry {
 
   /** Register a damage-bonus listener for a specific buff type. */
   registerBuffDamageBonus(params: {
-    buffType: SimBuffType;
     id: string;
     fn: BuffDamageBonusListener;
     priority?: number;
   }): void {
-    const list = (this.buffDamageBonus[params.buffType] ??=
+    const list = (this.buffDamageBonus[params.id] ??=
       []) as ListenerEntry<BuffDamageBonusListener>[];
     list.push({
       id: params.id,
@@ -140,7 +141,7 @@ export class SimRegistry {
       sortEntries(this.afterHitByOperatorId[key]!);
     }
     for (const key of Object.keys(this.buffDamageBonus)) {
-      sortEntries(this.buffDamageBonus[key as SimBuffType]!);
+      sortEntries(this.buffDamageBonus[key as BuffId]!);
     }
   }
 
@@ -149,7 +150,7 @@ export class SimRegistry {
   }
 
   runBuffDamageBonus(ctx: BuffDamageBonusListenerContext): void {
-    const list = this.buffDamageBonus[ctx.buff.type];
+    const list = this.buffDamageBonus[ctx.buff.id];
     if (!list || list.length === 0) return;
     for (const e of list) e.fn(ctx);
   }
@@ -164,40 +165,23 @@ export class SimRegistry {
 
 export type SimPluginRegisterFn = (registry: SimRegistry) => void;
 
-/**
- * Auto-load all plugin modules under src/content (recursive) and let them
- * register listeners into a single SimRegistry.
- */
+/** Load plugin modules for operators, buffs under src/data and let them register listeners into a single SimRegistry. */
 export function loadSimRegistry(): SimRegistry {
   const registry = new SimRegistry();
 
-  // Vite will include all matching modules in the bundle.
-  // Eager import ensures registration happens immediately.
-  const modules = import.meta.glob("../../data/plugins/**/plugin.ts", {
-    eager: true,
-  });
-
-  for (const [path, mod] of Object.entries(modules)) {
-    const anyMod = mod as any;
-    const register: unknown = anyMod?.register ?? anyMod?.default;
-    if (typeof register !== "function") {
-      // Keep failures visible during development.
-      // (No throw: missing plugins should not break the whole app.)
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[simPlugins] module ${path} has no register() export; skipped`,
-      );
-      continue;
-    }
-    (register as SimPluginRegisterFn)(registry);
-  }
-
   // Register operator-bound listeners from the operator defs themselves.
-  // This keeps each operator's runtime behavior co-located with its data.
-  for (const op of operatorsData) {
+  for (const op of Object.values(operatorsData)) {
     const anyOp = op as any;
     if (typeof anyOp?.registerSimPlugins === "function") {
       anyOp.registerSimPlugins(registry);
+    }
+  }
+
+  // Register damage bonuses from buffs defined in the data layer.
+  for (const buff of Object.values(buffsData)) {
+    const anyBuffDef = buff as any;
+    if (typeof anyBuffDef?.registerSimPlugins === "function") {
+      anyBuffDef.registerSimPlugins(registry);
     }
   }
 

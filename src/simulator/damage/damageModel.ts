@@ -1,15 +1,12 @@
-import { getOperator } from "../data/operators";
-import { getWeapon } from "../data/weapons";
+import OperatorsData from "../../data/operators";
+import { getWeapon } from "../../data/weapons";
+import type { OperatorBuild } from "../../types/operator";
 import type {
   OperatorAttributeType,
-  OperatorBuild,
   OperatorStatSnapshot,
-} from "../types/operator";
-import type { SimEntity } from "../types/simulator/simulator";
-import type {
-  DamageBonusLogEntry,
-  DamageBonusSnapshot,
-} from "./damageBonuses";
+} from "../../data/operators/OperatorDef";
+import type { SimEntity } from "../../types/simulator/simulator";
+import type { DamageBonusLogEntry, DamageBonusSnapshot } from "./damageBonuses";
 
 /**
  * DamageModel is a pure computation layer.
@@ -200,7 +197,7 @@ export function createDefaultDamageModel(params?: {
 
       // if (!ctx.source) throw new Error(`unhandled case: damage with no source`);
       // --- Attack stage ---
-      const opDef = getOperator(ctx.source.id);
+      const opDef = OperatorsData[ctx.source.id];
       const operatorLevel = clampOperatorLevel(
         Number(ctx.sourceBuild?.level ?? 1),
       );
@@ -255,9 +252,7 @@ export function createDefaultDamageModel(params?: {
 
       // SpecialMultiplier only applies to lift / crush damage kinds.
       const specialMul =
-        ctx.kind === "physical"
-          ? 1
-          : factorFromSum(bonuses.ratio.specialMul);
+        ctx.kind === "physical" ? 1 : factorFromSum(bonuses.ratio.specialMul);
 
       const rawDamage =
         attackFinal *

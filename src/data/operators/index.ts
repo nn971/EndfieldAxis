@@ -1,28 +1,29 @@
-import type { OperatorDef, OperatorId } from "../../types/operator";
-import type { OperatorDefClass } from "./OperatorDefClass";
+import type { OperatorId, OperatorDef } from "./OperatorDef";
 
 /**
  * Operator data is stored as TypeScript modules (default-exporting OperatorDefClass).
  * This keeps the existing folder and API shape stable for the editor.
  */
 const modules = import.meta.glob(
-  ["./*.ts", "!./index.ts", "!./OperatorDefClass.ts"],
+  ["./*.ts", "!./index.ts", "!./OperatorDef.ts"],
   {
     eager: true,
   },
-) as Record<string, { default: OperatorDefClass }>;
+) as Record<string, { default: OperatorDef }>;
 
-const byId = Object.fromEntries(
+const operatorsData = Object.fromEntries(
   Object.values(modules).map(mod => {
     const op = mod.default as unknown as OperatorDef;
     return [op.id, op];
   }),
 ) as Record<OperatorId, OperatorDef>;
 
-export const operatorsData = Object.keys(byId).map(id => byId[id]!);
+export default operatorsData;
 
-export const operatorsById = byId;
+// export const operatorsData = Object.keys(operatorsData).map(id => operatorsData[id]!);
 
-export function getOperator(id: OperatorId) {
-  return byId[id] ?? null;
-}
+// export const operatorsById = byId;
+
+// export function getOperator(id: OperatorId) {
+//   return byId[id] ?? null;
+// }

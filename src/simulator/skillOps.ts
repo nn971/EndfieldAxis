@@ -1,5 +1,6 @@
-import type { DmgType } from "../data/operators/OperatorDefClass";
-import type { SimBuffType, SimStatusType } from "../types/simulator/infliction";
+import { BuffId } from "../data/buffs/BuffDef";
+import type { DmgType } from "../data/operators/OperatorDef";
+import type { SimStatusType } from "../types/simulator/infliction";
 import type { SimEvent } from "../types/simulator/simulator";
 
 export type SkillCompileContext = {
@@ -62,7 +63,7 @@ export function physicalHit(
   };
 }
 
-export function applyBuff(frame: number, buffType: SimBuffType): SkillOpFn {
+export function applyBuff(frame: number, buffId: BuffId): SkillOpFn {
   return ctx => {
     const ev: SimEvent = {
       id: ctx.makeEventId(),
@@ -71,7 +72,7 @@ export function applyBuff(frame: number, buffType: SimBuffType): SkillOpFn {
       seq: ctx.nextSeq(),
       sourceId: ctx.sourceId,
       targetId: ctx.targetId,
-      buffType,
+      buffId,
     };
     return [ev];
   };

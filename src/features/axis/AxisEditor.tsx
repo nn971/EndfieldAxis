@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { operatorsData, operatorsById } from "../../data/operators/index";
 import type { SkillBox } from "../../types/editor";
-import type { SkillType } from "../../types/operator";
-import type { OperatorDef } from "../../types/operator";
+import type { SkillType } from "../../data/operators/OperatorDef";
+import operatorsData from "../../data/operators";
 import { moveItem } from "../../shared/lib/utils";
 
 const SKILL_TABS: { key: SkillType; label: string }[] = [
@@ -349,7 +348,7 @@ export default function AxisEditor({
 
   const ghostDurationFrames =
     ghostOperatorId && addSkillDrag
-      ? (operatorsById[ghostOperatorId]?.skills?.[addSkillDrag.skillType]
+      ? (operatorsData[ghostOperatorId]?.skills?.[addSkillDrag.skillType]
           ?.durationFrames ?? DEFAULT_NEW_BOX_DURATION)
       : DEFAULT_NEW_BOX_DURATION;
 
@@ -394,7 +393,7 @@ export default function AxisEditor({
           >
             {[0, 1, 2, 3].map(laneIndex => {
               const opId = effectiveTeamOperatorIds[laneIndex];
-              const name = operatorsById[opId]?.name ?? opId ?? "—";
+              const name = operatorsData[opId]?.name ?? opId ?? "—";
 
               return (
                 <div

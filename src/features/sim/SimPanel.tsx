@@ -5,13 +5,13 @@ import {
   selectSkillBoxes,
   selectTeamOperatorIds,
 } from "../solution/selectors";
-import { createDefaultDamageModel } from "../../simulator/damageModel";
+import { createDefaultDamageModel } from "../../simulator/damage/damageModel";
 import { compileSkillCast } from "../../simulator/compiler";
 import type { SimEvent, SimEntity } from "../../types/simulator/simulator";
 import type { SkillBox } from "../../types/editor";
-import { operatorsById } from "../../data/operators";
+import OperatorsData from "../../data/operators";
 import { summarizeLog } from "../../simulator/log";
-import { loadSimRegistry } from "../../simulator/registry";
+import { loadSimRegistry } from "../../simulator/listeners/registry";
 import { SimWorld } from "../../simulator/simulator";
 
 function compileSkillBoxes(params: {
@@ -64,7 +64,7 @@ export default function SimPanel() {
     const entities: SimEntity[] = [
       ...Array.from(allOperatorIds).map(operatorId => ({
         id: operatorId,
-        name: operatorsById[operatorId]?.name ?? operatorId,
+        name: OperatorsData[operatorId]?.name ?? operatorId,
         type: "operator" as const,
         hp: 999999,
         inflictions: {},

@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { operatorsData, getOperator } from "../../data/operators/index";
+import operatorsData from "../../data/operators";
 import { getAvatarUrl } from "../../shared/registry/avatarRegistry";
 // import PreviewSlider from "../../shared/components/PreviewSlider";
 import type { OperatorBuild } from "../../types/operator";
-import type { OperatorDef } from "../../types/operator";
+// import type { OperatorDef } from "../../data/operators/OperatorDef";
 import { OperatorBuildTab, WeaponTab, GearsTab } from "./Tabs";
 
 type OperatorPickerProps = {
@@ -35,7 +35,7 @@ function OperatorPicker({
         </div>
 
         <div className="mt-2 grid grid-cols-2 gap-2">
-          {operatorsData.map(op => {
+          {Object.values(operatorsData).map(op => {
             const url = getAvatarUrl(op.avatar);
             const active = op.id === currentId;
 
@@ -121,7 +121,7 @@ export default function OperatorEditor({
   const [page, setPage] = useState<BuildTab>("operator");
 
   const operator = useMemo(
-    () => operatorsData.find(op => op.id === operatorId),
+    () => (operatorId ? operatorsData[operatorId] : null),
     [operatorId],
   );
   // const operator = operatorId
