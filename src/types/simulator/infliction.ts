@@ -1,3 +1,5 @@
+import { BuffId } from "../../data/buffs/BuffDef";
+
 export type SimInflictionType =
   | "vulnerable"
   | "heat"
@@ -6,12 +8,8 @@ export type SimInflictionType =
   | "nature";
 export type SimStatusType = "lift" | "knockDown" | "crush" | "breach";
 
-// Buffs are non-stacking time-based modifiers (e.g. crystal).
-// NOTE: We keep buffs in this file for now to minimize file count.
-export type SimBuffType = "crystal" | "chenqianyuAtk";
-
 export type SimBuff = {
-  type: SimBuffType;
+  id: BuffId;
   lastApplyFrame: number;
 
   /** Optional stacks for stackable buffs (e.g. Chen Qianyu self buff). */

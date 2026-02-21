@@ -1,15 +1,20 @@
-import { BuffDef } from "../../../../types/simulator/BuffDef";
-import type { SimRegistry } from "../../../../simulator/registry";
+import { BuffDef } from "../../BuffDef";
+import type { SimRegistry } from "../../../../simulator/listeners/registry";
 
 class CrystalBuffDef extends BuffDef {
   constructor() {
-    super("crystal");
+    super({
+      id: "buff.crystal",
+      name: "Crystal",
+      icon: "CRYSTAL.png",
+      durationFrames: 240,
+      maxStacks: 1,
+    });
   }
 
   override registerSimPlugins(registry: SimRegistry): void {
     registry.registerBuffDamageBonus({
-      buffType: this.type,
-      id: "buff.crystal.incomingIncMul",
+      id: this.id,
       fn: ({ role, collector }) => {
         // crystal: increases damage suffered by +20% (incomingIncMul)
         if (role === "target") {
@@ -24,4 +29,4 @@ class CrystalBuffDef extends BuffDef {
   }
 }
 
-export const crystalBuffDef = new CrystalBuffDef();
+export default new CrystalBuffDef();

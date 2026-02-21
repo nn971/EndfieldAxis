@@ -2,14 +2,14 @@ import type {
   SimEntity,
   SimEntityId,
   SimEvent,
-} from "../types/simulator/simulator";
+} from "../../types/simulator/simulator";
 import type { DamageContext, DamageKind } from "./damageModel";
 import {
   DamageBonusCollector,
   type DamageBonusSnapshot,
 } from "./damageBonuses";
-import type { SimRegistry, HitEvent } from "./registry";
-import type { SimRead, SimOps } from "./simulator";
+import type { SimRegistry } from "../listeners/registry";
+import type { SimRead } from "../simulator";
 
 /**
  * DamageEngine builds the DamageContext fed into DamageModel.
@@ -107,21 +107,4 @@ export function buildDamageContext(params: {
     sourceBuild: params.read.getBuild(params.sourceId),
     meta: params.meta,
   };
-}
-
-export function dispatchAfterHit(params: {
-  registry: SimRegistry;
-  read: SimRead;
-  ops: SimOps;
-  ev: HitEvent;
-  sourceId: SimEntityId;
-  targetId: SimEntityId;
-}): void {
-  params.registry.runAfterHit({
-    read: params.read,
-    ops: params.ops,
-    ev: params.ev,
-    sourceId: params.sourceId,
-    targetId: params.targetId,
-  });
 }

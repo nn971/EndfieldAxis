@@ -1,6 +1,6 @@
-import { getOperator } from "../data/operators";
+import operatorsData from "../data/operators";
 import { makeId } from "../shared/lib/id";
-import { SkillType } from "../types/operator";
+import { SkillType } from "../data/operators/OperatorDef";
 import type { SimEvent } from "../types/simulator/simulator";
 
 const EVENT_PREFIX = "SimEvent_";
@@ -16,7 +16,7 @@ export function compileSkillCast(params: {
   nextSeq: () => number;
 }): SimEvent[] {
   const { sourceId, skillType, targetId, startFrame, nextSeq } = params;
-  const operator = getOperator(sourceId);
+  const operator = operatorsData[sourceId];
   if (!operator) return [];
   const skill = operator.skills[skillType];
   if (!skill) return [];

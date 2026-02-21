@@ -1,22 +1,16 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import { operatorsData } from "../../data/operators/index";
+import operatorsData from "../../data/operators";
 import type { SkillBox, SolutionState } from "../../types/editor";
-import type { SkillType } from "../../types/operator";
+import type { SkillType } from "../../data/operators/OperatorDef";
 import type { OperatorBuild } from "../../types/operator";
-import type { OperatorDef } from "../../types/operator";
 import { makeId } from "../../shared/lib/id";
 import { assignNoDup, moveItem } from "../../shared/lib/utils";
-
-// const operatorsData = operatorsJson as OperatorDef[];
-const operatorsById: Record<string, OperatorDef> = Object.fromEntries(
-  operatorsData.map(op => [op.id, op]),
-);
 
 const DEFAULT_DURATION_FRAMES = 325;
 
 function getDurationFrames(operatorId: string, skillType: SkillType): number {
   return (
-    operatorsById[operatorId]?.skills?.[skillType]?.durationFrames ??
+    operatorsData[operatorId]?.skills?.[skillType]?.durationFrames ??
     DEFAULT_DURATION_FRAMES
   );
 }
@@ -51,9 +45,10 @@ function makeDefaultBuild(): OperatorBuild {
 }
 
 function initState(): SolutionState {
-  const teamOperatorIds = operatorsData.slice(0, 4).map(op => op.id);
+  const teamOperatorIds = Object.keys(operatorsData).slice(0, 4);
   const buildByOperatorId: Record<string, OperatorBuild> = {};
-  for (const op of operatorsData) buildByOperatorId[op.id] = makeDefaultBuild();
+  for (const op of Object.values(operatorsData))
+    buildByOperatorId[op.id] = makeDefaultBuild();
 
   // const initialSkillBoxes: SkillBox[] = [
   //   {

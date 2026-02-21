@@ -5,16 +5,16 @@ import {
   type SimInfliction,
   type SimInflictionType,
   type SimBuff,
-  type SimBuffType,
 } from "../types/simulator/infliction";
-import { buildDamageContext } from "./damageEngine";
+import { BuffId } from "../data/buffs/BuffDef";
+import { buildDamageContext } from "./damage/damageEngine";
 import { SimWorld } from "./simulator";
 
 // TODO: load from data file (inflictions.json) instead of hardcoding.
 const DEFAULT_INFLICTION_DURATION_FRAMES = 1800;
 
 // crystal debuff lasts 300 frames.
-const BUFF_DURATION_FRAMES: Partial<Record<SimBuffType, number>> = {
+const BUFF_DURATION_FRAMES: Partial<Record<BuffId, number>> = {
   crystal: 300,
 };
 
@@ -47,9 +47,9 @@ function scheduleInflictionExpire(
 function scheduleBuffExpire(
   world: SimWorld,
   targetId: SimEntityId,
-  buffType: SimBuffType,
+  buffId: BuffId,
 ): void {
-  const duration = BUFF_DURATION_FRAMES[buffType] ?? 0;
+  const duration = BUFF_DURATION_FRAMES[buffId] ?? 0;
   if (duration <= 0) return;
   world.ops.schedule({
     id: makeEventId(),
@@ -57,7 +57,7 @@ function scheduleBuffExpire(
     frame: world.read.nowInFrames + duration,
     seq: world.ops.nextSeq(),
     sourceId: targetId,
-    buffType,
+    buffId: buffId,
     ref: "auto",
   } as SimEvent);
 }
@@ -132,6 +132,7 @@ export function resolveStatusApplication(
             2,
           )} special=${res.breakdown.specialMul.toFixed(2)} hp=${(targetAfter as any).hp}`,
           ctx,
+          res.breakdown,
           res.amount,
         );
 
@@ -191,6 +192,7 @@ export function resolveStatusApplication(
           2,
         )} special=${res.breakdown.specialMul.toFixed(2)} hp=${(targetAfter as any).hp}`,
         ctx,
+        res.breakdown,
         res.amount,
       );
 
@@ -207,7 +209,7 @@ export function resolveBuffApplication(
   self: SimWorld,
   sourceId: SimEntityId,
   targetId: SimEntityId,
-  buffType: SimBuffType,
+  buffId: BuffId,
 ) {
   const source = self.read.getEntity(sourceId);
   if (!source) throw new Error(`Unknown source with sourceId=${sourceId}`);
@@ -215,19 +217,19 @@ export function resolveBuffApplication(
   const target = self.read.getEntity(targetId);
   if (!target) throw new Error(`Unknown target with targetId=${targetId}`);
 
-  const existing = (target as any).buffs?.[buffType];
+  const existing = (target as any).buffs?.[buffId];
 
-  if (buffType === "crystal") {
+  if (buffId === "crystal") {
     const had = Boolean(existing);
     self.ops.upsertBuff(targetId, {
-      type: buffType,
+      id: buffId,
       lastApplyFrame: self.read.nowInFrames,
       stacks: 1,
     } as SimBuff);
-    scheduleBuffExpire(self, targetId, buffType);
+    scheduleBuffExpire(self, targetId, buffId);
     self.ops.log(
       "buff",
-      `BUFF ${buffType} ${had ? "refresh" : "apply"} (source=${(source as any).name} target=${(target as any).name})`,
+      `BUFF ${buffId} ${had ? "refresh" : "apply"} (source=${(source as any).name} target=${(target as any).name})`,
     );
     return true;
   }
@@ -235,14 +237,14 @@ export function resolveBuffApplication(
   // Default fallback: apply as a non-stacking, possibly-expiring buff.
   const had = Boolean(existing);
   self.ops.upsertBuff(targetId, {
-    type: buffType,
+    id: buffId,
     lastApplyFrame: self.read.nowInFrames,
     stacks: 1,
   } as SimBuff);
-  scheduleBuffExpire(self, targetId, buffType);
+  scheduleBuffExpire(self, targetId, buffId);
   self.ops.log(
     "buff",
-    `BUFF ${buffType} ${had ? "refresh" : "apply"} (source=${(source as any).name} target=${(target as any).name})`,
+    `BUFF ${buffId} ${had ? "refresh" : "apply"} (source=${(source as any).name} target=${(target as any).name})`,
   );
   return true;
 }
@@ -250,24 +252,21 @@ export function resolveBuffApplication(
 export function resolveBuffExpiration(
   self: SimWorld,
   entityId: SimEntityId,
-  buffType: SimBuffType,
+  buffId: BuffId,
 ) {
   // return false if expiration event is stale
 
   const ent = self.read.getEntity(entityId);
   if (!ent) throw new Error(`Unknown entity with entityId ${entityId}`);
 
-  const buff = (ent as any).buffs?.[buffType];
+  const buff = (ent as any).buffs?.[buffId];
   if (!buff) return false; // already removed or consumed
 
-  const duration = BUFF_DURATION_FRAMES[buffType] ?? 0;
+  const duration = BUFF_DURATION_FRAMES[buffId] ?? 0;
   if (duration <= 0) return false;
   if (self.read.nowInFrames >= buff.lastApplyFrame + duration) {
-    self.ops.removeBuff(entityId, buffType);
-    self.ops.log(
-      "buff",
-      `BUFF ${buffType} expire (entity=${(ent as any).name})`,
-    );
+    self.ops.removeBuff(entityId, buffId);
+    self.ops.log("buff", `BUFF ${buffId} expire (entity=${(ent as any).name})`);
     return true;
   }
 

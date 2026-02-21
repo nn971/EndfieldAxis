@@ -1,5 +1,5 @@
 import { SimEnv } from "../types/simulator/simulator";
-import type { DamageContext } from "./damageModel";
+import type { DamageContext } from "./damage/damageModel";
 
 export type SimLogEntryCat = "sim" | "act" | "buff" | "stat" | "dmg" | "dev";
 type SimLogEntryBase = {
@@ -11,6 +11,7 @@ export type SimLogEntry =
   | (SimLogEntryBase & {
       cat: "dmg";
       ctx: DamageContext;
+      breakdown: Record<string, unknown>;
       amount: number;
     })
   | (SimLogEntryBase & {
@@ -32,17 +33,19 @@ export function pushLog(
 
   // these are required for damage log entries
   ctx?: DamageContext,
+  breakdown?: Record<string, unknown>,
   amount?: number,
 ): void {
   if (logEntryType === "dmg") {
-    if (!ctx || amount === undefined)
-      throw new Error("Damage log entries require ctx and amount");
+    if (!ctx || !breakdown || amount === undefined)
+      throw new Error("Damage log entries require ctx, breakdown, and amount");
     const entry: SimLogEntry = {
       cat: "dmg",
       frame,
       env,
       message,
       ctx,
+      breakdown,
       amount,
     };
     log.push(entry);
@@ -69,9 +72,9 @@ export function summarizeLog(
       const tag = `[${entry.cat.toUpperCase()}]`;
       if (entry.cat === "dmg") {
         serialized.push(`${fmtFrame(entry.frame)} ${tag} ${entry.message}`);
-        // serialized.push(
-        //   `breakdown: ${JSON.stringify(entry.ctx, null, 2)} | amount: ${entry.amount}`,
-        // );
+        serialized.push(
+          `breakdown: ${JSON.stringify(entry.breakdown.bonusLog, null, 2)} | amount: ${entry.amount}`,
+        );
       } else {
         serialized.push(`${fmtFrame(entry.frame)} ${tag} ${entry.message}`);
       }

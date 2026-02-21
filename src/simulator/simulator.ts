@@ -1,7 +1,6 @@
 import type { OperatorBuild } from "../types/operator";
 import type {
   SimBuff,
-  SimBuffType,
   SimInfliction,
   SimInflictionType,
   SimStatusType,
@@ -13,20 +12,22 @@ import type {
   SimEvent,
 } from "../types/simulator/simulator";
 import { pushLog, type SimLog, type SimLogEntryCat } from "./log";
-import type { DamageContext, DamageModel } from "./damageModel";
-import { SimRegistry } from "./registry";
+import type { DamageContext, DamageModel } from "./damage/damageModel";
+import { SimRegistry } from "./listeners/registry";
 
-import { buildDamageContext, dispatchAfterHit } from "./damageEngine";
-import { createDefaultDamageModel } from "./damageModel";
+import { buildDamageContext } from "./damage/damageEngine";
+// import { dispatchAfterHit } from "./listeners/handlers";
+import { createDefaultDamageModel } from "./damage/damageModel";
 
 // import resolver methods
-import "./resolver";
+import "./resolvers";
 import {
   resolveBuffApplication,
   resolveBuffExpiration,
   resolveInflictionExpiration,
   resolveStatusApplication,
-} from "./resolver";
+} from "./resolvers";
+import { BuffId } from "../data/buffs/BuffDef";
 
 /**
  * SimWorld
@@ -65,19 +66,20 @@ export type SimOps = {
     cat: SimLogEntryCat,
     message: string,
     ctx?: DamageContext,
+    breakdown?: Record<string, unknown>,
     amount?: number,
   ) => void;
   /** Apply raw damage (integer) to target hp. */
   applyDamage: (targetId: SimEntityId, amount: number) => void;
   upsertBuff: (targetId: SimEntityId, buff: SimBuff) => void;
-  removeBuff: (targetId: SimEntityId, buffType: SimBuffType) => void;
+  removeBuff: (targetId: SimEntityId, buffId: BuffId) => void;
   /**
    * Add stacks to a buff (creating it if missing), clamping to [0, maxStacks].
    * Optionally emits a log entry when stacks change.
    */
   addBuffStacks: (params: {
     targetId: SimEntityId;
-    buffType: SimBuffType;
+    buffId: BuffId;
     delta: number;
     maxStacks: number;
     logOnChange?: {
@@ -101,9 +103,9 @@ type SimResolvers = {
   resolveBuffApplication: (
     sourceId: SimEntityId,
     targetId: SimEntityId,
-    buffType: SimBuffType,
+    buffId: BuffId,
   ) => void;
-  resolveBuffExpiration: (entityId: SimEntityId, buffType: SimBuffType) => void;
+  resolveBuffExpiration: (entityId: SimEntityId, buffId: BuffId) => void;
   resolveInflictionExpiration: (
     sourceId: SimEntityId,
     inflictionType: SimInflictionType,
@@ -204,11 +206,11 @@ export class SimWorld {
       schedule: (ev: SimEvent) => this.schedule(ev),
       popNextEvent: () => this.popNextEvent(),
       advanceToFrame: (frame: number) => this.advanceToFrame(frame),
-      log: (cat, message, ctx, amount) =>
-        this.appendLog(cat, message, ctx, amount),
+      log: (cat, message, ctx, breakdown, amount) =>
+        this.appendLog(cat, message, ctx, breakdown, amount),
       applyDamage: (targetId, amount) => this.applyDamage(targetId, amount),
       upsertBuff: (targetId, buff) => this.upsertBuff(targetId, buff),
-      removeBuff: (targetId, buffType) => this.removeBuff(targetId, buffType),
+      removeBuff: (targetId, buffId) => this.removeBuff(targetId, buffId),
       addBuffStacks: params => this.addBuffStacks(params),
       upsertInfliction: (targetId, inf) => this.upsertInfliction(targetId, inf),
       removeInfliction: (targetId, inflictionType) =>
@@ -216,10 +218,10 @@ export class SimWorld {
     };
 
     this.resolvers = {
-      resolveBuffApplication: (sourceId, targetId, buffType) =>
-        resolveBuffApplication(self, sourceId, targetId, buffType),
-      resolveBuffExpiration: (entityId, buffType) =>
-        resolveBuffExpiration(self, entityId, buffType),
+      resolveBuffApplication: (sourceId, targetId, buffId) =>
+        resolveBuffApplication(self, sourceId, targetId, buffId),
+      resolveBuffExpiration: (entityId, buffId) =>
+        resolveBuffExpiration(self, entityId, buffId),
       resolveInflictionExpiration: (sourceId, inflictionType) =>
         resolveInflictionExpiration(self, sourceId, inflictionType),
       resolveStatusApplication: (sourceId, targetId, statusType) =>
@@ -258,9 +260,19 @@ export class SimWorld {
     cat: SimLogEntryCat,
     message: string,
     ctx?: DamageContext,
+    breakdown?: Record<string, unknown>,
     amount?: number,
   ): void {
-    pushLog(this.log, cat, this.nowInFrames, this.env, message, ctx, amount);
+    pushLog(
+      this.log,
+      cat,
+      this.nowInFrames,
+      this.env,
+      message,
+      ctx,
+      breakdown,
+      amount,
+    );
   }
 
   // ----- Mutations (worldOps) -----
@@ -273,18 +285,18 @@ export class SimWorld {
   private upsertBuff(targetId: SimEntityId, buff: SimBuff): void {
     const ent = this.getEntityOrThrow(targetId);
     (ent as any).buffs ??= {};
-    (ent as any).buffs[buff.type] = buff;
+    (ent as any).buffs[buff.id] = buff;
   }
 
-  private removeBuff(targetId: SimEntityId, buffType: SimBuffType): void {
+  private removeBuff(targetId: SimEntityId, buffId: BuffId): void {
     const ent = this.getEntityOrThrow(targetId);
     if (!(ent as any).buffs) return;
-    delete (ent as any).buffs[buffType];
+    delete (ent as any).buffs[buffId];
   }
 
   private addBuffStacks(params: {
     targetId: SimEntityId;
-    buffType: SimBuffType;
+    buffId: BuffId;
     delta: number;
     maxStacks: number;
     logOnChange?: {
@@ -293,8 +305,8 @@ export class SimWorld {
     };
   }): void {
     const ent = this.getEntityOrThrow(params.targetId);
-    (ent as any).buffs ??= {};
-    const existing = (ent as any).buffs[params.buffType] as SimBuff | undefined;
+    ent.buffs ??= {};
+    const existing = ent.buffs[params.buffId] as SimBuff | undefined;
     const before = Math.max(0, Number((existing as any)?.stacks ?? 0));
     const after = Math.max(
       0,
@@ -305,15 +317,15 @@ export class SimWorld {
     );
 
     if (!existing) {
-      (ent as any).buffs[params.buffType] = {
-        type: params.buffType,
+      ent.buffs[params.buffId] = {
+        id: params.buffId,
         stacks: after,
         lastApplyFrame: this.nowInFrames,
       } as any;
     } else {
       (existing as any).stacks = after;
       (existing as any).lastApplyFrame = this.nowInFrames;
-      (ent as any).buffs[params.buffType] = existing;
+      ent.buffs[params.buffId] = existing;
     }
 
     if (params.logOnChange && before !== after) {
@@ -411,15 +423,14 @@ export class SimWorld {
             "dmg",
             `"${source.name}" hit "${target.name}" for ${res.amount} damage (hp left: ${(targetAfter as any).hp})`,
             ctx,
+            res.breakdown,
             res.amount,
           );
 
-          // After-hit triggers (operator talents, buff procs, etc.)
-          dispatchAfterHit({
-            registry: this.registry,
+          this.registry.runAfterHit({
             read: this.read,
             ops: this.ops,
-            ev,
+            ev: ev,
             sourceId: source.id,
             targetId: target.id,
           });
@@ -443,7 +454,7 @@ export class SimWorld {
           this.resolvers.resolveBuffApplication(
             source.id,
             target.id,
-            ev.buffType!,
+            ev.buffId!,
           );
           break;
         }
@@ -452,7 +463,7 @@ export class SimWorld {
           // sourceId holds the entity who owns the buff.
           if (!ev.sourceId)
             throw new Error(`event with type buffExpire but no sourceId`);
-          this.resolvers.resolveBuffExpiration(ev.sourceId, ev.buffType!);
+          this.resolvers.resolveBuffExpiration(ev.sourceId, ev.buffId!);
           break;
         }
 

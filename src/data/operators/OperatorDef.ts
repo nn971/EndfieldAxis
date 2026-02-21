@@ -1,4 +1,4 @@
-import type { SimRegistry } from "../../simulator/registry";
+import type { SimRegistry } from "../../simulator/listeners/registry";
 
 /**
  * OperatorDefClass
@@ -10,26 +10,6 @@ import type { SimRegistry } from "../../simulator/registry";
  */
 
 export type DmgType = "physical" | "heat" | "electric" | "cryo" | "nature";
-
-export type SkillType =
-  | "normalAttack"
-  | "normalSkill"
-  | "comboSkill"
-  | "ultimate";
-// | string;
-
-/**
- * A skill timeline step is now expressed as code (a function), not a tagged-data DSL.
- * The concrete context/type is defined in simulator/skillOps.
- */
-export type SkillTimelineStep = (ctx: any) => any[];
-
-export type SkillDef = {
-  name: string;
-  durationFrames: number;
-  icon: string;
-  timeline?: SkillTimelineStep[];
-};
 
 export type OperatorId = string;
 
@@ -45,6 +25,22 @@ export type OperatorStatSnapshot = {
   agility: number;
   intellect: number;
   will: number;
+};
+
+export type SkillType =
+  | "normalAttack"
+  | "normalSkill"
+  | "comboSkill"
+  | "ultimate";
+// | string;
+
+export type SkillTimelineStep = (ctx: any) => any[];
+
+export type SkillDef = {
+  name: string;
+  durationFrames: number;
+  icon: string;
+  timeline?: SkillTimelineStep[];
 };
 
 export type OperatorDefInit = {
@@ -64,23 +60,23 @@ export type OperatorDefInit = {
   };
 };
 
-export class OperatorDefClass {
-  public id: OperatorId;
-  public name: string;
-  public avatar: string;
-  public attributes: {
+export class OperatorDef {
+  public readonly id: OperatorId;
+  public readonly name: string;
+  public readonly avatar: string;
+  public readonly attributes: {
     main: OperatorAttributeType;
     sub: OperatorAttributeType;
   };
-  public stats: {
+  public readonly stats: {
     level1: OperatorStatSnapshot;
     level90: OperatorStatSnapshot;
   };
-  public skills: {
+  public readonly skills: {
     [key in SkillType]?: SkillDef;
   };
 
-  constructor(init: OperatorDefInit) {
+  protected constructor(init: OperatorDefInit) {
     this.id = init.id;
     this.name = init.name;
     this.avatar = init.avatar;
