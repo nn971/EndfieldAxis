@@ -87,12 +87,12 @@ export function resolveStatusApplication(
 
       if (current <= 0) {
         self.ops.upsertInfliction(targetId, {
-          type: "vulnerable",
+          type: "physical",
           stacks: 1,
           lastApplyFrame: self.read.nowInFrames,
         } as SimInfliction);
 
-        scheduleInflictionExpire(self, targetId, "vulnerable");
+        scheduleInflictionExpire(self, targetId, "physical");
         self.ops.log(
           "buff",
           `INFLICTION vulnerable apply (by LIFT, target=${(target as any).name})`,
@@ -103,12 +103,12 @@ export function resolveStatusApplication(
         const before = current;
         const after = Math.min(4, before + 1);
         self.ops.upsertInfliction(targetId, {
-          type: "vulnerable",
+          type: "physical",
           stacks: after,
           lastApplyFrame: self.read.nowInFrames,
         } as SimInfliction);
 
-        scheduleInflictionExpire(self, targetId, "vulnerable");
+        scheduleInflictionExpire(self, targetId, "physical");
 
         self.ops.log(
           "buff",
@@ -152,12 +152,12 @@ export function resolveStatusApplication(
 
       if (current <= 0) {
         self.ops.upsertInfliction(targetId, {
-          type: "vulnerable",
+          type: "physical",
           stacks: 1,
           lastApplyFrame: self.read.nowInFrames,
         } as SimInfliction);
 
-        scheduleInflictionExpire(self, targetId, "vulnerable");
+        scheduleInflictionExpire(self, targetId, "physical");
         self.ops.log(
           "buff",
           `INFLICTION vulnerable apply (by CRUSH, target=${(target as any).name})`,
@@ -167,7 +167,7 @@ export function resolveStatusApplication(
 
       // Has vulnerable: consume all stacks and trigger crush burst damage.
       const consumed = current;
-      self.ops.removeInfliction(targetId, "vulnerable");
+      self.ops.removeInfliction(targetId, "physical");
 
       self.ops.log(
         "buff",

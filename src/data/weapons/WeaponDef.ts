@@ -1,4 +1,5 @@
 import { SimRegistry } from "../../simulator/listeners/registry";
+import { RestStatBonusBucket } from "../../types/operator";
 
 export type WeaponId = string;
 
@@ -17,7 +18,15 @@ export const WeaponTypeName = {
   handcannon: "Handcannon",
 } as Record<WeaponType, string>;
 
-export type WeaponSkillId = string;
+export type BaseWeaponSkillId =
+  | "agilityboost"
+  | "physicaldmgboost"
+  | "attackboost";
+export type Size = "L" | "M" | "S";
+export type ThirdWeaponSkillCat = "combative" | "infliction";
+export type ThirdWeaponSkillId = string; // unique id for each weapon's 3rd skill
+
+export type WeaponSkillId = BaseWeaponSkillId | ThirdWeaponSkillCat;
 
 export type WeaponDefInit = {
   id: WeaponId;
@@ -28,14 +37,24 @@ export type WeaponDefInit = {
     level1: number;
     level90: number;
   };
-  skills: {
-    1: WeaponSkillId;
-    2: WeaponSkillId;
-    3: { id: WeaponSkillId; name: string } | null;
+
+  s1: { id: BaseWeaponSkillId; size: "S" | "M" | "L" };
+  s2: { id: BaseWeaponSkillId; size: "S" | "M" | "L" };
+  s3: {
+    id: ThirdWeaponSkillId;
+    cat: ThirdWeaponSkillCat;
+    name: string;
+    bonus: {
+      bucket: RestStatBonusBucket;
+      byRank: (rank: number) => number;
+    };
   };
 };
 
 export class WeaponDef {
+  /** Each weapon has a unique 3rd skill,
+   * its boost value should be calculated separately,
+   * and its behavior should be handled by sim plugins. */
   public readonly id: WeaponId;
   public readonly name: string;
   public readonly type: WeaponType;
@@ -45,10 +64,16 @@ export class WeaponDef {
     level1: number;
     level90: number;
   };
-  public readonly skills: {
-    1: WeaponSkillId;
-    2: WeaponSkillId;
-    3: { id: WeaponSkillId; name: string } | null;
+  public readonly s1: { id: BaseWeaponSkillId; size: "S" | "M" | "L" };
+  public readonly s2: { id: BaseWeaponSkillId; size: "S" | "M" | "L" };
+  public readonly s3: {
+    id: ThirdWeaponSkillId;
+    cat: ThirdWeaponSkillCat;
+    name: string;
+    bonus: {
+      bucket: RestStatBonusBucket;
+      byRank: (rank: number) => number;
+    };
   };
 
   protected constructor(init: WeaponDefInit) {
@@ -57,8 +82,22 @@ export class WeaponDef {
     this.type = init.type;
     this.icon = init.icon;
     this.atkStat = init.atkStat;
-    this.skills = init.skills;
+    this.s1 = init.s1;
+    this.s2 = init.s2;
+    this.s3 = init.s3;
   }
 
   registerSimPlugins(_registry: SimRegistry): void {}
 }
+
+export const BASE_WEAPON_SKILL_LABEL: Record<BaseWeaponSkillId, string> = {
+  agilityboost: "Agility Boost",
+  physicaldmgboost: "Physical DMG Boost",
+  attackboost: "ATK Boost",
+};
+
+export const THIRD_WEAPON_SKILL_CAT_LABEL: Record<ThirdWeaponSkillCat, string> =
+  {
+    combative: "Combative",
+    infliction: "Infliction",
+  };

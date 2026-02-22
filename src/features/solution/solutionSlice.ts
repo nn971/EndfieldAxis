@@ -2,7 +2,7 @@ import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import operatorsData from "../../data/operators";
 import type { SkillBox, SolutionState } from "../../types/editor";
 import type { OperatorId, SkillType } from "../../data/operators/OperatorDef";
-import type { OperatorBuild } from "../../types/operator";
+import type { OperatorBuild, RestStatSnapshot } from "../../types/operator";
 import { statUpdater } from "./statUpdater";
 import { makeId } from "../../shared/lib/id";
 import { assignNoDup, moveItem } from "../../shared/lib/utils";
@@ -14,6 +14,39 @@ function getDurationFrames(operatorId: string, skillType: SkillType): number {
     operatorsData[operatorId]?.skills?.[skillType]?.durationFrames ??
     DEFAULT_DURATION_FRAMES
   );
+}
+
+export function makeEmptyRestStat(): RestStatSnapshot {
+  return {
+    operatorAttack: 0,
+    weaponAttack: 0,
+    baseAtk: 0,
+    atkIncRatio: 0,
+    atkIncFlat: 0,
+    attributes: {
+      strength: 0,
+      agility: 0,
+      intellect: 0,
+      will: 0,
+    },
+    attributesBonusRatio: 0,
+
+    criticalHitChance: 0.05,
+    criticalHitDmgIncRatio: 0.5,
+    artsIntensity: 0,
+    comboCooldownReduction: 0,
+    ultimateGainEfficiency: 0,
+    staggerEfficiency: 0,
+    dmgIncRatio: {
+      physical: 0,
+      heat: 0,
+      electric: 0,
+      cryo: 0,
+      nature: 0,
+    },
+    ultimateDmgIncRatio: 0,
+    log: [],
+  };
 }
 
 function makeDefaultBuild(operatorId: OperatorId): OperatorBuild {
@@ -31,22 +64,15 @@ function makeDefaultBuild(operatorId: OperatorId): OperatorBuild {
       talent1: 2,
       talent2: 2,
     },
-    weapon: { id: null, level: 90, skillRanks: {} },
+    trustRank: 4,
+    weapon: { id: null, level: 90, skillRanks: { s1: 0, s2: 0, s3: 0 } },
     gears: {
       armor: { gearId: null, ranks: [0, 0, 0] },
       gloves: { gearId: null, ranks: [0, 0, 0] },
       kit1: { gearId: null, ranks: [0, 0, 0] },
       kit2: { gearId: null, ranks: [0, 0, 0] },
     },
-    restStat: {
-      operatorAttack: 0,
-      weaponAttack: 0,
-      baseAtk: 0,
-      attributes: { strength: 0, agility: 0, intellect: 0, will: 0 },
-      damageBonusRatio: {},
-      damageBonusValue: {},
-      log: [],
-    },
+    restStat: makeEmptyRestStat(),
   };
 
   statUpdater(build);

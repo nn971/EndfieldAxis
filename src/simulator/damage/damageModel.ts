@@ -56,9 +56,7 @@ export type DamageBreakdown = {
   weaponAttack: number;
   attackIncMul: number;
   attackIncValue: number;
-  mainAttributePoints: number;
-  secondaryAttributePoints: number;
-  attributeRatio: number;
+  attributeBonusRatio: number;
   attackFinal: number;
 
   // Multipliers
@@ -216,10 +214,12 @@ export function createDefaultDamageModel(params?: {
       let operatorAttack = 0;
       let weaponAttack = 0;
       let levelStats = DEFAULT_STAT_SNAPSHOT;
+      let attributeBonusRatio = 0;
 
       if (restStat) {
         operatorAttack = Number(restStat.operatorAttack ?? 0);
         weaponAttack = Number(restStat.weaponAttack ?? 0);
+        attributeBonusRatio = Number(restStat.attributesBonusRatio ?? 0);
       } else {
         // if (!ctx.source) throw new Error(`unhandled case: damage with no source`);
         // --- Attack stage ---
@@ -250,26 +250,26 @@ export function createDefaultDamageModel(params?: {
             );
           }
         }
+
+        const mainAttributePoints = getAttributeValue(
+          levelStats,
+          opDef?.attributes?.main,
+        );
+        const secondaryAttributePoints = getAttributeValue(
+          levelStats,
+          opDef?.attributes?.sub,
+        );
+        attributeBonusRatio =
+          mainAttributePoints * 0.005 + secondaryAttributePoints * 0.002;
       }
 
       const attackIncRatio = bonuses.ratio.attackIncMul;
       const attackIncValue = bonuses.value.attackIncValue;
 
-      const mainAttributePoints = getAttributeValue(
-        levelStats,
-        opDef?.attributes?.main,
-      );
-      const secondaryAttributePoints = getAttributeValue(
-        levelStats,
-        opDef?.attributes?.sub,
-      );
-      const attributeRatio =
-        mainAttributePoints * 0.005 + secondaryAttributePoints * 0.002;
-
       const attackFinal =
         ((operatorAttack + weaponAttack) * (1 + attackIncRatio) +
           attackIncValue) *
-        (1 + attributeRatio);
+        (1 + attributeBonusRatio);
 
       // --- Multipliers ---
       const dmgSkillMultiplier = Number(ctx.dmgSkillMultiplier ?? 1);
@@ -314,9 +314,7 @@ export function createDefaultDamageModel(params?: {
           weaponAttack,
           attackIncMul: attackIncRatio,
           attackIncValue,
-          mainAttributePoints,
-          secondaryAttributePoints,
-          attributeRatio,
+          attributeBonusRatio,
           attackFinal,
 
           dmgSkillMultiplier,

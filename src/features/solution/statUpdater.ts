@@ -5,10 +5,11 @@ import weaponsData from "../../data/weapons";
 import type { OperatorAttributeType } from "../../data/operators/OperatorDef";
 import type {
   OperatorBuild,
-  RestStatBonusEntry,
+  RestBonusEntry,
   RestStatSnapshot,
 } from "../../types/operator";
-import { getWeaponSkillRestBonuses } from "../../data/weapons/weaponSkillStats";
+import { getWeaponSkillRestBonus } from "../../data/weapons/weaponSkillStats";
+import { makeEmptyRestStat } from "./solutionSlice";
 
 const MAX_LEVEL = 90;
 
@@ -30,194 +31,196 @@ function interpolateLevelStat(
   return Math.max(0, Math.round(raw));
 }
 
-function makeZeroAttributes(): Record<OperatorAttributeType, number> {
-  return {
-    strength: 0,
-    agility: 0,
-    intellect: 0,
-    will: 0,
-  };
-}
-
-export function computeRestStat(build: OperatorBuild): RestStatSnapshot {
-  const opDef = operatorsData[build.id];
-  if (!opDef) {
-    return {
-      operatorAttack: 0,
-      weaponAttack: 0,
-      baseAtk: 0,
-      attributes: makeZeroAttributes(),
-      damageBonusRatio: {},
-      damageBonusValue: {},
-      log: [],
-    };
+function applyRestStatAddValue(
+  snapshot: RestStatSnapshot,
+  bucket: RestBonusEntry["bucket"],
+  addValue: number,
+): void {
+  // Attributes
+  if (bucket in snapshot.attributes) {
+    snapshot.attributes[bucket as OperatorAttributeType] += addValue; // Only one of these two is nonzero
+    return;
   }
 
-  const log: RestStatBonusEntry[] = [];
+  switch (bucket) {
+    case "baseAtk": {
+      // Keep it simple: treat any flat baseAtk bonus as additional operator base ATK.
+      // (baseAtk is recomputed from operatorAttack + weaponAttack later)
+      snapshot.operatorAttack += addValue;
+      return;
+    }
+    case "atkIncRatio": {
+      snapshot.atkIncRatio += addValue;
+      return;
+    }
+    case "atkIncFlat": {
+      snapshot.atkIncFlat += addValue;
+      return;
+    }
+    case "artsIntensity": {
+      snapshot.artsIntensity += addValue;
+      return;
+    }
+    case "comboCooldownReduction": {
+      snapshot.comboCooldownReduction += addValue;
+      return;
+    }
+    case "ultimateGainEfficiency": {
+      snapshot.ultimateGainEfficiency += addValue;
+      return;
+    }
+    case "physicalDmgIncRatio": {
+      snapshot.dmgIncRatio.physical += addValue;
+      return;
+    }
+    case "ultimateDmgIncRatio": {
+      snapshot.ultimateDmgIncRatio += addValue;
+      return;
+    }
+    default: {
+      // Forward-compat: keep calculation alive even if UI adds new buckets.
+      console.warn(
+        `Unhandled rest stat bucket ${bucket} for addValue=${addValue}`,
+      );
+      return;
+    }
+  }
+}
+
+// function makeZeroAttributes(): Record<OperatorAttributeType, number> {
+//   return {
+//     strength: 0,
+//     agility: 0,
+//     intellect: 0,
+//     will: 0,
+//   };
+// }
+
+export function computeRestStat(build: OperatorBuild): RestStatSnapshot {
+  const snapshot = makeEmptyRestStat();
+  const opDef = operatorsData[build.id];
+  if (!opDef) {
+    return snapshot;
+  }
 
   // ---- Level scaling (operator base) ----
-  const operatorAttack = interpolateLevelStat(
+  snapshot.operatorAttack = interpolateLevelStat(
     build.level,
     opDef.stats.level1.attack,
     opDef.stats.level90.attack,
   );
 
-  log.push({
+  snapshot.log.push({
     source: "level",
-    sourceId: build.id,
     bucket: "baseAtk",
-    addValue: operatorAttack,
-    note: `Operator base ATK (lv ${clampLevel(build.level)})`,
+    addValue: snapshot.operatorAttack,
+    log: `Operator ${build.id} base ATK (lv ${clampLevel(build.level)})`,
   });
 
-  const attributes = makeZeroAttributes();
-  for (const attr of Object.keys(attributes) as OperatorAttributeType[]) {
+  for (const attr of Object.keys(
+    snapshot.attributes,
+  ) as OperatorAttributeType[]) {
     const v = interpolateLevelStat(
       build.level,
       (opDef.stats.level1 as any)[attr] ?? 0,
       (opDef.stats.level90 as any)[attr] ?? 0,
     );
-    attributes[attr] += v;
+    snapshot.attributes[attr] += v;
     if (v !== 0) {
-      log.push({
+      snapshot.log.push({
         source: "level",
-        sourceId: build.id,
         bucket: attr,
         addValue: v,
-        note: `Operator base ${attr} (lv ${clampLevel(build.level)})`,
+        log: `Operator ${build.id} base ${attr} (lv ${clampLevel(build.level)})`,
       });
     }
   }
 
+  // ---- Trust rank (operator base) ----
+  const TRUST_BONUS_MAPPING: Record<number, number> = {
+    0: 0,
+    1: 10,
+    2: 25,
+    3: 40,
+    4: 60,
+  };
+  const trustBonus = TRUST_BONUS_MAPPING[build.trustRank] ?? 0;
+  snapshot.attributes[opDef.attributes.main] += trustBonus;
+  if (trustBonus !== 0) {
+    snapshot.log.push({
+      source: "trust",
+      bucket: opDef.attributes.main,
+      addValue: trustBonus,
+      log: `Trust rank ${build.trustRank} (+${trustBonus} ${opDef.attributes.main})`,
+    });
+  }
+
+  // Collect weapon-skill and gear rest-stat atoms first, then apply them in one pass.
+  const weaponAndGearBonuses: RestBonusEntry[] = [];
+
   // ---- Weapon attack scaling + weapon skills rest bonuses ----
-  let weaponAttack = 0;
-  if (build.weapon?.id != null) {
+  if (build.weapon.id != null) {
     const wDef = weaponsData[build.weapon.id];
     if (wDef) {
-      weaponAttack = interpolateLevelStat(
+      snapshot.weaponAttack = interpolateLevelStat(
         build.weapon.level,
         wDef.atkStat.level1,
         wDef.atkStat.level90,
       );
-      log.push({
+      snapshot.log.push({
         source: "weapon",
-        sourceId: build.weapon.id,
         bucket: "baseAtk",
-        addValue: weaponAttack,
-        note: `Weapon ATK (lv ${clampLevel(build.weapon.level)})`,
+        addValue: snapshot.weaponAttack,
+        log: `Weapon ${build.weapon.id} base ATK (lv ${clampLevel(build.weapon.level)})`,
       });
 
-      const skillIds: string[] = [wDef.skills[1], wDef.skills[2]];
-      if (wDef.skills[3]?.id) skillIds.push(wDef.skills[3].id);
-
-      for (const skillId of skillIds) {
-        const rank = Math.max(
-          1,
-          Math.min(9, Number(build.weapon.skillRanks?.[skillId] ?? 1)),
+      for (const k of ["s1", "s2", "s3"] as const) {
+        const entry = getWeaponSkillRestBonus(
+          build.weapon.id,
+          k,
+          build.weapon.skillRanks[k],
         );
-        const deltas = getWeaponSkillRestBonuses(skillId, rank);
-
-        for (const d of deltas) {
-          if (d.attributes) {
-            for (const [k, v] of Object.entries(d.attributes) as Array<
-              [OperatorAttributeType, number]
-            >) {
-              if (!Number.isFinite(v) || v === 0) continue;
-              attributes[k] += v;
-              log.push({
-                source: "weapon",
-                sourceId: skillId,
-                bucket: k,
-                addValue: v,
-                note: d.note ?? `Weapon skill ${skillId} (rank ${rank})`,
-              });
-            }
-          }
-          if (Number.isFinite(d.attackIncMul) && d.attackIncMul !== 0) {
-            log.push({
-              source: "weapon",
-              sourceId: skillId,
-              bucket: "attackIncMul",
-              addRatio: d.attackIncMul,
-              note: d.note ?? `Weapon skill ${skillId} (rank ${rank})`,
-            });
-          }
-          if (Number.isFinite(d.attackIncValue) && d.attackIncValue !== 0) {
-            log.push({
-              source: "weapon",
-              sourceId: skillId,
-              bucket: "attackIncValue",
-              addValue: d.attackIncValue,
-              note: d.note ?? `Weapon skill ${skillId} (rank ${rank})`,
-            });
-          }
-          if (Number.isFinite(d.outgoingIncMul) && d.outgoingIncMul !== 0) {
-            log.push({
-              source: "weapon",
-              sourceId: skillId,
-              bucket: "outgoingIncMul",
-              addRatio: d.outgoingIncMul,
-              note: d.note ?? `Weapon skill ${skillId} (rank ${rank})`,
-            });
-          }
-        }
+        if (entry) weaponAndGearBonuses.push(entry);
       }
     }
   }
 
-  // ---- Gears (fixed attribute bonuses from def class) ----
+  // ---- Gears (artificing ranks -> static rest-stat buckets) ----
   for (const [slotKey, slot] of Object.entries(build.gears)) {
     if (!slot.gearId) continue;
     const gDef = gearsData[slot.gearId];
     if (!gDef) continue;
 
-    const mainType = gDef.attributes.main;
-    const subType = gDef.attributes.sub;
-    const mainAdd = gDef.getRestAttributeBonus(slot.ranks).main;
-    const subAdd = gDef.getRestAttributeBonus(slot.ranks).sub;
-
-    if (mainAdd !== 0) {
-      attributes[mainType] += mainAdd;
-      log.push({
-        source: "gear",
-        sourceId: gDef.id,
-        bucket: mainType,
-        addValue: mainAdd,
-        note: `${gDef.name} (${slotKey}) main attr, ranks=${slot.ranks.join(",")}`,
-      });
-    }
-    if (subAdd !== 0) {
-      attributes[subType] += subAdd;
-      log.push({
-        source: "gear",
-        sourceId: gDef.id,
-        bucket: subType,
-        addValue: subAdd,
-        note: `${gDef.name} (${slotKey}) sub attr, ranks=${slot.ranks.join(",")}`,
-      });
-    }
+    weaponAndGearBonuses.push(
+      ...gDef.getRestAttributeBonus(slot.ranks, slotKey),
+    );
   }
+
+  for (const e of weaponAndGearBonuses) {
+    if (!e.addValue) continue;
+    applyRestStatAddValue(snapshot, e.bucket, e.addValue);
+    snapshot.log.push(e);
+  }
+
+  // ---- Attribute bonus ratio ----
+  const mainAttribute = opDef.attributes.main;
+  const subAttribute = opDef.attributes.sub;
+  snapshot.attributesBonusRatio =
+    0.005 * snapshot.attributes[mainAttribute] +
+    0.002 * snapshot.attributes[subAttribute];
+
+  // ---- Update baseAtk ----
+  snapshot.baseAtk = snapshot.operatorAttack + snapshot.weaponAttack;
 
   // ---- Aggregate static damage buckets from build ----
-  let attackIncMul = 0;
-  let attackIncValue = 0;
-  let outgoingIncMul = 0;
 
-  for (const e of log) {
-    if (e.bucket === "attackIncMul") attackIncMul += e.addRatio ?? 0;
-    if (e.bucket === "attackIncValue") attackIncValue += e.addValue ?? 0;
-    if (e.bucket === "outgoingIncMul") outgoingIncMul += e.addRatio ?? 0;
-  }
+  // for (const e of log) {
+  //   if (e.bucket === "atkIncRatio") attackIncMul += e.addRatio ?? 0;
+  //   if (e.bucket === "attackIncValue") attackIncValue += e.addValue ?? 0;
+  //   if (e.bucket === "outgoingIncMul") outgoingIncMul += e.addRatio ?? 0;
+  // }
 
-  return {
-    operatorAttack,
-    weaponAttack,
-    baseAtk: operatorAttack + weaponAttack,
-    attributes,
-    damageBonusRatio: { attackIncMul, outgoingIncMul },
-    damageBonusValue: { attackIncValue },
-    log,
-  };
+  return snapshot;
 }
 
 /** Update build.restStat in-place (immer-friendly). */

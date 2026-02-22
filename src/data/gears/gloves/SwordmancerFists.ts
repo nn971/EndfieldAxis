@@ -8,13 +8,15 @@ class SwordmancerFistsDef extends GearsDef {
       name: "Swordmancer TAC Fists",
       icon: "SWORDMANCERFISTS.png",
       defend: 56,
-      attributes: {
-        main: "will",
-        sub: "intellect",
+      bonusBuckets: {
+        s1: "agility",
+        s2: "strength",
+        s3: "ultimateDmgIncRatio",
       },
-      restAttrByRank: {
-        mainByRank: [0, 0, 0, 0],
-        subByRank: [0, 0, 0, 0],
+      bonusValuesByRank: {
+        s1: [65, 71, 78, 84],
+        s2: [43, 47, 51, 55],
+        s3: [0.431, 0.474, 0.518, 0.561],
       },
     });
   }

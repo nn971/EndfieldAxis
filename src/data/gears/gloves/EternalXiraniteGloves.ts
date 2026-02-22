@@ -8,13 +8,15 @@ class EternalXiraniteGlovesDef extends GearsDef {
       name: "Eternal Xiranite Gloves",
       icon: "ETERNALXIRANITEGLOVES.png",
       defend: 56,
-      attributes: {
-        main: "will",
-        sub: "intellect",
+      bonusBuckets: {
+        s1: "will",
+        s2: "intellect",
+        s3: "agility",
       },
-      restAttrByRank: {
-        mainByRank: [0, 0, 0, 0],
-        subByRank: [0, 0, 0, 0],
+      bonusValuesByRank: {
+        s1: [0, 0, 0, 0],
+        s2: [0, 0, 0, 0],
+        s3: [0, 0, 0, 0],
       },
     });
   }

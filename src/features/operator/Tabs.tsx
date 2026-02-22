@@ -3,11 +3,21 @@ import { OperatorBuild } from "../../types/operator";
 import PreviewSlider from "../../shared/components/PreviewSlider";
 import weaponsData from "../../data/weapons";
 import placeholderUrl from "../../assets/default/placeholder.jpg";
-import { WeaponId, WeaponType } from "../../data/weapons/WeaponDef";
+import {
+  BaseWeaponSkillId,
+  ThirdWeaponSkillCat,
+  WeaponDef,
+  WeaponId,
+  WeaponType,
+} from "../../data/weapons/WeaponDef";
 import operatorsData from "../../data/operators";
 import { OperatorId } from "../../data/operators/OperatorDef";
 import gearsData from "../../data/gears";
 import { GearsId, GearsType, GearsTypeName } from "../../data/gears/GearsDef";
+import {
+  BASE_WEAPON_SKILL_LABEL,
+  THIRD_WEAPON_SKILL_CAT_LABEL,
+} from "../../data/weapons/WeaponDef";
 
 type TabProps = {
   operatorId: OperatorId;
@@ -57,6 +67,14 @@ export function OperatorBuildTab({ operatorId, build, onCommit }: TabProps) {
           })
         }
       />
+
+      <PreviewSlider
+        label="Trust Bonus Rank"
+        min={0}
+        max={4}
+        value={build.trustRank}
+        onCommit={v => onCommit(operatorId, { trustRank: v })}
+      />
     </div>
   );
 }
@@ -65,7 +83,7 @@ export function WeaponTab({ operatorId, build, onCommit }: TabProps) {
   const weaponBuild = build.weapon;
   const [isPicking, setIsPicking] = useState(false);
 
-  const weapon = useMemo(
+  const weaponDef = useMemo(
     () => (weaponBuild?.id ? weaponsData[weaponBuild.id] : null),
     [weaponBuild?.id],
   );
@@ -116,12 +134,14 @@ export function WeaponTab({ operatorId, build, onCommit }: TabProps) {
           <img
             className="w-full h-full object-cover"
             src={placeholderUrl}
-            alt={weapon?.name ?? "No Weapon"}
+            alt={weaponDef?.name ?? "No Weapon"}
           />
         </div>
         <div className="text-left">
           <div className="text-sm text-zinc-300">Weapon</div>
-          <div className="text-base font-medium">{weapon?.name ?? "None"}</div>
+          <div className="text-base font-medium">
+            {weaponDef?.name ?? "None"}
+          </div>
           <div className="text-xs text-zinc-500">
             {weaponBuild?.id ?? "no weapon equipped"}
           </div>
@@ -129,7 +149,7 @@ export function WeaponTab({ operatorId, build, onCommit }: TabProps) {
         </div>
       </button>
 
-      {weapon && weaponBuild && (
+      {weaponDef && weaponBuild && (
         <div className="mt-4">
           <PreviewSlider
             label="Weapon Level"
@@ -146,32 +166,28 @@ export function WeaponTab({ operatorId, build, onCommit }: TabProps) {
             }
           />
           <div className="text-xs text-zinc-400">Weapon skills</div>
-          {[1, 2, 3].map(n => {
-            const spec = weapon.skills[n as 1 | 2 | 3];
-            if (n === 3 && spec == null) return null;
-            const skillId =
-              n === 3
-                ? (spec as { id: string; name: string }).id
-                : (spec as string);
+          {["s1", "s2", "s3"].map(n => {
+            const spec = weaponDef[n as keyof WeaponDef];
+            if (spec == null) return null;
+            const skillId = (spec as { id: WeaponId }).id;
             const skillName =
-              n === 3
-                ? (spec as { id: string; name: string }).name
-                : `Skill ${n}`;
-            const curRank = build.weapon?.skillRanks?.[skillId] ?? 1;
+              n === "s3"
+                ? `${THIRD_WEAPON_SKILL_CAT_LABEL[(spec as { id: string; cat: ThirdWeaponSkillCat; name: string }).cat]}: ${(spec as { id: string; cat: string; name: string }).name}`
+                : `${BASE_WEAPON_SKILL_LABEL[skillId as BaseWeaponSkillId]} ${(spec as { id: BaseWeaponSkillId; size: string }).size}`;
             return (
               <PreviewSlider
                 key={skillId}
                 label={`${skillName} Rank`}
                 min={1}
                 max={9}
-                value={curRank}
+                value={weaponBuild.skillRanks[n as "s1" | "s2" | "s3"]}
                 onCommit={v =>
                   onCommit(operatorId, {
                     weapon: {
                       ...build.weapon!,
                       skillRanks: {
                         ...build.weapon!.skillRanks,
-                        [skillId]: v,
+                        [n]: v,
                       },
                     },
                   })
@@ -198,7 +214,17 @@ export function WeaponTab({ operatorId, build, onCommit }: TabProps) {
             setIsPicking(false);
           }}
           onClear={() => {
-            onCommit(operatorId, { weapon: null });
+            onCommit(operatorId, {
+              weapon: {
+                id: null,
+                level: 0,
+                skillRanks: {
+                  s1: 0,
+                  s2: 0,
+                  s3: 0,
+                },
+              },
+            });
             setIsPicking(false);
           }}
         />
@@ -348,6 +374,24 @@ function GearSlotEditor({
   const slot = build.gears[slotKey];
   const gear = slot.gearId ? gearsData[slot.gearId] : null;
 
+  const bucketLabel = (b: string) => {
+    const m: Record<string, string> = {
+      baseAtk: "Base ATK",
+      atkIncRatio: "ATK%",
+      atkIncFlat: "ATK Flat",
+      artsIntensity: "Arts Intensity",
+      comboCooldownReduction: "Combo CD Reduction",
+      ultimateGainEfficiency: "Ultimate Gain Efficiency",
+      physicalDmgIncRatio: "Physical DMG%",
+      ultimateDmgIncRatio: "Ultimate DMG%",
+      strength: "Strength",
+      agility: "Agility",
+      intellect: "Intellect",
+      will: "Will",
+    };
+    return m[b] ?? b;
+  };
+
   return (
     <div className="mt-4 rounded border border-zinc-800 bg-zinc-950/30 p-3">
       <div className="flex items-center justify-between">
@@ -379,8 +423,17 @@ function GearSlotEditor({
 
       {slot.gearId ? (
         <div className="mt-2">
+          {gear && (
+            <div className="mb-1 text-[11px] text-zinc-500">
+              Bonuses: {bucketLabel(gear.bonusBuckets.s1)} /{" "}
+              {bucketLabel(gear.bonusBuckets.s2)} /{" "}
+              {bucketLabel(gear.bonusBuckets.s3)}
+            </div>
+          )}
           <PreviewSlider
-            label="Artificing Rank 1"
+            label={`S1 ${gear ? `(${bucketLabel(gear.bonusBuckets.s1)})` : ""} — bonus +${
+              gear ? (gear.bonusValuesByRank.s1[slot.ranks[0]] ?? 0) : 0
+            }`}
             min={0}
             max={3}
             value={slot.ranks[0]}
@@ -396,7 +449,9 @@ function GearSlotEditor({
             }}
           />
           <PreviewSlider
-            label="Artificing Rank 2"
+            label={`S2 ${gear ? `(${bucketLabel(gear.bonusBuckets.s2)})` : ""} — bonus +${
+              gear ? (gear.bonusValuesByRank.s2[slot.ranks[1]] ?? 0) : 0
+            }`}
             min={0}
             max={3}
             value={slot.ranks[1]}
@@ -412,7 +467,9 @@ function GearSlotEditor({
             }}
           />
           <PreviewSlider
-            label="Artificing Rank 3"
+            label={`S3 ${gear ? `(${bucketLabel(gear.bonusBuckets.s3)})` : ""} — bonus +${
+              gear ? (gear.bonusValuesByRank.s3[slot.ranks[2]] ?? 0) : 0
+            }`}
             min={0}
             max={3}
             value={slot.ranks[2]}

@@ -1,5 +1,6 @@
 import { SimRegistry } from "../../simulator/listeners/registry";
-import { OperatorAttributeType } from "../operators/OperatorDef";
+import { RestBonusEntry, RestStatBonusBucket } from "../../types/operator";
+// import { OperatorAttributeType } from "../operators/OperatorDef";
 
 export type GearsId = string;
 
@@ -16,14 +17,26 @@ export type GearsDefInit = {
   name: string;
   icon: string;
   defend: number;
-  attributes: {
-    main: OperatorAttributeType;
-    sub: OperatorAttributeType;
+  bonusBuckets: {
+    s1: RestStatBonusBucket;
+    s2: RestStatBonusBucket;
+    s3: RestStatBonusBucket;
   };
-  restAttrByRank: {
-    mainByRank: [number, number, number, number];
-    subByRank: [number, number, number, number];
+  bonusValuesByRank: {
+    s1: [number, number, number, number];
+    s2: [number, number, number, number];
+    s3: [number, number, number, number];
   };
+};
+
+export type GearBonusKey = "s1" | "s2" | "s3";
+
+export type GearRestBonus = {
+  key: GearBonusKey;
+  bucket: RestStatBonusBucket;
+  /** 0..3 */
+  rank: number;
+  addValue: number;
 };
 
 export class GearsDef {
@@ -33,13 +46,15 @@ export class GearsDef {
   public readonly icon: string;
 
   public readonly defend: number;
-  public readonly attributes: {
-    main: OperatorAttributeType;
-    sub: OperatorAttributeType;
+  public readonly bonusBuckets: {
+    s1: RestStatBonusBucket;
+    s2: RestStatBonusBucket;
+    s3: RestStatBonusBucket;
   };
-  public readonly restAttrByRank: {
-    mainByRank: [number, number, number, number];
-    subByRank: [number, number, number, number];
+  public readonly bonusValuesByRank: {
+    s1: [number, number, number, number];
+    s2: [number, number, number, number];
+    s3: [number, number, number, number];
   };
 
   constructor(init: GearsDefInit) {
@@ -48,30 +63,53 @@ export class GearsDef {
     this.name = init.name;
     this.icon = init.icon;
     this.defend = init.defend;
-    this.attributes = init.attributes;
-    this.restAttrByRank = init.restAttrByRank;
+    this.bonusBuckets = init.bonusBuckets;
+    this.bonusValuesByRank = init.bonusValuesByRank;
   }
 
   registerSimPlugins(_registry: SimRegistry): void {}
 
-  getRestAttributeBonus(ranks: [number, number, number]): {
-    main: number;
-    sub: number;
-  } {
+  /**
+   * Static rest-stat bonuses contributed by artificing ranks.
+   *
+   * Convention: ranks[0/1/2] correspond to s1/s2/s3.
+   */
+  getRestStatBonuses(ranks: [number, number, number]): GearRestBonus[] {
     const clamp = (r: number) =>
       Math.max(0, Math.min(3, Number.isFinite(r) ? Math.round(r) : 0));
-    const [r1, r2, r3] = ranks.map(clamp) as [number, number, number];
 
-    const main =
-      this.restAttrByRank.mainByRank[r1] +
-      this.restAttrByRank.mainByRank[r2] +
-      this.restAttrByRank.mainByRank[r3];
+    const rk: Record<GearBonusKey, number> = {
+      s1: clamp(ranks[0]),
+      s2: clamp(ranks[1]),
+      s3: clamp(ranks[2]),
+    };
 
-    const sub =
-      this.restAttrByRank.subByRank[r1] +
-      this.restAttrByRank.subByRank[r2] +
-      this.restAttrByRank.subByRank[r3];
+    const keys: GearBonusKey[] = ["s1", "s2", "s3"];
+    return keys.map(key => {
+      const rank = rk[key];
+      const bucket = this.bonusBuckets[key];
+      const addValue = this.bonusValuesByRank[key][rank] ?? 0;
+      return { key, bucket, rank, addValue };
+    });
+  }
 
-    return { main, sub };
+  /**
+   * Convenience wrapper returning log-ready rest bonus atoms.
+   *
+   * NOTE: kept separate from getRestStatBonuses so UI code can reuse the raw
+   * bonus (bucket + value) without forcing a log format.
+   */
+  getRestAttributeBonus(
+    ranks: [number, number, number],
+    slotKey?: string,
+  ): RestBonusEntry[] {
+    return this.getRestStatBonuses(ranks)
+      .filter(b => b.addValue !== 0)
+      .map(b => ({
+        source: "gear" as const,
+        bucket: b.bucket,
+        addValue: b.addValue,
+        log: `${this.name}${slotKey ? ` (${slotKey})` : ""} ${b.key} (rank ${b.rank})`,
+      }));
   }
 }

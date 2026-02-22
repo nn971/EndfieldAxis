@@ -11,10 +11,16 @@ class GrandVisionDef extends WeaponDef {
         level1: 51,
         level90: 500,
       },
-      skills: {
-        1: "agilityboost.L",
-        2: "attackboost.L",
-        3: { id: "infliction", name: "Long Time Wish" },
+      s1: { id: "agilityboost", size: "L" },
+      s2: { id: "attackboost", size: "L" },
+      s3: {
+        id: "longtimewish",
+        cat: "infliction",
+        name: "Long Time Wish",
+        bonus: {
+          bucket: "artsIntensity",
+          byRank: r => 24 + 6 * r + (r > 8 ? 6 : 0),
+        },
       },
     });
   }

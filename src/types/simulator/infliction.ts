@@ -1,11 +1,6 @@
 import { BuffId } from "../../data/buffs/BuffDef";
+import { DamageType } from "../operator";
 
-export type SimInflictionType =
-  | "vulnerable"
-  | "heat"
-  | "electric"
-  | "cryo"
-  | "nature";
 export type SimStatusType = "lift" | "knockDown" | "crush" | "breach";
 
 export type SimBuff = {
@@ -17,13 +12,13 @@ export type SimBuff = {
 };
 
 export type SimInflictionDef = {
-  id: SimInflictionType;
+  id: DamageType;
   name: string;
   durationFrames: 1800;
   maxStacks: 4;
 };
 export type SimInfliction = {
-  type: SimInflictionType;
+  type: DamageType;
   stacks: number;
   lastApplyFrame: number;
 };

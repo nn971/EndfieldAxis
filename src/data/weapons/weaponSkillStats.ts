@@ -1,32 +1,32 @@
-import type { OperatorAttributeType } from "../operators/OperatorDef";
+import weaponsData from ".";
+import { RestBonusEntry, RestStatBonusBucket } from "../../types/operator";
+import { BaseWeaponSkillId, Size, WeaponId } from "./WeaponDef";
 
-export type WeaponSkillRestBonus = {
-  /** Flat attribute points (e.g. +12 agility). */
-  attributes?: Partial<Record<OperatorAttributeType, number>>;
-  /** Additive ratio (e.g. +0.1 means +10%). */
-  attackIncMul?: number;
-  /** Flat value attack bonus. */
-  attackIncValue?: number;
-  /** Additive ratio outgoing damage increase (currently used for physical). */
-  outgoingIncMul?: number;
-  note?: string;
-};
+// export type WeaponSkillRestBonus = {
+//   /** Flat attribute points (e.g. +12 agility). */
+//   attributes?: Partial<Record<OperatorAttributeType, number>>;
+//   /** Additive ratio (e.g. +0.1 means +10%). */
+//   attackIncMul?: number;
+//   /** Flat value attack bonus. */
+//   attackIncValue?: number;
+//   /** Additive ratio outgoing damage increase (currently used for physical). */
+//   outgoingIncMul?: number;
+//   note?: string;
+// };
 
 function clampRank(rank: number): number {
   if (!Number.isFinite(rank)) return 1;
   return Math.max(1, Math.min(9, Math.round(rank)));
 }
 
-type Size = "L" | "M" | "S";
-type SkillFamily = "agilityboost" | "physicaldmgboost" | "attackboost";
 /** Weapon skill boost values by ranks:
- * bump = max(0, rank - 8)
+ * bump = max(0, rank - 8),
  * value = floor((A * rank + B) / 9) + C * bump
  *
  * (Flat boost by values, and ratio boost by 10*percentage.)
  */
 const PARAMS: Record<
-  SkillFamily,
+  BaseWeaponSkillId,
   Record<Size, { A: number; B: number; C: number }>
 > = {
   agilityboost: {
@@ -47,64 +47,81 @@ const PARAMS: Record<
 };
 
 function evalSkillBoostValues(
-  family: SkillFamily,
+  family: BaseWeaponSkillId,
   size: Size,
   rank: number,
+  isRatio: boolean = false,
 ): number {
   const r = Math.max(1, Math.min(9, Math.round(rank)));
   const bump = Math.max(0, r - 8);
   const { A, B, C } = PARAMS[family][size];
-  return Math.floor((A * r + B) / 9) + C * bump;
+  const v = Math.floor((A * r + B) / 9) + C * bump;
+  return isRatio ? v / 1000 : v;
 }
 // agility points: ticks
 // percent with 1 decimal: ticks / 10
 // simulator ratio: ticks / 1000
 
 /**
- * Build-static rest-stat bonuses from weapon skill id + rank.
+ * Build-static rest-stat bonus atom from a weapon skill (id + rank).
+ *
+ * This function is intentionally pure (does not mutate the RestStatSnapshot).
  */
-export function getWeaponSkillRestBonuses(
-  skillId: string,
+export function getWeaponSkillRestBonus(
+  weaponId: WeaponId,
+  skill: "s1" | "s2" | "s3",
   rank: number,
-): WeaponSkillRestBonus[] {
+): RestBonusEntry | null {
   const r = clampRank(rank);
-  const [name, size] = String(skillId).split(".");
-  const s = size ?? "";
 
-  if (s != "L" && s != "M" && s != "S") return [];
-  else {
-    switch (name) {
+  if (skill != "s3") {
+    const skillDef = weaponsData[weaponId][skill];
+    const s = (skillDef as { size: Size }).size;
+    switch ((skillDef as { id: WeaponId }).id) {
       case "agilityboost": {
-        const add = evalSkillBoostValues("agilityboost", s as Size, r);
-        return [
-          {
-            attributes: { agility: add },
-            note: `Weapon skill ${skillId}: +${add} agility (rank ${r})`,
-          },
-        ];
+        const addValue = evalSkillBoostValues("agilityboost", s, r);
+        return {
+          source: "weapon",
+          bucket: "agility",
+          addValue,
+          log: `Weapon ${weaponId} ${skill} agilityboost (rank ${r})`,
+        };
       }
       case "attackboost": {
-        const add = evalSkillBoostValues("attackboost", s as Size, r) * 0.001;
-        return [
-          {
-            attackIncMul: add,
-            note: `Weapon skill ${skillId}: +${add * 100}% ATK (rank ${r})`,
-          },
-        ];
+        const addValue = evalSkillBoostValues("attackboost", s, r, true);
+        return {
+          source: "weapon",
+          bucket: "atkIncRatio",
+          addValue,
+          log: `Weapon ${weaponId} ${skill} attackboost (rank ${r})`,
+        };
       }
       case "physicaldmgboost": {
-        const add =
-          evalSkillBoostValues("physicaldmgboost", s as Size, r) * 0.001;
-        return [
-          {
-            // TODO: should be applied only to physical damage
-            outgoingIncMul: add,
-            note: `Weapon skill ${skillId}: +${add * 100}% physical dmg (rank ${r})`,
-          },
-        ];
+        const addValue = evalSkillBoostValues("physicaldmgboost", s, r, true);
+        return {
+          source: "weapon",
+          bucket: "physicalDmgIncRatio",
+          addValue,
+          log: `Weapon ${weaponId} ${skill} physicaldmgboost (rank ${r})`,
+        };
       }
       default:
-        return [];
+        console.warn(
+          `Unknown weapon skill id ${(skillDef as { id: WeaponId }).id} for rest bonus calculation; returning null.`,
+        );
+        return null;
     }
+  } else {
+    const skillDef = weaponsData[weaponId].s3;
+    const addValue = skillDef.bonus.byRank(r);
+    const bucket = skillDef.bonus.bucket as RestStatBonusBucket;
+    return {
+      source: "weapon",
+      bucket,
+      addValue,
+      log:
+        `Weapon ${weaponId} s3 ${String((skillDef as any).id ?? "")}`.trim() +
+        ` (rank ${r})`,
+    };
   }
 }

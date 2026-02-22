@@ -8,13 +8,15 @@ class SwordmancerArmorDef extends GearsDef {
       name: "Swordmancer Heavy Armor",
       icon: "SWORDMANCERARMOR.png",
       defend: 56,
-      attributes: {
-        main: "will",
-        sub: "intellect",
+      bonusBuckets: {
+        s1: "agility",
+        s2: "strength",
+        s3: "artsIntensity",
       },
-      restAttrByRank: {
-        mainByRank: [0, 0, 0, 0],
-        subByRank: [0, 0, 0, 0],
+      bonusValuesByRank: {
+        s1: [87, 95, 104, 113],
+        s2: [58, 63, 69, 75],
+        s3: [20, 22, 24, 26],
       },
     });
   }

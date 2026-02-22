@@ -8,13 +8,15 @@ class SwordmancerFlintDef extends GearsDef {
       name: "Swordmancer Flint",
       icon: "SWORDMANCERFLINT.png",
       defend: 56,
-      attributes: {
-        main: "will",
-        sub: "intellect",
+      bonusBuckets: {
+        s1: "agility",
+        s2: "strength",
+        s3: "physicalDmgIncRatio",
       },
-      restAttrByRank: {
-        mainByRank: [0, 0, 0, 0],
-        subByRank: [0, 0, 0, 0],
+      bonusValuesByRank: {
+        s1: [32, 35, 38, 41],
+        s2: [21, 23, 25, 27],
+        s3: [0.23, 0.253, 0.276, 0.299],
       },
     });
   }
