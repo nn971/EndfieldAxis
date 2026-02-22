@@ -54,17 +54,17 @@ export type DamageBreakdown = {
   // Attack stage
   operatorAttack: number;
   weaponAttack: number;
-  attackIncMul: number;
-  attackIncValue: number;
+  atkIncRatio: number;
+  atkIncFlat: number;
   attributeBonusRatio: number;
-  attackFinal: number;
+  atkFinal: number;
 
   // Multipliers
   dmgSkillMultiplier: number;
-  outgoingIncMul: number;
-  outgoingAmpMul: number;
-  incomingIncMul: number;
-  incomingAmpMul: number;
+  dmgIncMul: number;
+  dmgAmpMul: number;
+  rcvDmgIncMul: number;
+  rcvDmgAmpMul: number;
   defendMul: number;
   resistanceMul: number;
   staggerMul: number;
@@ -263,42 +263,41 @@ export function createDefaultDamageModel(params?: {
           mainAttributePoints * 0.005 + secondaryAttributePoints * 0.002;
       }
 
-      const attackIncRatio = bonuses.ratio.attackIncMul;
-      const attackIncValue = bonuses.value.attackIncValue;
+      const atkIncRatio = bonuses.atkIncRatio;
+      const atkIncFlat = bonuses.atkIncFlat;
 
-      const attackFinal =
-        ((operatorAttack + weaponAttack) * (1 + attackIncRatio) +
-          attackIncValue) *
+      const atkFinal =
+        ((operatorAttack + weaponAttack) * (1 + atkIncRatio) + atkIncFlat) *
         (1 + attributeBonusRatio);
 
       // --- Multipliers ---
       const dmgSkillMultiplier = Number(ctx.dmgSkillMultiplier ?? 1);
 
       // ratio buckets
-      const outgoingIncMul = factorFromSum(bonuses.ratio.outgoingIncMul);
-      const outgoingAmpMul = factorFromSum(bonuses.ratio.outgoingAmpMul);
-      const incomingIncMul = factorFromSum(bonuses.ratio.incomingIncMul);
-      const incomingAmpMul = factorFromSum(bonuses.ratio.incomingAmpMul);
+      const dmgIncRatio = factorFromSum(bonuses.dmgIncRatio);
+      const dmgAmpRatio = factorFromSum(bonuses.dmgAmpRatio);
+      const rcvDmgIncRatio = factorFromSum(bonuses.rcvDmgIncRatio);
+      const rcvDmgAmpRatio = factorFromSum(bonuses.rcvDmgAmpRatio);
 
       // TODO Set enemy defend to 50 for this moment
       // const defendMul = factorFromSum(sumRatio(atoms, "defendMul"));
       const defendMul = 0.5;
 
-      const resistanceMul = factorFromSum(bonuses.ratio.resistanceMul);
-      const staggerMul = factorFromSum(bonuses.ratio.staggerMul);
-      const criticalHitMul = factorFromSum(bonuses.ratio.criticalHitMul);
+      const resistanceMul = factorFromSum(bonuses.resistanceMul);
+      const staggerMul = factorFromSum(bonuses.staggerMul);
+      const criticalHitMul = factorFromSum(bonuses.criticalHitMul);
 
       // SpecialMultiplier only applies to lift / crush damage kinds.
       const specialMul =
-        ctx.kind === "physical" ? 1 : factorFromSum(bonuses.ratio.specialMul);
+        ctx.kind === "physical" ? 1 : factorFromSum(bonuses.specialMul);
 
       const rawDamage =
-        attackFinal *
+        atkFinal *
         dmgSkillMultiplier *
-        outgoingIncMul *
-        outgoingAmpMul *
-        incomingIncMul *
-        incomingAmpMul *
+        dmgIncRatio *
+        dmgAmpRatio *
+        rcvDmgIncRatio *
+        rcvDmgAmpRatio *
         defendMul *
         resistanceMul *
         staggerMul *
@@ -312,16 +311,16 @@ export function createDefaultDamageModel(params?: {
         breakdown: {
           operatorAttack,
           weaponAttack,
-          attackIncMul: attackIncRatio,
-          attackIncValue,
+          atkIncRatio: atkIncRatio,
+          atkIncFlat: atkIncFlat,
           attributeBonusRatio,
-          attackFinal,
+          atkFinal: atkFinal,
 
           dmgSkillMultiplier,
-          outgoingIncMul,
-          outgoingAmpMul,
-          incomingIncMul,
-          incomingAmpMul,
+          dmgIncMul: dmgIncRatio,
+          dmgAmpMul: dmgAmpRatio,
+          rcvDmgIncMul: rcvDmgIncRatio,
+          rcvDmgAmpMul: rcvDmgAmpRatio,
           defendMul,
           resistanceMul,
           staggerMul,

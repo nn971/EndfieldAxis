@@ -4,13 +4,12 @@
  */
 
 export type DamageBucket =
-  | "attackIncMul" // 百分比加攻
-  | "attackIncValue" // 固定值加攻
-  | "skillMul" // 技能倍率（目前不走 bucket，保留作未来扩展）
-  | "outgoingIncMul" // 增伤
-  | "outgoingAmpMul" // 增幅
-  | "incomingIncMul" // 易伤
-  | "incomingAmpMul" // 脆弱
+  | "atkIncRatio" // 百分比加攻
+  | "atkIncFlat" // 固定值加攻
+  | "dmgIncRatio" // 增伤
+  | "dmgAmpRatio" // 增幅
+  | "rcvDmgIncRatio" // 易伤
+  | "rcvDmgAmpRatio" // 脆弱
   | "defendMul" // 防御
   | "resistanceMul" // 抗性
   | "staggerMul" // 失衡
@@ -18,13 +17,12 @@ export type DamageBucket =
   | "specialMul"; // 特殊系数（连击、源石技艺强度）
 
 export const DAMAGE_BUCKETS: readonly DamageBucket[] = [
-  "attackIncMul",
-  "attackIncValue",
-  "skillMul",
-  "outgoingIncMul",
-  "outgoingAmpMul",
-  "incomingIncMul",
-  "incomingAmpMul",
+  "atkIncRatio",
+  "atkIncFlat",
+  "dmgIncRatio",
+  "dmgAmpRatio",
+  "rcvDmgIncRatio",
+  "rcvDmgAmpRatio",
   "defendMul",
   "resistanceMul",
   "staggerMul",
@@ -34,37 +32,29 @@ export const DAMAGE_BUCKETS: readonly DamageBucket[] = [
 
 export type DamageBonusLogEntry = {
   bucket: DamageBucket;
-
-  /** Additive ratio within the same bucket, e.g. +0.2 means +20%. */
-  addRatio?: number;
-
-  /** Additive flat value within the same bucket (mostly for attack). */
-  addValue?: number;
-
+  addValue: number;
+  isRatio?: boolean;
   /** Debug label shown in breakdown. */
   note?: string;
 };
 
-export type DamageBonusSnapshot = {
-  /** Additive totals for ratio buckets (each bucket becomes 1 + ratio[bucket]). */
-  ratio: Record<DamageBucket, number>;
-  /** Additive totals for flat-value buckets (mostly attackIncValue). */
-  value: Record<DamageBucket, number>;
-  /** Human-readable log entries for breakdown. */
+export type DamageBonusSnapshot = Record<DamageBucket, number> & {
   log: DamageBonusLogEntry[];
 };
 
-function makeZeroTotals(): Record<DamageBucket, number> {
-  return Object.fromEntries(DAMAGE_BUCKETS.map(b => [b, 0])) as Record<
-    DamageBucket,
-    number
-  >;
-}
+// function makeZeroTotals(): Record<DamageBucket, number> {
+//   return Object.fromEntries(DAMAGE_BUCKETS.map(b => [b, 0])) as Record<
+//     DamageBucket,
+//     number
+//   >;
+// }
 
 export function createEmptyDamageBonuses(): DamageBonusSnapshot {
   return {
-    ratio: makeZeroTotals(),
-    value: makeZeroTotals(),
+    ...(Object.fromEntries(DAMAGE_BUCKETS.map(b => [b, 0])) as Record<
+      DamageBucket,
+      number
+    >),
     log: [],
   };
 }
@@ -76,15 +66,15 @@ export class DamageBonusCollector {
     this.snap = createEmptyDamageBonuses();
   }
 
-  addRatio(bucket: DamageBucket, delta: number, note?: string): void {
-    if (!Number.isFinite(delta) || delta === 0) return;
-    this.snap.ratio[bucket] += delta;
-    this.snap.log.push({ bucket, addRatio: delta, note });
-  }
+  // addRatio(bucket: DamageBucket, delta: number, note?: string): void {
+  //   if (!Number.isFinite(delta) || delta === 0) return;
+  //   this.snap.ratio[bucket] += delta;
+  //   this.snap.log.push({ bucket, addRatio: delta, note });
+  // }
 
   addValue(bucket: DamageBucket, delta: number, note?: string): void {
     if (!Number.isFinite(delta) || delta === 0) return;
-    this.snap.value[bucket] += delta;
+    this.snap[bucket] += delta;
     this.snap.log.push({ bucket, addValue: delta, note });
   }
 
@@ -92,9 +82,7 @@ export class DamageBonusCollector {
     // defensive copy so callers don't accidentally mutate while keeping
     // object shape JSON-friendly.
     return {
-      ratio: { ...this.snap.ratio },
-      value: { ...this.snap.value },
-      log: [...this.snap.log],
+      ...this.snap,
     };
   }
 }

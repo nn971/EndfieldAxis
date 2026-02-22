@@ -97,41 +97,77 @@ export function buildDamageContext(params: {
   // Merge static build-derived buckets (weapon skills / gears / etc.).
   const sourceBuild = params.read.getBuild(params.sourceId);
   if (sourceBuild?.restStat) {
-    const merged: DamageBonusSnapshot = {
-      ratio: { ...bonuses.ratio },
-      value: { ...bonuses.value },
-      log: [...bonuses.log],
-    };
+    const rs = sourceBuild.restStat;
 
-    for (const [bucket, delta] of Object.entries(
-      sourceBuild.restStat.damageBonusRatio ?? {},
-    )) {
-      if (!Number.isFinite(delta) || delta === 0) continue;
-      if (bucket in merged.ratio) {
-        // bucket is expected to match DamageBucket keys.
-        (merged.ratio as any)[bucket] += delta;
-        merged.log.push({
-          bucket: bucket as any,
-          addRatio: delta,
-          note: "restStat",
+    // Base attack bonuses
+    if (Number.isFinite(rs.atkIncRatio) && rs.atkIncRatio !== 0) {
+      bonuses.atkIncRatio += rs.atkIncRatio;
+      bonuses.log.push({
+        bucket: "atkIncRatio",
+        addValue: rs.atkIncRatio,
+        note: "restStat.atkIncRatio",
+      });
+    }
+    if (Number.isFinite(rs.atkIncFlat) && rs.atkIncFlat !== 0) {
+      bonuses.atkIncFlat += rs.atkIncFlat;
+      bonuses.log.push({
+        bucket: "atkIncFlat",
+        addValue: rs.atkIncFlat,
+        note: "restStat.atkIncFlat",
+      });
+    }
+
+    // Damage increase bonuses
+    // TODO Currently, normal hit damage is always kind="physical".
+    if (params.kind === "physical") {
+      const phys = Number(rs.dmgIncRatio?.physical ?? 0);
+      if (Number.isFinite(phys) && phys !== 0) {
+        bonuses.dmgIncRatio += phys;
+        bonuses.log.push({
+          bucket: "dmgIncRatio",
+          addValue: phys,
+          note: "restStat.dmgIncRatio.physical",
+        });
+      }
+
+      // Extra ultimate damage bonus (if the hit is tagged as ultimate)
+      const isUltimateHit =
+        params.ev?.type === "hit" &&
+        (params.ev as any)?.skillType === "ultimate";
+      const ult = Number(rs.ultimateDmgIncRatio ?? 0);
+      if (isUltimateHit && Number.isFinite(ult) && ult !== 0) {
+        bonuses.dmgIncRatio += ult;
+        bonuses.log.push({
+          bucket: "dmgIncRatio",
+          addValue: ult,
+          note: "restStat.ultimateDmgIncRatio",
         });
       }
     }
-    for (const [bucket, delta] of Object.entries(
-      sourceBuild.restStat.damageBonusValue ?? {},
-    )) {
-      if (!Number.isFinite(delta) || delta === 0) continue;
-      if (bucket in merged.value) {
-        (merged.value as any)[bucket] += delta;
-        merged.log.push({
-          bucket: bucket as any,
-          addValue: delta,
-          note: "restStat",
+
+    // TODO Special multiplier only applies to lift/crush damage kinds in DamageModel.
+    if (params.kind === "lift" || params.kind === "crush") {
+      const arts = Number(rs.artsIntensity ?? 0);
+      if (Number.isFinite(arts) && arts !== 0) {
+        bonuses.specialMul += arts;
+        bonuses.log.push({
+          bucket: "specialMul",
+          addValue: arts,
+          note: "restStat.artsIntensity",
         });
       }
     }
 
-    bonuses = merged;
+    // TODO Stagger efficiency (placeholder hook until staggered enemy logic is implemented)
+    // const stag = Number(rs.staggerEfficiency ?? 0);
+    // if (Number.isFinite(stag) && stag !== 0) {
+    //   bonuses.staggerMul += stag;
+    //   bonuses.log.push({
+    //     bucket: "staggerMul",
+    //     addValue: stag,
+    //     note: "restStat.staggerEfficiency",
+    //   });
+    // }
   }
 
   const source = params.read.getEntity(params.sourceId);

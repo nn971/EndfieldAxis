@@ -135,7 +135,7 @@ export function resolveStatusApplication(
         // TODO: replace debug log with exact breakdown UI.
         self.ops.log(
           "dmg",
-          `  DMG(liftProc)=${res.amount} incomingInc=${res.breakdown.incomingIncMul.toFixed(
+          `  DMG(liftProc)=${res.amount} incomingInc=${res.breakdown.rcvDmgIncMul.toFixed(
             2,
           )} special=${res.breakdown.specialMul.toFixed(2)} hp=${(targetAfter as any).hp}`,
           ctx,
@@ -195,7 +195,7 @@ export function resolveStatusApplication(
       // TODO: exact crush scaling & rounding
       self.ops.log(
         "dmg",
-        `  DMG(crushBurst)=${res.amount} incomingInc=${res.breakdown.incomingIncMul.toFixed(
+        `  DMG(crushBurst)=${res.amount} incomingInc=${res.breakdown.rcvDmgIncMul.toFixed(
           2,
         )} special=${res.breakdown.specialMul.toFixed(2)} hp=${(targetAfter as any).hp}`,
         ctx,

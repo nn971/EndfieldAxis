@@ -18,8 +18,8 @@ class CrystalBuffDef extends BuffDef {
       fn: ({ role, collector }) => {
         // crystal: increases damage suffered by +20% (incomingIncMul)
         if (role === "target") {
-          collector.addRatio(
-            "incomingIncMul",
+          collector.addValue(
+            "rcvDmgIncRatio",
             0.2,
             "buff.crystal(+20% incomingInc)",
           );

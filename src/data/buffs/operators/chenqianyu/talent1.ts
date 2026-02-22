@@ -23,8 +23,8 @@ class ChenQianyuAtkBuffDef extends BuffDef {
         if (role !== "source") return;
         const stacks = Math.max(0, Number((buff as any).stacks ?? 0));
         if (!Number.isFinite(stacks) || stacks <= 0) return;
-        collector.addRatio(
-          "attackIncMul",
+        collector.addValue(
+          "atkIncRatio",
           stacks * this.bonusPerStack,
           `buff.chenqianyu.talent1.atkInc(+8% x${stacks})`,
         );
