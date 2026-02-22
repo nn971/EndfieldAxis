@@ -20,6 +20,10 @@ export type GearsDefInit = {
     main: OperatorAttributeType;
     sub: OperatorAttributeType;
   };
+  restAttrByRank: {
+    mainByRank: [number, number, number, number];
+    subByRank: [number, number, number, number];
+  };
 };
 
 export class GearsDef {
@@ -33,7 +37,10 @@ export class GearsDef {
     main: OperatorAttributeType;
     sub: OperatorAttributeType;
   };
-  //TODO
+  public readonly restAttrByRank: {
+    mainByRank: [number, number, number, number];
+    subByRank: [number, number, number, number];
+  };
 
   constructor(init: GearsDefInit) {
     this.id = init.id;
@@ -42,7 +49,29 @@ export class GearsDef {
     this.icon = init.icon;
     this.defend = init.defend;
     this.attributes = init.attributes;
+    this.restAttrByRank = init.restAttrByRank;
   }
 
   registerSimPlugins(_registry: SimRegistry): void {}
+
+  getRestAttributeBonus(ranks: [number, number, number]): {
+    main: number;
+    sub: number;
+  } {
+    const clamp = (r: number) =>
+      Math.max(0, Math.min(3, Number.isFinite(r) ? Math.round(r) : 0));
+    const [r1, r2, r3] = ranks.map(clamp) as [number, number, number];
+
+    const main =
+      this.restAttrByRank.mainByRank[r1] +
+      this.restAttrByRank.mainByRank[r2] +
+      this.restAttrByRank.mainByRank[r3];
+
+    const sub =
+      this.restAttrByRank.subByRank[r1] +
+      this.restAttrByRank.subByRank[r2] +
+      this.restAttrByRank.subByRank[r3];
+
+    return { main, sub };
+  }
 }

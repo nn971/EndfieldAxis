@@ -1,8 +1,9 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import operatorsData from "../../data/operators";
 import type { SkillBox, SolutionState } from "../../types/editor";
-import type { SkillType } from "../../data/operators/OperatorDef";
+import type { OperatorId, SkillType } from "../../data/operators/OperatorDef";
 import type { OperatorBuild } from "../../types/operator";
+import { statUpdater } from "./statUpdater";
 import { makeId } from "../../shared/lib/id";
 import { assignNoDup, moveItem } from "../../shared/lib/utils";
 
@@ -15,14 +16,14 @@ function getDurationFrames(operatorId: string, skillType: SkillType): number {
   );
 }
 
-function makeDefaultBuild(): OperatorBuild {
-  return {
+function makeDefaultBuild(operatorId: OperatorId): OperatorBuild {
+  const build: OperatorBuild = {
+    id: operatorId,
     level: 90,
-
-    potentialRank: 2,
+    potentialRank: 0,
     skillRanks: {
-      normalAttack: 6,
-      normalSkill: 6,
+      normalAttack: 9,
+      normalSkill: 9,
       comboSkill: 9,
       ultimate: 9,
     },
@@ -30,21 +31,34 @@ function makeDefaultBuild(): OperatorBuild {
       talent1: 2,
       talent2: 2,
     },
-    weapon: null,
+    weapon: { id: null, level: 90, skillRanks: {} },
     gears: {
       armor: { gearId: null, ranks: [0, 0, 0] },
       gloves: { gearId: null, ranks: [0, 0, 0] },
       kit1: { gearId: null, ranks: [0, 0, 0] },
       kit2: { gearId: null, ranks: [0, 0, 0] },
     },
+    restStat: {
+      operatorAttack: 0,
+      weaponAttack: 0,
+      baseAtk: 0,
+      attributes: { strength: 0, agility: 0, intellect: 0, will: 0 },
+      damageBonusRatio: {},
+      damageBonusValue: {},
+      log: [],
+    },
   };
+
+  statUpdater(build);
+
+  return build;
 }
 
 function initState(): SolutionState {
   const teamOperatorIds = Object.keys(operatorsData).slice(0, 4);
   const buildByOperatorId: Record<string, OperatorBuild> = {};
   for (const op of Object.values(operatorsData))
-    buildByOperatorId[op.id] = makeDefaultBuild();
+    buildByOperatorId[op.id] = makeDefaultBuild(op.id);
 
   // const initialSkillBoxes: SkillBox[] = [
   //   {
@@ -76,6 +90,20 @@ export const solutionSlice = createSlice({
      * NOTE: reducers in createSlice may either mutate OR return a new state.
      */
     solutionReplaced(_state, action: PayloadAction<SolutionState>) {
+      const next = action.payload;
+      for (const [opId, build] of Object.entries(
+        next.buildByOperatorId ?? {},
+      )) {
+        try {
+          build.id = opId;
+          statUpdater(build);
+        } catch (e) {
+          console.warn(
+            `Failed to update stats for operator ${opId} during solution load.`,
+            JSON.stringify(e),
+          );
+        }
+      }
       return action.payload;
     },
     laneReordered(state, action: PayloadAction<{ from: number; to: number }>) {
@@ -115,7 +143,13 @@ export const solutionSlice = createSlice({
       const { operatorId, patch } = action.payload;
       const cur = state.buildByOperatorId[operatorId];
       if (!cur) return;
-      state.buildByOperatorId[operatorId] = { ...cur, ...patch };
+
+      // Recompute stats
+      const next = { ...cur, ...patch } as OperatorBuild;
+      next.id = operatorId;
+      statUpdater(next);
+
+      state.buildByOperatorId[operatorId] = next;
     },
     skillBoxAdded(
       state,

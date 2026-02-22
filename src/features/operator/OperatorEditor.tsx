@@ -7,6 +7,123 @@ import type { OperatorBuild } from "../../types/operator";
 import { OperatorBuildTab, WeaponTab, GearsTab } from "./Tabs";
 import { OperatorId } from "../../data/operators/OperatorDef";
 
+function RestStatPreview({ build }: { build: OperatorBuild }) {
+  const [open, setOpen] = useState(false);
+  const rest = build.restStat;
+  if (!rest) return null;
+
+  const fmtInt = (n: number) => (Number.isFinite(n) ? Math.round(n) : 0);
+  const fmtPct = (x: number) =>
+    `${Math.round((Number.isFinite(x) ? x : 0) * 1000) / 10}%`;
+
+  const attackIncMul = rest.damageBonusRatio?.attackIncMul ?? 0;
+  const outgoingIncMul = rest.damageBonusRatio?.outgoingIncMul ?? 0;
+  const attackIncValue = rest.damageBonusValue?.attackIncValue ?? 0;
+
+  return (
+    <div className="mt-3 rounded border border-zinc-700 bg-zinc-950/40 p-3">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold">Build preview</div>
+        <button
+          className="text-[11px] px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700"
+          onClick={() => setOpen(v => !v)}
+          title="Show restStat breakdown"
+        >
+          {open ? "Hide" : "Details"}
+        </button>
+      </div>
+
+      <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+        <div className="rounded border border-zinc-800 bg-zinc-950 p-2">
+          <div className="text-zinc-400">ATK</div>
+          <div className="mt-1">
+            <span className="text-zinc-300">base</span> {fmtInt(rest.baseAtk)}
+          </div>
+          <div className="text-[11px] text-zinc-500">
+            op {fmtInt(rest.operatorAttack)} + weapon{" "}
+            {fmtInt(rest.weaponAttack)}
+          </div>
+
+          {/* <div className="mt-1">
+            <span className="text-zinc-300">total</span> {fmtInt(rest.baseAtk)}
+          </div>
+          <div className="text-[11px] text-zinc-500">
+        
+          </div> */}
+        </div>
+
+        <div className="rounded border border-zinc-800 bg-zinc-950 p-2">
+          <div className="text-zinc-400">Static damage buckets</div>
+          <div className="mt-1 flex flex-col gap-0.5">
+            <div>
+              <span className="text-zinc-500">attackIncMul</span>{" "}
+              {fmtPct(attackIncMul)}
+            </div>
+            <div>
+              <span className="text-zinc-500">attackIncValue</span>{" "}
+              {fmtInt(attackIncValue)}
+            </div>
+            <div>
+              <span className="text-zinc-500">outgoingIncMul</span>{" "}
+              {fmtPct(outgoingIncMul)}
+            </div>
+          </div>
+        </div>
+
+        <div className="col-span-2 rounded border border-zinc-800 bg-zinc-950 p-2">
+          <div className="text-zinc-400">Attributes</div>
+          <div className="mt-1 grid grid-cols-4 gap-2 text-[11px]">
+            {Object.entries(rest.attributes ?? {}).map(([k, v]) => (
+              <div key={k} className="rounded bg-zinc-900/50 px-2 py-1">
+                <div className="text-zinc-500">{k}</div>
+                <div className="text-zinc-300">{fmtInt(v)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {open && (
+        <div className="mt-3">
+          <div className="text-xs text-zinc-400">
+            Contributors (restStat.log)
+          </div>
+          <div className="mt-1 max-h-56 overflow-auto rounded border border-zinc-800 bg-zinc-950 p-2">
+            {rest.log?.length ? (
+              <div className="space-y-1">
+                {rest.log.map((e, i) => (
+                  <div key={i} className="text-[11px] leading-4 text-zinc-300">
+                    <span className="text-zinc-500">[{e.source}]</span>{" "}
+                    <span className="text-zinc-400">{e.bucket}</span>{" "}
+                    {e.addValue != null ? (
+                      <span className="text-zinc-200">
+                        +{fmtInt(e.addValue)}
+                      </span>
+                    ) : null}
+                    {e.addRatio != null ? (
+                      <span className="text-zinc-200">
+                        +{fmtPct(e.addRatio)}
+                      </span>
+                    ) : null}
+                    {e.sourceId ? (
+                      <span className="text-zinc-600"> ({e.sourceId})</span>
+                    ) : null}
+                    {e.note ? (
+                      <span className="text-zinc-500"> — {e.note}</span>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-[11px] text-zinc-500">No entries.</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 type OperatorPickerProps = {
   currentId: OperatorId;
   teamOperatorIds: OperatorId[];
@@ -194,6 +311,8 @@ export default function OperatorEditor({
           <div className="text-xs text-zinc-500">click avatar to change</div>
         </div>
       </button>
+
+      <RestStatPreview build={operatorBuild} />
 
       {page === "operator" && (
         <OperatorBuildTab

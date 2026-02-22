@@ -62,47 +62,47 @@ export function OperatorBuildTab({ operatorId, build, onCommit }: TabProps) {
 }
 
 export function WeaponTab({ operatorId, build, onCommit }: TabProps) {
+  const weaponBuild = build.weapon;
   const [isPicking, setIsPicking] = useState(false);
 
   const weapon = useMemo(
-    () => (build.weapon ? weaponsData[build.weapon.id] : null),
-    [build.weapon?.id],
+    () => (weaponBuild?.id ? weaponsData[weaponBuild.id] : null),
+    [weaponBuild?.id],
   );
 
   const weaponType = operatorsData[operatorId].weaponType;
 
-  if (!build.weapon) {
-    return (
-      <div className="text-sm text-zinc-500">
-        No weapon equipped.
-        <button
-          className="ml-2 px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700"
-          onClick={() => setIsPicking(true)}
-        >
-          Select Weapon
-        </button>
-
-        {isPicking && (
-          <WeaponPicker
-            weaponType={weaponType}
-            currentId={null}
-            onClose={() => setIsPicking(false)}
-            onPick={newId => {
-              onCommit(operatorId, {
-                weapon: {
-                  id: newId,
-                  level: 90,
-                  skillRanks: {},
-                },
-              });
-              setIsPicking(false);
-            }}
-            onClear={() => setIsPicking(false)}
-          />
-        )}
-      </div>
-    );
-  }
+  // if (!build.weapon) {
+  //   return (
+  //     <div className="text-sm text-zinc-500">
+  //       No weapon equipped.
+  //       <button
+  //         className="ml-2 px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700"
+  //         onClick={() => setIsPicking(true)}
+  //       >
+  //         Select Weapon
+  //       </button>
+  //       {isPicking && (
+  //         <WeaponPicker
+  //           weaponType={weaponType}
+  //           currentId={null}
+  //           onClose={() => setIsPicking(false)}
+  //           onPick={newId => {
+  //             onCommit(operatorId, {
+  //               weapon: {
+  //                 id: newId,
+  //                 level: 90,
+  //                 skillRanks: {},
+  //               },
+  //             });
+  //             setIsPicking(false);
+  //           }}
+  //           onClear={() => setIsPicking(false)}
+  //         />
+  //       )}
+  //     </div>
+  //   );
+  // }
 
   return (
     <div>
@@ -116,41 +116,43 @@ export function WeaponTab({ operatorId, build, onCommit }: TabProps) {
           <img
             className="w-full h-full object-cover"
             src={placeholderUrl}
-            alt={weapon?.name ?? "Weapon"}
+            alt={weapon?.name ?? "No Weapon"}
           />
         </div>
         <div className="text-left">
           <div className="text-sm text-zinc-300">Weapon</div>
-          <div className="text-base font-medium">
-            {weapon?.name ?? "Unknown weapon"}
+          <div className="text-base font-medium">{weapon?.name ?? "None"}</div>
+          <div className="text-xs text-zinc-500">
+            {weaponBuild?.id ?? "no weapon equipped"}
           </div>
-          <div className="text-xs text-zinc-500">{build.weapon.id}</div>
           <div className="text-xs text-zinc-500">click icon to change</div>
         </div>
       </button>
 
-      <PreviewSlider
-        label="Weapon Level"
-        min={1}
-        max={90}
-        value={build.weapon.level}
-        onCommit={v =>
-          onCommit(operatorId, {
-            weapon: {
-              ...build.weapon,
-              level: v,
-            },
-          })
-        }
-      />
-
-      {weapon && (
+      {weapon && weaponBuild && (
         <div className="mt-4">
+          <PreviewSlider
+            label="Weapon Level"
+            min={1}
+            max={90}
+            value={weaponBuild.level}
+            onCommit={v =>
+              onCommit(operatorId, {
+                weapon: {
+                  ...weaponBuild,
+                  level: v,
+                },
+              })
+            }
+          />
           <div className="text-xs text-zinc-400">Weapon skills</div>
           {[1, 2, 3].map(n => {
             const spec = weapon.skills[n as 1 | 2 | 3];
             if (n === 3 && spec == null) return null;
-            const skillId = n === 3 ? (spec as { id: string; name: string }).id : (spec as string);
+            const skillId =
+              n === 3
+                ? (spec as { id: string; name: string }).id
+                : (spec as string);
             const skillName =
               n === 3
                 ? (spec as { id: string; name: string }).name
@@ -183,13 +185,14 @@ export function WeaponTab({ operatorId, build, onCommit }: TabProps) {
       {isPicking && (
         <WeaponPicker
           weaponType={weaponType}
-          currentId={build.weapon.id}
+          currentId={weaponBuild?.id ?? null}
           onClose={() => setIsPicking(false)}
           onPick={newId => {
             onCommit(operatorId, {
               weapon: {
-                ...build.weapon,
                 id: newId,
+                level: weaponBuild?.level ?? 90,
+                skillRanks: weaponBuild?.skillRanks ?? {},
               },
             });
             setIsPicking(false);
@@ -366,9 +369,7 @@ function GearSlotEditor({
         </div>
         <div className="text-left">
           <div className="text-sm text-zinc-300">Gear</div>
-          <div className="text-base font-medium">
-            {gear?.name ?? "(none)"}
-          </div>
+          <div className="text-base font-medium">{gear?.name ?? "(none)"}</div>
           <div className="text-xs text-zinc-500">
             {slot.gearId ?? "no gear equipped"}
           </div>
@@ -384,7 +385,11 @@ function GearSlotEditor({
             max={3}
             value={slot.ranks[0]}
             onCommit={v => {
-              const next: [number, number, number] = [v, slot.ranks[1], slot.ranks[2]];
+              const next: [number, number, number] = [
+                v,
+                slot.ranks[1],
+                slot.ranks[2],
+              ];
               onCommit(operatorId, {
                 gears: { ...build.gears, [slotKey]: { ...slot, ranks: next } },
               });
@@ -396,7 +401,11 @@ function GearSlotEditor({
             max={3}
             value={slot.ranks[1]}
             onCommit={v => {
-              const next: [number, number, number] = [slot.ranks[0], v, slot.ranks[2]];
+              const next: [number, number, number] = [
+                slot.ranks[0],
+                v,
+                slot.ranks[2],
+              ];
               onCommit(operatorId, {
                 gears: { ...build.gears, [slotKey]: { ...slot, ranks: next } },
               });
@@ -408,7 +417,11 @@ function GearSlotEditor({
             max={3}
             value={slot.ranks[2]}
             onCommit={v => {
-              const next: [number, number, number] = [slot.ranks[0], slot.ranks[1], v];
+              const next: [number, number, number] = [
+                slot.ranks[0],
+                slot.ranks[1],
+                v,
+              ];
               onCommit(operatorId, {
                 gears: { ...build.gears, [slotKey]: { ...slot, ranks: next } },
               });
@@ -461,7 +474,13 @@ type GearPickerProps = {
   onClose: () => void;
 };
 
-function GearPicker({ type, currentId, onPick, onClear, onClose }: GearPickerProps) {
+function GearPicker({
+  type,
+  currentId,
+  onPick,
+  onClear,
+  onClose,
+}: GearPickerProps) {
   return (
     <div className="fixed inset-0 bg-black/60 grid place-items-center z-50">
       <div className="w-[520px] max-w-[90vw] rounded-lg border border-zinc-700 bg-zinc-900 p-3">

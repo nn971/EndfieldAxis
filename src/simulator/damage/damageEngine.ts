@@ -85,7 +85,7 @@ export function buildDamageContext(params: {
   ev?: SimEvent;
   meta?: Record<string, unknown>;
 }): DamageContext {
-  const bonuses = collectDamageBonuses({
+  let bonuses = collectDamageBonuses({
     registry: params.registry,
     read: params.read,
     ev: params.ev,
@@ -93,6 +93,46 @@ export function buildDamageContext(params: {
     sourceId: params.sourceId,
     targetId: params.targetId,
   });
+
+  // Merge static build-derived buckets (weapon skills / gears / etc.).
+  const sourceBuild = params.read.getBuild(params.sourceId);
+  if (sourceBuild?.restStat) {
+    const merged: DamageBonusSnapshot = {
+      ratio: { ...bonuses.ratio },
+      value: { ...bonuses.value },
+      log: [...bonuses.log],
+    };
+
+    for (const [bucket, delta] of Object.entries(
+      sourceBuild.restStat.damageBonusRatio ?? {},
+    )) {
+      if (!Number.isFinite(delta) || delta === 0) continue;
+      if (bucket in merged.ratio) {
+        // bucket is expected to match DamageBucket keys.
+        (merged.ratio as any)[bucket] += delta;
+        merged.log.push({
+          bucket: bucket as any,
+          addRatio: delta,
+          note: "restStat",
+        });
+      }
+    }
+    for (const [bucket, delta] of Object.entries(
+      sourceBuild.restStat.damageBonusValue ?? {},
+    )) {
+      if (!Number.isFinite(delta) || delta === 0) continue;
+      if (bucket in merged.value) {
+        (merged.value as any)[bucket] += delta;
+        merged.log.push({
+          bucket: bucket as any,
+          addValue: delta,
+          note: "restStat",
+        });
+      }
+    }
+
+    bonuses = merged;
+  }
 
   const source = params.read.getEntity(params.sourceId);
   const target = params.read.getEntity(params.targetId);
@@ -104,7 +144,7 @@ export function buildDamageContext(params: {
     target: target as unknown as SimEntity,
     dmgSkillMultiplier: params.dmgSkillMultiplier,
     bonuses,
-    sourceBuild: params.read.getBuild(params.sourceId),
+    sourceBuild,
     meta: params.meta,
   };
 }

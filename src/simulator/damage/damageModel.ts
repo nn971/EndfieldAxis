@@ -204,36 +204,51 @@ export function createDefaultDamageModel(params?: {
     compute(ctx: DamageContext): DamageResult {
       const bonuses = ctx.bonuses;
 
-      // if (!ctx.source) throw new Error(`unhandled case: damage with no source`);
       // --- Attack stage ---
       const opDef = OperatorsData[ctx.source.id];
       if (!opDef)
         throw new Error(`Operator not found: ${JSON.stringify(ctx.source.id)}`);
-      const operatorLevel = clampOperatorLevel(
-        Number(ctx.sourceBuild?.level ?? 1),
-      );
-      const levelStats = getLevelStats({
-        level: operatorLevel,
-        roundingPolicy,
-        level1: opDef?.stats?.level1,
-        level90: opDef?.stats?.level90,
-      });
-      const operatorAttack = Number(levelStats.attack ?? 0);
 
-      const weapon = ctx.sourceBuild?.weapon;
+      // Prefer precomputed restStat from the build; fallback to level interpolation
+      // only when restStat is missing (older saved solutions / dev states).
+      const restStat = ctx.sourceBuild?.restStat;
+
+      let operatorAttack = 0;
       let weaponAttack = 0;
-      if (weapon != undefined && weapon) {
-        const weaponDef = weaponsData[weapon?.id];
-        if (!weaponDef) {
-          console.warn(`Weapon not found: ${JSON.stringify(weapon.id)}`);
-        } else {
-          const weaponLevel = clampWeaponLevel(Number(weapon.level));
-          weaponAttack = interpolateLevelStat(
-            weaponLevel,
-            weaponDef?.atkStat?.level1 ?? 0,
-            weaponDef?.atkStat?.level90 ?? 0,
-            roundingPolicy,
-          );
+      let levelStats = DEFAULT_STAT_SNAPSHOT;
+
+      if (restStat) {
+        operatorAttack = Number(restStat.operatorAttack ?? 0);
+        weaponAttack = Number(restStat.weaponAttack ?? 0);
+      } else {
+        // if (!ctx.source) throw new Error(`unhandled case: damage with no source`);
+        // --- Attack stage ---
+        const operatorLevel = clampOperatorLevel(
+          Number(ctx.sourceBuild?.level ?? 1),
+        );
+        levelStats = getLevelStats({
+          level: operatorLevel,
+          roundingPolicy,
+          level1: opDef?.stats?.level1,
+          level90: opDef?.stats?.level90,
+        });
+        operatorAttack = Number(levelStats.attack ?? 0);
+
+        const weapon = ctx.sourceBuild?.weapon;
+        let weaponAttack = 0;
+        if (weapon != undefined && weapon.id != null) {
+          const weaponDef = weaponsData[weapon.id];
+          if (!weaponDef) {
+            console.warn(`Weapon not found: ${JSON.stringify(weapon.id)}`);
+          } else {
+            const weaponLevel = clampWeaponLevel(Number(weapon.level));
+            weaponAttack = interpolateLevelStat(
+              weaponLevel,
+              weaponDef?.atkStat?.level1 ?? 0,
+              weaponDef?.atkStat?.level90 ?? 0,
+              roundingPolicy,
+            );
+          }
         }
       }
 

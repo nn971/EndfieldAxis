@@ -12,6 +12,10 @@ class SwordmancerArmorDef extends GearsDef {
         main: "will",
         sub: "intellect",
       },
+      restAttrByRank: {
+        mainByRank: [0, 0, 0, 0],
+        subByRank: [0, 0, 0, 0],
+      },
     });
   }
 }
