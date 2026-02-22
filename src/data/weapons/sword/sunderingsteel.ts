@@ -1,3 +1,4 @@
+import { SimRegistry } from "../../../simulator/listeners/registry";
 import { WeaponDef } from "../WeaponDef";
 
 class SunderingSteelDef extends WeaponDef {
@@ -21,6 +22,30 @@ class SunderingSteelDef extends WeaponDef {
           bucket: "atkIncRatio",
           byRank: r => (40 + 10 * r + (r > 8 ? 10 : 0)) / 1000,
         },
+      },
+    });
+  }
+
+  override registerSimPlugins(registry: SimRegistry): void {
+    const MAX_STACKS = 2;
+    const BONUS_BUFF = "weapon.sunderingsteel.atkIncRatio";
+
+    registry.registerBeforeApplyStatusForWeapon({
+      weaponId: this.id,
+      id: "weapon.sunderingsteel.anthemofcinder",
+      fn: ({ ops, ev, sourceId }) => {
+        // console.log(`Anthem of Cider triggered`);
+        ops.addBuffStacks({
+          targetId: sourceId,
+          buffId: BONUS_BUFF,
+          delta: 1,
+          maxStacks: MAX_STACKS,
+          logOnChange: {
+            cat: "buff",
+            format: (before, after) =>
+              `Anthem of Cider stacks ${before} -> ${after} (trigger=${ev.statusType})`,
+          },
+        });
       },
     });
   }

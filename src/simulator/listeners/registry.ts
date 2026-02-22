@@ -5,15 +5,16 @@ import type { DamageKind } from "../damage/damageModel";
 import type { SimOps, SimRead } from "../simulator";
 import operatorsData from "../../data/operators";
 import buffsData from "../../data/buffs";
+import weaponsData from "../../data/weapons";
 import { BuffId } from "../../data/buffs/BuffDef";
+import { WeaponId } from "../../data/weapons/WeaponDef";
+import { OperatorId } from "../../data/operators/OperatorDef";
 
 /**
  * Listener/registry layer:
  * - The simulator core only emits events and asks the registry to run listeners.
  * - Buffs/operators define listeners elsewhere ("content"), and are auto-registered.
  */
-
-export type HitEvent = Extract<SimEvent, { type: "hit" }>;
 
 export type DamageBonusListenerContext = {
   read: SimRead;
@@ -33,7 +34,6 @@ export type BuffDamageBonusListenerContext = DamageBonusListenerContext & {
   role: "source" | "target";
   buff: Readonly<SimBuff>;
 };
-
 export type BuffDamageBonusListener = (
   ctx: BuffDamageBonusListenerContext,
 ) => void;
@@ -41,12 +41,22 @@ export type BuffDamageBonusListener = (
 export type AfterHitTriggerContext = {
   read: SimRead;
   ops: SimOps;
-  ev: HitEvent;
+  ev: Extract<SimEvent, { type: "hit" }>;
   sourceId: SimEntityId;
   targetId: SimEntityId;
 };
-
 export type AfterHitTrigger = (ctx: AfterHitTriggerContext) => void;
+
+export type BeforeApplyStatusTriggerContext = {
+  read: SimRead;
+  ops: SimOps;
+  ev: Extract<SimEvent, { type: "statusApply" }>;
+  sourceId: SimEntityId;
+  targetId: SimEntityId;
+};
+export type BeforeApplyStatusTrigger = (
+  ctx: BeforeApplyStatusTriggerContext,
+) => void;
 
 type ListenerEntry<TFn> = {
   id: string;
@@ -69,8 +79,13 @@ export class SimRegistry {
 
   private afterHitGlobal: ListenerEntry<AfterHitTrigger>[] = [];
   private afterHitByOperatorId: Record<
-    string,
+    OperatorId,
     ListenerEntry<AfterHitTrigger>[]
+  > = {};
+
+  private beforeApplyStatusByWeaponId: Record<
+    WeaponId,
+    ListenerEntry<BeforeApplyStatusTrigger>[]
   > = {};
 
   /** Register a global damage-bonus listener (not tied to a buff). */
@@ -130,6 +145,22 @@ export class SimRegistry {
     });
   }
 
+  /** Register an before-apply-status trigger that only runs when source is holding a weapon whose id matches weaponId. */
+  registerBeforeApplyStatusForWeapon(params: {
+    weaponId: WeaponId;
+    id: string;
+    fn: BeforeApplyStatusTrigger;
+    priority?: number;
+  }): void {
+    const list = (this.beforeApplyStatusByWeaponId[params.weaponId] ??=
+      []) as ListenerEntry<BeforeApplyStatusTrigger>[];
+    list.push({
+      id: params.id,
+      fn: params.fn,
+      priority: params.priority ?? 0,
+    });
+  }
+
   /**
    * Freeze ordering. Call once after all plugins are registered.
    * This guarantees deterministic results independent of glob import order.
@@ -139,6 +170,9 @@ export class SimRegistry {
     sortEntries(this.afterHitGlobal);
     for (const key of Object.keys(this.afterHitByOperatorId)) {
       sortEntries(this.afterHitByOperatorId[key]!);
+    }
+    for (const key of Object.keys(this.beforeApplyStatusByWeaponId)) {
+      sortEntries(this.beforeApplyStatusByWeaponId[key]!);
     }
     for (const key of Object.keys(this.buffDamageBonus)) {
       sortEntries(this.buffDamageBonus[key as BuffId]!);
@@ -162,7 +196,17 @@ export class SimRegistry {
 
   runAfterHit(ctx: AfterHitTriggerContext): void {
     for (const e of this.afterHitGlobal) e.fn(ctx);
+
     const list = this.afterHitByOperatorId[ctx.sourceId];
+    if (!list || list.length === 0) return;
+    for (const e of list) e.fn(ctx);
+  }
+
+  runBeforeApplyStatus(ctx: BeforeApplyStatusTriggerContext): void {
+    const sourceBuild = ctx.read.getBuild(ctx.sourceId);
+    if (!sourceBuild) return;
+    if (!sourceBuild.weapon.id) return;
+    const list = this.beforeApplyStatusByWeaponId[sourceBuild.weapon.id];
     if (!list || list.length === 0) return;
     for (const e of list) e.fn(ctx);
   }
@@ -187,6 +231,14 @@ export function loadSimRegistry(): SimRegistry {
     const anyBuffDef = buff as any;
     if (typeof anyBuffDef?.registerSimPlugins === "function") {
       anyBuffDef.registerSimPlugins(registry);
+    }
+  }
+
+  // Register weapon-bound listeners (e.g. before-apply-status triggers).
+  for (const weapon of Object.values(weaponsData)) {
+    const anyWeaponDef = weapon as any;
+    if (typeof anyWeaponDef?.registerSimPlugins === "function") {
+      anyWeaponDef.registerSimPlugins(registry);
     }
   }
 

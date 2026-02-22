@@ -15,6 +15,7 @@ import {
 //   | "atkIncValue"
 //   | OutcomingDmgIncRatioBucket;
 
+/** also serves as infliction type */
 export type DamageType = "physical" | "heat" | "electric" | "cryo" | "nature";
 
 export type RestStatBonusBucket =

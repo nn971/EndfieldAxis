@@ -2,17 +2,17 @@ import type { OperatorBuild } from "../types/operator";
 import type {
   SimBuff,
   SimInfliction,
-  SimInflictionType,
   SimStatusType,
 } from "../types/simulator/infliction";
+import type { DamageType } from "../types/operator";
 import type {
   SimEntity,
   SimEntityId,
   SimEnv,
   SimEvent,
 } from "../types/simulator/simulator";
-import { pushLog, type SimLog, type SimLogEntryCat } from "./log";
 import type { DamageContext, DamageModel } from "./damage/damageModel";
+import { pushLog, type SimLog, type SimLogEntryCat } from "./log";
 import { SimRegistry } from "./listeners/registry";
 
 import { buildDamageContext } from "./damage/damageEngine";
@@ -88,10 +88,7 @@ export type SimOps = {
     };
   }) => void;
   upsertInfliction: (targetId: SimEntityId, inf: SimInfliction) => void;
-  removeInfliction: (
-    targetId: SimEntityId,
-    inflictionType: SimInflictionType,
-  ) => void;
+  removeInfliction: (targetId: SimEntityId, inflictionType: DamageType) => void;
 };
 
 type SimResolvers = {
@@ -108,7 +105,7 @@ type SimResolvers = {
   resolveBuffExpiration: (entityId: SimEntityId, buffId: BuffId) => void;
   resolveInflictionExpiration: (
     sourceId: SimEntityId,
-    inflictionType: SimInflictionType,
+    inflictionType: DamageType,
   ) => void;
 };
 
@@ -321,7 +318,7 @@ export class SimWorld {
 
   private removeInfliction(
     targetId: SimEntityId,
-    inflictionType: SimInflictionType,
+    inflictionType: DamageType,
   ): void {
     const ent = this.getEntityOrThrow(targetId);
     if (!(ent as any).inflictions) return;
@@ -417,6 +414,13 @@ export class SimWorld {
         case "statusApply": {
           if (!target) throw new Error(`undefined target`);
           if (!source) throw new Error(`undefined source`);
+          this.registry.runBeforeApplyStatus({
+            read: this.read,
+            ops: this.ops,
+            ev: ev,
+            sourceId: source.id,
+            targetId: target.id,
+          });
           this.resolvers.resolveStatusApplication(
             source.id,
             target.id,

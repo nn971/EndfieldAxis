@@ -89,7 +89,7 @@ class ChenQianyuDef extends OperatorDef {
           logOnChange: {
             cat: "buff",
             format: (before, after) =>
-              `BUFF chenqianyuAtk stacks ${before} -> ${after} (trigger=skillHit)`,
+              `Chen Qianyu Talent1 stacks ${before} -> ${after} (trigger=${ev.skillType})`,
           },
         });
       },
