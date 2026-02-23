@@ -51,6 +51,8 @@ export type SimRead = {
   getEntity(id: SimEntityId): SimEntity;
   /** Returns operator build if this entityId corresponds to an operator, else undefined. */
   getBuild(entityId: SimEntityId): OperatorBuild | undefined;
+  /** Lookup an event by id (useful for provenance via SimEventBase.ref). */
+  getEvent(id: string): SimEvent | undefined;
 };
 
 export type SimOps = {
@@ -140,6 +142,9 @@ export class SimWorld {
   public readonly registry: SimRegistry;
   public readonly damageModel: DamageModel;
 
+  private readonly eventById = new Map<string, SimEvent>();
+  private currentEvent: SimEvent | null = null;
+
   public readonly read: SimRead;
   public readonly ops: SimOps;
   public readonly resolvers: SimResolvers;
@@ -156,6 +161,7 @@ export class SimWorld {
     if (init.futureEvents && init.futureEvents.length > 0) {
       // Clone to avoid accidental external mutation.
       this.queue = [...init.futureEvents];
+      for (const e of this.queue) this.eventById.set(e.id, e);
       sortEventsInPlace(this.queue);
       // Ensure seqCounter is ahead of any provided seq values.
       const maxSeq = this.queue.reduce((m, ev) => Math.max(m, ev.seq ?? 0), 0);
@@ -176,6 +182,7 @@ export class SimWorld {
       },
       getEntity: (id: SimEntityId) => self.getEntityOrThrow(id),
       getBuild: (entityId: SimEntityId) => self.buildByOperatorId?.[entityId],
+      getEvent: (id: string) => self.eventById.get(id),
     };
 
     this.ops = {
@@ -219,7 +226,12 @@ export class SimWorld {
   }
 
   private schedule(ev: SimEvent): void {
+    // Auto-fill ref to the currently handled event, unless caller set it explicitly.
+    if ((ev as any).ref === undefined && this.currentEvent) {
+      (ev as any).ref = this.currentEvent.id;
+    }
     this.queue.push(ev);
+    this.eventById.set(ev.id, ev);
     sortEventsInPlace(this.queue);
   }
 
@@ -346,6 +358,8 @@ export class SimWorld {
 
       this.ops.advanceToFrame(ev.frame);
 
+      this.currentEvent = ev;
+
       const source = ev.sourceId
         ? (this.read.getEntity(ev.sourceId) as SimEntity)
         : null;
@@ -359,6 +373,16 @@ export class SimWorld {
             "act",
             `"${source?.name}" cast "${ev.skillType}" on "${target?.name}"`,
           );
+
+          const spawned = this.registry.runOnCastStart({
+            read: this.read,
+            ev: ev,
+            sourceId: ev.sourceId,
+            targetId: ev.targetId,
+            nextSeq: this.ops.nextSeq,
+            makeEventId: () => makeId("SimEvent_"),
+          });
+          for (const sev of spawned) this.ops.schedule(sev);
           break;
         }
 
@@ -367,6 +391,16 @@ export class SimWorld {
             "act",
             `"${source?.name}" finished casting "${ev.skillType}" on "${target?.name}"`,
           );
+
+          const spawned = this.registry.runOnCastEnd({
+            read: this.read,
+            ev: ev,
+            sourceId: ev.sourceId,
+            targetId: ev.targetId,
+            nextSeq: this.ops.nextSeq,
+            makeEventId: () => makeId("SimEvent_"),
+          });
+          for (const sev of spawned) this.ops.schedule(sev);
           break;
         }
 
@@ -376,11 +410,25 @@ export class SimWorld {
 
           const dmgSkillMultiplier = Number(ev.dmgMultiplier ?? 1);
 
+          // Determine damage kind by inspecting the parent event.
+          // - If parent is statusApply(lift/crush), treat this as a status burst.
+          // - Otherwise treat as normal physical damage.
+          let kind: any = "physical";
+          const ref = (ev as any).ref;
+          if (typeof ref === "string") {
+            const parent = this.read.getEvent(ref);
+            if (parent?.type === "statusApply") {
+              const st = (parent as any).statusType;
+              if (st === "lift") kind = "lift";
+              else if (st === "crush") kind = "crush";
+            }
+          }
+
           const ctx = buildDamageContext({
             registry: this.registry,
             read: this.read,
             frame: ev.frame,
-            kind: "physical",
+            kind,
             sourceId: source.id,
             targetId: target.id,
             dmgSkillMultiplier,
@@ -420,6 +468,58 @@ export class SimWorld {
           if (!target) throw new Error(`undefined target`);
           if (!source) throw new Error(`undefined source`);
 
+          // Crystal consumption is triggered by applying a physical status to a crystaled enemy.
+          // We schedule these consequence events BEFORE resolving the status so that any proc hits
+          // (scheduled during resolveStatusApplication) get larger seq and therefore execute earlier.
+          const hasCrystal = Boolean((target as any).buffs?.["buff.crystal"]);
+          if (hasCrystal) {
+            const endId = "endministrator";
+            const endExists = Boolean(this.read.env.entitiesById[endId]);
+            const baseRef = (ev as any).ref;
+
+            // (1) Talent buff: applied after crystal burst damage.
+            if (endExists) {
+              this.ops.schedule({
+                id: makeId("SimEvent_"),
+                type: "buffApply",
+                frame: ev.frame,
+                seq: this.ops.nextSeq(),
+                sourceId: endId,
+                targetId: endId,
+                buffId: "buff.endministrator.talent1.atkInc" as any,
+                ref: baseRef,
+              } as SimEvent);
+            }
+
+            // (2) Remove crystal after the burst damage.
+            this.ops.schedule({
+              id: makeId("SimEvent_"),
+              type: "buffRemove",
+              frame: ev.frame,
+              seq: this.ops.nextSeq(),
+              sourceId: target.id,
+              buffId: "buff.crystal" as any,
+              ref: baseRef,
+            } as SimEvent);
+
+            // (3) Burst hit, seen as Endministrator combo-skill damage.
+            if (endExists) {
+              this.ops.schedule({
+                id: makeId("SimEvent_"),
+                type: "hit",
+                frame: ev.frame,
+                seq: this.ops.nextSeq(),
+                sourceId: endId,
+                targetId: target.id,
+                damageType: "physical" as any,
+                HitType: "normal",
+                skillType: "comboSkill" as any,
+                dmgMultiplier: 3.2,
+                ref: baseRef,
+              } as SimEvent);
+            }
+          }
+
           // First resolve the status (mutates inflictions and may schedule proc hits).
           const success = this.resolvers.resolveStatusApplication(
             source.id,
@@ -453,6 +553,28 @@ export class SimWorld {
             target.id,
             ev.buffId!,
           );
+
+          const spawned = this.registry.runAfterBuffApply({
+            read: this.read,
+            ev: ev,
+            sourceId: source.id,
+            targetId: target.id,
+            nextSeq: this.ops.nextSeq,
+            makeEventId: () => makeId("SimEvent_"),
+          });
+          for (const sev of spawned) this.ops.schedule(sev);
+          break;
+        }
+
+        case "buffRemove": {
+          if (!ev.sourceId)
+            throw new Error(`event with type buffRemove but no sourceId`);
+          const owner = this.read.getEntity(ev.sourceId);
+          this.ops.removeBuff(ev.sourceId, ev.buffId);
+          this.ops.log(
+            "buff",
+            `BUFF ${ev.buffId} removed (entity=${(owner as any).name})`,
+          );
           break;
         }
 
@@ -480,6 +602,8 @@ export class SimWorld {
           this.ops.log("dev", `WARN: unknown event ${(_never as any)?.type}`);
         }
       }
+
+      this.currentEvent = null;
     }
 
     this.ops.log("sim", "SIM end");

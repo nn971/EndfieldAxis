@@ -16,6 +16,7 @@ export type SimEventType =
   | "inflictionApply" // apply an infliction
   | "inflictionExpire" // expire an infliction, either by duration or by dispel
   | "buffApply" // apply a timed buff/debuff (e.g. enemy crystal)
+  | "buffRemove" // remove a buff immediately (e.g. crystal consumed)
   | "buffExpire"; // expire a timed buff/debuff
 // | string;
 
@@ -24,6 +25,9 @@ export type SimEventBase = {
   type: SimEventType;
   frame: number;
   seq: number; // larger seq earlier when frame equal
+
+  /** Optional reference to a related event (parent / originating action). */
+  ref?: string | null;
 
   sourceId?: SimEntityId;
   targetId?: SimEntityId;
@@ -83,6 +87,12 @@ export type SimEvent =
       type: "buffApply";
       sourceId?: SimEntityId;
       targetId: SimEntityId;
+      buffId: BuffId;
+    })
+  | (SimEventBase & {
+      type: "buffRemove";
+      /** entity who owns the buff */
+      sourceId: SimEntityId;
       buffId: BuffId;
     })
   | (SimEventBase & {

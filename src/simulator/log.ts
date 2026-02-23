@@ -72,9 +72,9 @@ export function summarizeLog(
       const tag = `[${entry.cat.toUpperCase()}]`;
       if (entry.cat === "dmg") {
         serialized.push(`${fmtFrame(entry.frame)} ${tag} ${entry.message}`);
-        serialized.push(
-          `breakdown: ${JSON.stringify(entry.breakdown.bonusLog, null, 2)} | amount: ${entry.amount}`,
-        );
+        // serialized.push(
+        //   `breakdown: ${JSON.stringify(entry.breakdown.bonusLog, null, 2)} | amount: ${entry.amount}`,
+        // );
       } else {
         serialized.push(`${fmtFrame(entry.frame)} ${tag} ${entry.message}`);
       }

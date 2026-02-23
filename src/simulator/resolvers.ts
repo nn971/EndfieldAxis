@@ -253,7 +253,7 @@ export function resolveBuffApplication(
 
   const existing = (target as any).buffs?.[buffId];
 
-  if (buffId === "crystal") {
+  if (buffId === "buff.crystal") {
     const had = Boolean(existing);
     self.ops.upsertBuff(targetId, {
       id: buffId,

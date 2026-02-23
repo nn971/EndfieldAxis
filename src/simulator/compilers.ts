@@ -48,10 +48,11 @@ export function compileSkillCast(params: {
   });
 
   // events for skill ops
-  for (const step of skill?.timeline ?? []) {
+  // Here we need to reverse the order because larger seq happens earlier.
+  for (const step of skill?.timeline?.reverse() ?? []) {
     if (typeof step !== "function") {
       throw new Error(
-        `Skill timeline must be function steps now. Found: ${JSON.stringify(step)}`,
+        `Skill timeline step must be function. Found: ${JSON.stringify(step)}`,
       );
     }
     const eventsToAdd = (step as any)({
@@ -63,6 +64,9 @@ export function compileSkillCast(params: {
       makeEventId,
     });
     for (const ev of (eventsToAdd ?? []) as SimEvent[]) {
+      // Link timeline events to the castStart event so downstream logic can
+      // reconstruct provenance via SimEventBase.ref.
+      (ev as any).ref ??= startEventId;
       events.push(ev);
     }
   }

@@ -64,6 +64,29 @@ export type BeforeApplyStatusTrigger = (
   ctx: BeforeApplyStatusTriggerContext,
 ) => SimEvent[];
 
+export type AfterBuffApplyTriggerContext = {
+  read: SimRead;
+  ev: Extract<SimEvent, { type: "buffApply" }>;
+  sourceId: SimEntityId;
+  targetId: SimEntityId;
+  /** Allocate a unique seq for spawned events. */
+  nextSeq: () => number;
+  /** Allocate a unique id for spawned events. */
+  makeEventId: () => string;
+};
+export type AfterBuffApplyTrigger = (ctx: AfterBuffApplyTriggerContext) =>
+  SimEvent[];
+
+export type OnCastTriggerContext = {
+  read: SimRead;
+  ev: Extract<SimEvent, { type: "castStart" | "castEnd" }>;
+  sourceId: SimEntityId;
+  targetId?: SimEntityId;
+  nextSeq: () => number;
+  makeEventId: () => string;
+};
+export type OnCastTrigger = (ctx: OnCastTriggerContext) => SimEvent[];
+
 type ListenerEntry<TFn> = {
   id: string;
   priority: number;
@@ -93,6 +116,13 @@ export class SimRegistry {
     WeaponId,
     ListenerEntry<BeforeApplyStatusTrigger>[]
   > = {};
+
+  private afterBuffApplyByBuffId: Partial<
+    Record<BuffId, ListenerEntry<AfterBuffApplyTrigger>[]>
+  > = {};
+
+  private onCastStartGlobal: ListenerEntry<OnCastTrigger>[] = [];
+  private onCastEndGlobal: ListenerEntry<OnCastTrigger>[] = [];
 
   /** Register a global damage-bonus listener (not tied to a buff). */
   registerGlobalDamageBonus(params: {
@@ -167,6 +197,46 @@ export class SimRegistry {
     });
   }
 
+  /** Register an after-buff-apply trigger for a specific buffId (e.g. crystal -> long wish). */
+  registerAfterBuffApplyForBuff(params: {
+    buffId: BuffId;
+    id: string;
+    fn: AfterBuffApplyTrigger;
+    priority?: number;
+  }): void {
+    const list = (this.afterBuffApplyByBuffId[params.buffId] ??=
+      []) as ListenerEntry<AfterBuffApplyTrigger>[];
+    list.push({
+      id: params.id,
+      fn: params.fn,
+      priority: params.priority ?? 0,
+    });
+  }
+
+  registerOnCastStartGlobal(params: {
+    id: string;
+    fn: OnCastTrigger;
+    priority?: number;
+  }): void {
+    this.onCastStartGlobal.push({
+      id: params.id,
+      fn: params.fn,
+      priority: params.priority ?? 0,
+    });
+  }
+
+  registerOnCastEndGlobal(params: {
+    id: string;
+    fn: OnCastTrigger;
+    priority?: number;
+  }): void {
+    this.onCastEndGlobal.push({
+      id: params.id,
+      fn: params.fn,
+      priority: params.priority ?? 0,
+    });
+  }
+
   /**
    * Freeze ordering. Call once after all plugins are registered.
    * This guarantees deterministic results independent of glob import order.
@@ -180,6 +250,11 @@ export class SimRegistry {
     for (const key of Object.keys(this.beforeApplyStatusByWeaponId)) {
       sortEntries(this.beforeApplyStatusByWeaponId[key]!);
     }
+    for (const key of Object.keys(this.afterBuffApplyByBuffId)) {
+      sortEntries(this.afterBuffApplyByBuffId[key as BuffId]!);
+    }
+    sortEntries(this.onCastStartGlobal);
+    sortEntries(this.onCastEndGlobal);
     for (const key of Object.keys(this.buffDamageBonus)) {
       sortEntries(this.buffDamageBonus[key as BuffId]!);
     }
@@ -225,6 +300,35 @@ export class SimRegistry {
 
     const out: SimEvent[] = [];
     for (const e of list) {
+      const spawned = e.fn(ctx) ?? [];
+      for (const ev of spawned) out.push(ev);
+    }
+    return out;
+  }
+
+  runAfterBuffApply(ctx: AfterBuffApplyTriggerContext): SimEvent[] {
+    const list = this.afterBuffApplyByBuffId[ctx.ev.buffId];
+    if (!list || list.length === 0) return [];
+    const out: SimEvent[] = [];
+    for (const e of list) {
+      const spawned = e.fn(ctx) ?? [];
+      for (const ev of spawned) out.push(ev);
+    }
+    return out;
+  }
+
+  runOnCastStart(ctx: OnCastTriggerContext): SimEvent[] {
+    const out: SimEvent[] = [];
+    for (const e of this.onCastStartGlobal) {
+      const spawned = e.fn(ctx) ?? [];
+      for (const ev of spawned) out.push(ev);
+    }
+    return out;
+  }
+
+  runOnCastEnd(ctx: OnCastTriggerContext): SimEvent[] {
+    const out: SimEvent[] = [];
+    for (const e of this.onCastEndGlobal) {
       const spawned = e.fn(ctx) ?? [];
       for (const ev of spawned) out.push(ev);
     }
