@@ -1,6 +1,6 @@
-import { GearsDef } from "../GearsDef";
+import { SwordmancerDef } from "../abstractSet/SwordmancerDef";
 
-class SwordmancerGauntletsDef extends GearsDef {
+class SwordmancerGauntletsDef extends SwordmancerDef {
   constructor() {
     super({
       id: "swordmancergauntlets",

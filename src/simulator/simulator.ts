@@ -502,16 +502,6 @@ export class SimWorld {
           if (!target) throw new Error(`undefined target`);
           if (!source) throw new Error(`undefined source`);
 
-          const consumeTriggers = this.registry.runOnStatusApplyForBuff({
-            read: this.read,
-            ev,
-            sourceId: source.id,
-            targetId: target.id,
-            nextSeq: this.ops.nextSeq,
-            makeEventId: () => makeId("SimEvent_"),
-          });
-          for (const sev of consumeTriggers) this.ops.schedule(sev);
-
           // First resolve the status (mutates inflictions and may schedule proc hits).
           const success = this.resolvers.resolveStatusApplication(
             source.id,
@@ -520,21 +510,48 @@ export class SimWorld {
             ev.id,
           );
 
-          // Trigger listeners only if status successfully triggered TODO why isn't this working?
-          if (!success) break;
+          // Trigger listeners only if status successfully triggered.
+          // console.log(success);
+          if (success) {
+            // TODO The triggers about StatusApply are redundant
+            let spawned = this.registry.runOnStatusApply({
+              read: this.read,
+              ev,
+              sourceId: source.id,
+              targetId: target.id,
+              nextSeq: this.ops.nextSeq,
+              makeEventId: () => makeId("SimEvent_"),
+            });
 
-          // Then run triggers that want to react to a status application.
-          // Since same-frame events execute by descending seq, spawned events will run
-          // before any proc hits scheduled by the resolver above.
-          const spawned = this.registry.runBeforeApplyStatus({
+            for (const sev of spawned) {
+              // console.log(sev);
+              this.ops.schedule(sev);
+            }
+
+            // Then run triggers that want to react to a status application.
+            // Since same-frame events execute by descending seq, spawned events will run
+            // before any proc hits scheduled by the resolver above.
+            spawned = this.registry.runBeforeApplyStatus({
+              read: this.read,
+              ev: ev,
+              sourceId: source.id,
+              targetId: target.id,
+              nextSeq: this.ops.nextSeq,
+              makeEventId: () => makeId("SimEvent_"),
+            });
+            for (const sev of spawned) this.ops.schedule(sev);
+          }
+
+          const spawned = this.registry.runOnStatusApplyForBuff({
             read: this.read,
-            ev: ev,
+            ev,
             sourceId: source.id,
             targetId: target.id,
             nextSeq: this.ops.nextSeq,
             makeEventId: () => makeId("SimEvent_"),
           });
           for (const sev of spawned) this.ops.schedule(sev);
+
           break;
         }
 

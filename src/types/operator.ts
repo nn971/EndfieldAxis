@@ -26,6 +26,7 @@ export type RestStatBonusBucket =
   | "artsIntensity"
   | "comboCooldownReduction"
   | "ultimateGainEfficiency"
+  | "staggerEfficiency"
   | "physicalDmgIncRatio"
   | "ultimateDmgIncRatio";
 

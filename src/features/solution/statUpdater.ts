@@ -10,6 +10,7 @@ import type {
 } from "../../types/operator";
 import { getWeaponSkillRestBonus } from "../../data/weapons/weaponSkillStats";
 import { makeEmptyRestStat } from "./solutionSlice";
+import { gearsSetData } from "../../data/gears";
 
 const MAX_LEVEL = 90;
 
@@ -67,6 +68,10 @@ function applyRestStatAddValue(
     }
     case "ultimateGainEfficiency": {
       snapshot.ultimateGainEfficiency += addValue;
+      return;
+    }
+    case "staggerEfficiency": {
+      snapshot.staggerEfficiency += addValue;
       return;
     }
     case "physicalDmgIncRatio": {
@@ -193,6 +198,23 @@ export function computeRestStat(build: OperatorBuild): RestStatSnapshot {
 
     weaponAndGearBonuses.push(
       ...gDef.getRestAttributeBonus(slot.ranks, slotKey),
+    );
+  }
+
+  // ---- Gear set bonuses ----
+  for (const set of Object.values(gearsSetData)) {
+    const pieces = Object.values(build.gears).filter(
+      slot => !!slot.gearId && set.gearIds.includes(slot.gearId),
+    ).length;
+    if (pieces < set.minPieces) continue;
+
+    weaponAndGearBonuses.push(
+      ...set.restBonuses.map(b => ({
+        source: "gear" as const,
+        bucket: b.bucket,
+        addValue: b.addValue,
+        log: b.log,
+      })),
     );
   }
 

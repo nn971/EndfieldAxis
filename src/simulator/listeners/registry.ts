@@ -5,6 +5,7 @@ import type { SimOps, SimRead } from "../simulator";
 import operatorsData from "../../data/operators";
 import buffsData from "../../data/buffs";
 import weaponsData from "../../data/weapons";
+import gearsData from "../../data/gears";
 import { BuffId } from "../../data/buffs/BuffDef";
 import { WeaponId } from "../../data/weapons/WeaponDef";
 import { OperatorId } from "../../data/operators/OperatorDef";
@@ -123,6 +124,18 @@ export type OnCastTriggerContext = {
 };
 export type OnCastTrigger = (ctx: OnCastTriggerContext) => SimEvent[];
 
+export type OnStatusApplyTriggerContext = {
+  read: SimRead;
+  ev: Extract<SimEvent, { type: "statusApply" }>;
+  sourceId: SimEntityId;
+  targetId: SimEntityId;
+  nextSeq: () => number;
+  makeEventId: () => string;
+};
+export type OnStatusApplyTrigger = (
+  ctx: OnStatusApplyTriggerContext,
+) => SimEvent[];
+
 type ListenerEntry<TFn> = {
   id: string;
   priority: number;
@@ -171,6 +184,7 @@ export class SimRegistry {
 
   private onCastStartGlobal: ListenerEntry<OnCastTrigger>[] = [];
   private onCastEndGlobal: ListenerEntry<OnCastTrigger>[] = [];
+  private onStatusApplyGlobal: ListenerEntry<OnStatusApplyTrigger>[] = [];
 
   /** Register a global damage-bonus listener (not tied to a buff). */
   registerGlobalDamageBonus(params: {
@@ -330,6 +344,18 @@ export class SimRegistry {
     });
   }
 
+  registerOnStatusApplyGlobal(params: {
+    id: string;
+    fn: OnStatusApplyTrigger;
+    priority?: number;
+  }): void {
+    this.onStatusApplyGlobal.push({
+      id: params.id,
+      fn: params.fn,
+      priority: params.priority ?? 0,
+    });
+  }
+
   /**
    * Freeze ordering. Call once after all plugins are registered.
    * This guarantees deterministic results independent of glob import order.
@@ -357,6 +383,7 @@ export class SimRegistry {
     }
     sortEntries(this.onCastStartGlobal);
     sortEntries(this.onCastEndGlobal);
+    sortEntries(this.onStatusApplyGlobal);
     for (const key of Object.keys(this.buffDamageBonus)) {
       sortEntries(this.buffDamageBonus[key as BuffId]!);
     }
@@ -484,6 +511,15 @@ export class SimRegistry {
     }
     return out;
   }
+
+  runOnStatusApply(ctx: OnStatusApplyTriggerContext): SimEvent[] {
+    const out: SimEvent[] = [];
+    for (const e of this.onStatusApplyGlobal) {
+      const spawned = e.fn(ctx) ?? [];
+      for (const ev of spawned) out.push(ev);
+    }
+    return out;
+  }
 }
 
 export type SimPluginRegisterFn = (registry: SimRegistry) => void;
@@ -513,6 +549,14 @@ export function loadSimRegistry(): SimRegistry {
     const anyBuffDef = buff as any;
     if (typeof anyBuffDef?.registerSimPlugins === "function") {
       anyBuffDef.registerSimPlugins(registry);
+    }
+  }
+
+  // Register gear-bound listeners (e.g. set effects).
+  for (const gear of Object.values(gearsData)) {
+    const anyGear = gear as any;
+    if (typeof anyGear?.registerSimPlugins === "function") {
+      anyGear.registerSimPlugins(registry);
     }
   }
 
