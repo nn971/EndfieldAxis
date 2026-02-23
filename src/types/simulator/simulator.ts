@@ -1,17 +1,17 @@
 import { BuffId } from "../../data/buffs/BuffDef";
 import { DmgType, SkillType } from "../../data/operators/OperatorDef";
+import { DamageType } from "../operator";
 import type {
   SimInfliction,
   SimBuff,
   SimStatusType,
   SimInflictionDef,
-  SimInflictionType,
 } from "./infliction";
 
 export type SimEventType =
   | "castStart" // start frame of casting a skill
   | "castEnd" // end frame of casting a skill
-  | "hit" // attack or skill hit, physical or arts
+  | "hit" // attack or skill or status hit, physical or arts
   | "statusApply" // apply a status
   | "inflictionApply" // apply an infliction
   | "inflictionExpire" // expire an infliction, either by duration or by dispel
@@ -23,7 +23,7 @@ export type SimEventBase = {
   id: string; // unique id within a simulation, for endding events to refer to
   type: SimEventType;
   frame: number;
-  seq: number; // smaller seq earlier when frame equal
+  seq: number; // larger seq earlier when frame equal
 
   sourceId?: SimEntityId;
   targetId?: SimEntityId;
@@ -47,7 +47,14 @@ export type SimEvent =
       type: "hit";
       sourceId: SimEntityId;
       targetId: SimEntityId;
-      hitType: DmgType;
+      damageType: DmgType;
+      /** HitType feeds DamageModel special multiplier logic. */
+      // TODO The categories here should be organized more appropriately. Or maybe define some helper function like isSkillHit(), isStatusHit()?
+      HitType?: // | "normalAttack"
+        // | "normalSkill"
+        // | "comboSkill"
+        // | "ultimate" // hits by skills
+        "normal" | "lift" | "crush" | "knockDown" | "breach"; // hits by physical statuses
       /** If this hit was produced by compiling a skill cast, the originating skillType. */
       skillType?: SkillType;
       dmgMultiplier?: number; // TODO
@@ -62,14 +69,14 @@ export type SimEvent =
       type: "inflictionApply";
       sourceId: SimEntityId;
       targetId: SimEntityId;
-      inflictionType: SimInflictionType;
+      inflictionType: DamageType;
       inflictionStacks: number;
     })
   | (SimEventBase & {
       type: "inflictionExpire";
       sourceId: SimEntityId;
       targetId: SimEntityId;
-      inflictionType: SimInflictionType;
+      inflictionType: DamageType;
       ref: string;
     })
   | (SimEventBase & {

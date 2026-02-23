@@ -40,23 +40,29 @@ export type BuffDamageBonusListener = (
 
 export type AfterHitTriggerContext = {
   read: SimRead;
-  ops: SimOps;
   ev: Extract<SimEvent, { type: "hit" }>;
   sourceId: SimEntityId;
   targetId: SimEntityId;
+  /** Allocate a unique seq for spawned events. */
+  nextSeq: () => number;
+  /** Allocate a unique id for spawned events. */
+  makeEventId: () => string;
 };
-export type AfterHitTrigger = (ctx: AfterHitTriggerContext) => void;
+export type AfterHitTrigger = (ctx: AfterHitTriggerContext) => SimEvent[];
 
 export type BeforeApplyStatusTriggerContext = {
   read: SimRead;
-  ops: SimOps;
   ev: Extract<SimEvent, { type: "statusApply" }>;
   sourceId: SimEntityId;
   targetId: SimEntityId;
+  /** Allocate a unique seq for spawned events. */
+  nextSeq: () => number;
+  /** Allocate a unique id for spawned events. */
+  makeEventId: () => string;
 };
 export type BeforeApplyStatusTrigger = (
   ctx: BeforeApplyStatusTriggerContext,
-) => void;
+) => SimEvent[];
 
 type ListenerEntry<TFn> = {
   id: string;
@@ -194,21 +200,35 @@ export class SimRegistry {
     for (const e of list) e.fn(ctx);
   }
 
-  runAfterHit(ctx: AfterHitTriggerContext): void {
-    for (const e of this.afterHitGlobal) e.fn(ctx);
+  runAfterHit(ctx: AfterHitTriggerContext): SimEvent[] {
+    const out: SimEvent[] = [];
+    for (const e of this.afterHitGlobal) {
+      const spawned = e.fn(ctx) ?? [];
+      for (const ev of spawned) out.push(ev);
+    }
 
     const list = this.afterHitByOperatorId[ctx.sourceId];
-    if (!list || list.length === 0) return;
-    for (const e of list) e.fn(ctx);
+    if (!list || list.length === 0) return out;
+    for (const e of list) {
+      const spawned = e.fn(ctx) ?? [];
+      for (const ev of spawned) out.push(ev);
+    }
+    return out;
   }
 
-  runBeforeApplyStatus(ctx: BeforeApplyStatusTriggerContext): void {
+  runBeforeApplyStatus(ctx: BeforeApplyStatusTriggerContext): SimEvent[] {
     const sourceBuild = ctx.read.getBuild(ctx.sourceId);
-    if (!sourceBuild) return;
-    if (!sourceBuild.weapon.id) return;
+    if (!sourceBuild) return [];
+    if (!sourceBuild.weapon.id) return [];
     const list = this.beforeApplyStatusByWeaponId[sourceBuild.weapon.id];
-    if (!list || list.length === 0) return;
-    for (const e of list) e.fn(ctx);
+    if (!list || list.length === 0) return [];
+
+    const out: SimEvent[] = [];
+    for (const e of list) {
+      const spawned = e.fn(ctx) ?? [];
+      for (const ev of spawned) out.push(ev);
+    }
+    return out;
   }
 }
 
@@ -226,19 +246,19 @@ export function loadSimRegistry(): SimRegistry {
     }
   }
 
+  // Register weapon-bound listeners (e.g. before-apply-status triggers).
+  for (const w of Object.values(weaponsData)) {
+    const anyW = w as any;
+    if (typeof anyW?.registerSimPlugins === "function") {
+      anyW.registerSimPlugins(registry);
+    }
+  }
+
   // Register damage bonuses from buffs defined in the data layer.
   for (const buff of Object.values(buffsData)) {
     const anyBuffDef = buff as any;
     if (typeof anyBuffDef?.registerSimPlugins === "function") {
       anyBuffDef.registerSimPlugins(registry);
-    }
-  }
-
-  // Register weapon-bound listeners (e.g. before-apply-status triggers).
-  for (const weapon of Object.values(weaponsData)) {
-    const anyWeaponDef = weapon as any;
-    if (typeof anyWeaponDef?.registerSimPlugins === "function") {
-      anyWeaponDef.registerSimPlugins(registry);
     }
   }
 

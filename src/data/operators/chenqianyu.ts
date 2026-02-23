@@ -75,23 +75,23 @@ class ChenQianyuDef extends OperatorDef {
     registry.registerAfterHitForOperator({
       operatorId: this.id,
       id: "operator.chenqianyu.talent.atkStack",
-      fn: ({ ops, ev, sourceId }) => {
+      fn: ({ ev, sourceId, nextSeq, makeEventId }) => {
         // We interpret "by a skill" as: hit carries skillType, and it's not normalAttack.
         const st = (ev as any).skillType as string | undefined;
         const isSkillHit = Boolean(st && st !== "normalAttack");
-        if (!isSkillHit) return;
+        if (!isSkillHit) return [];
 
-        ops.addBuffStacks({
-          targetId: sourceId,
-          buffId: BONUS_BUFF,
-          delta: 1,
-          maxStacks: MAX_STACKS,
-          logOnChange: {
-            cat: "buff",
-            format: (before, after) =>
-              `Chen Qianyu Talent1 stacks ${before} -> ${after} (trigger=${ev.skillType})`,
+        return [
+          {
+            id: makeEventId(),
+            type: "buffApply",
+            frame: ev.frame,
+            seq: nextSeq(),
+            sourceId: sourceId,
+            targetId: sourceId,
+            buffId: BONUS_BUFF,
           },
-        });
+        ];
       },
     });
   }

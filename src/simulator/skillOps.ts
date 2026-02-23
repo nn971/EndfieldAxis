@@ -26,19 +26,26 @@ export function physicalHit(
 ): SkillOpFn {
   return ctx => {
     const events: SimEvent[] = [];
-    events.push({
+
+    // NOTE: In SimWorld, same-frame events are executed by descending seq (larger seq first).
+    // We allocate hitSeq first, then statusSeq, so statusApply executes before the hit.
+    const hitSeq = ctx.nextSeq();
+
+    const hitEv: SimEvent = {
       id: ctx.makeEventId(),
       type: "hit",
       frame: ctx.startFrame + frame,
-      seq: ctx.nextSeq(),
+      seq: hitSeq,
 
       sourceId: ctx.sourceId,
       targetId: ctx.targetId,
 
-      hitType: (opts.dmgType ?? "physical") as any,
+      damageType: (opts.dmgType ?? "physical") as any,
+      // TODO implement this
+      HitType: "normal",
       skillType: ctx.skillType as any,
       dmgMultiplier: opts.dmgMultiplier,
-    });
+    };
 
     const withStatus = Boolean(opts.withStatus);
     if (withStatus) {
@@ -46,19 +53,22 @@ export function physicalHit(
         throw new Error(
           `physicalHit(frame=${frame}): withStatus=true but statusType missing`,
         );
+
+      const statusSeq = ctx.nextSeq();
       events.push({
         id: ctx.makeEventId(),
         type: "statusApply",
         frame: ctx.startFrame + frame,
-        seq: ctx.nextSeq(),
+        seq: statusSeq,
 
         sourceId: ctx.sourceId,
         targetId: ctx.targetId,
 
         statusType: opts.statusType,
-      });
+      } satisfies SimEvent);
     }
 
+    events.push(hitEv);
     return events;
   };
 }

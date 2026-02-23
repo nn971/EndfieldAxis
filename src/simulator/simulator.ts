@@ -11,6 +11,7 @@ import type {
   SimEnv,
   SimEvent,
 } from "../types/simulator/simulator";
+import { makeId } from "../shared/lib/id";
 import type { DamageContext, DamageModel } from "./damage/damageModel";
 import { pushLog, type SimLog, type SimLogEntryCat } from "./log";
 import { SimRegistry } from "./listeners/registry";
@@ -77,26 +78,27 @@ export type SimOps = {
    * Add stacks to a buff (creating it if missing), clamping to [0, maxStacks].
    * Optionally emits a log entry when stacks change.
    */
-  addBuffStacks: (params: {
-    targetId: SimEntityId;
-    buffId: BuffId;
-    delta: number;
-    maxStacks: number;
-    logOnChange?: {
-      cat: SimLogEntryCat;
-      format: (before: number, after: number) => string;
-    };
-  }) => void;
+  // addBuffStacks: (params: {
+  //   targetId: SimEntityId;
+  //   buffId: BuffId;
+  //   delta: number;
+  //   maxStacks: number;
+  //   logOnChange?: {
+  //     cat: SimLogEntryCat;
+  //     format: (before: number, after: number) => string;
+  //   };
+  // }) => void;
   upsertInfliction: (targetId: SimEntityId, inf: SimInfliction) => void;
   removeInfliction: (targetId: SimEntityId, inflictionType: DamageType) => void;
 };
 
 type SimResolvers = {
+  /** should return whether the status is triggered */
   resolveStatusApplication: (
     sourceId: SimEntityId,
     targetId: SimEntityId,
     statusType: SimStatusType,
-  ) => void;
+  ) => boolean;
   resolveBuffApplication: (
     sourceId: SimEntityId,
     targetId: SimEntityId,
@@ -118,10 +120,11 @@ type SimWorldInit = {
   damageModel?: DamageModel;
 };
 
+/** Larger seq happens first in the same frame */
 function sortEventsInPlace(queue: SimEvent[]): void {
   queue.sort((a, b) => {
     if (a.frame !== b.frame) return a.frame - b.frame;
-    return a.seq - b.seq;
+    return b.seq - a.seq;
   });
 }
 
@@ -185,7 +188,7 @@ export class SimWorld {
       applyDamage: (targetId, amount) => this.applyDamage(targetId, amount),
       upsertBuff: (targetId, buff) => this.upsertBuff(targetId, buff),
       removeBuff: (targetId, buffId) => this.removeBuff(targetId, buffId),
-      addBuffStacks: params => this.addBuffStacks(params),
+      // addBuffStacks: params => this.addBuffStacks(params),
       upsertInfliction: (targetId, inf) => this.upsertInfliction(targetId, inf),
       removeInfliction: (targetId, inflictionType) =>
         this.removeInfliction(targetId, inflictionType),
@@ -268,47 +271,47 @@ export class SimWorld {
     delete (ent as any).buffs[buffId];
   }
 
-  private addBuffStacks(params: {
-    targetId: SimEntityId;
-    buffId: BuffId;
-    delta: number;
-    maxStacks: number;
-    logOnChange?: {
-      cat: SimLogEntryCat;
-      format: (before: number, after: number) => string;
-    };
-  }): void {
-    const ent = this.getEntityOrThrow(params.targetId);
-    ent.buffs ??= {};
-    const existing = ent.buffs[params.buffId] as SimBuff | undefined;
-    const before = Math.max(0, Number((existing as any)?.stacks ?? 0));
-    const after = Math.max(
-      0,
-      Math.min(
-        params.maxStacks,
-        before + Math.trunc(Number(params.delta) || 0),
-      ),
-    );
+  // private addBuffStacks(params: {
+  //   targetId: SimEntityId;
+  //   buffId: BuffId;
+  //   delta: number;
+  //   maxStacks: number;
+  //   logOnChange?: {
+  //     cat: SimLogEntryCat;
+  //     format: (before: number, after: number) => string;
+  //   };
+  // }): void {
+  //   const ent = this.getEntityOrThrow(params.targetId);
+  //   ent.buffs ??= {};
+  //   const existing = ent.buffs[params.buffId] as SimBuff | undefined;
+  //   const before = Math.max(0, Number((existing as any)?.stacks ?? 0));
+  //   const after = Math.max(
+  //     0,
+  //     Math.min(
+  //       params.maxStacks,
+  //       before + Math.trunc(Number(params.delta) || 0),
+  //     ),
+  //   );
 
-    if (!existing) {
-      ent.buffs[params.buffId] = {
-        id: params.buffId,
-        stacks: after,
-        lastApplyFrame: this.nowInFrames,
-      } as any;
-    } else {
-      (existing as any).stacks = after;
-      (existing as any).lastApplyFrame = this.nowInFrames;
-      ent.buffs[params.buffId] = existing;
-    }
+  //   if (!existing) {
+  //     ent.buffs[params.buffId] = {
+  //       id: params.buffId,
+  //       stacks: after,
+  //       lastApplyFrame: this.nowInFrames,
+  //     } as any;
+  //   } else {
+  //     (existing as any).stacks = after;
+  //     (existing as any).lastApplyFrame = this.nowInFrames;
+  //     ent.buffs[params.buffId] = existing;
+  //   }
 
-    if (params.logOnChange && before !== after) {
-      this.appendLog(
-        params.logOnChange.cat,
-        params.logOnChange.format(before, after),
-      );
-    }
-  }
+  //   if (params.logOnChange && before !== after) {
+  //     this.appendLog(
+  //       params.logOnChange.cat,
+  //       params.logOnChange.format(before, after),
+  //     );
+  //   }
+  // }
 
   private upsertInfliction(targetId: SimEntityId, inf: SimInfliction): void {
     const ent = this.getEntityOrThrow(targetId);
@@ -395,37 +398,50 @@ export class SimWorld {
 
           this.ops.log(
             "dmg",
-            `"${source.name}" hit "${target.name}" for ${res.amount} damage (hp left: ${(targetAfter as any).hp})`,
+            `"${source.name}" hit "${target.name}" for ${res.amount} damage by ${ev.HitType} (hp left: ${(targetAfter as any).hp})`,
             ctx,
             res.breakdown,
             res.amount,
           );
 
-          this.registry.runAfterHit({
+          const spawned = this.registry.runAfterHit({
             read: this.read,
-            ops: this.ops,
             ev: ev,
             sourceId: source.id,
             targetId: target.id,
+            nextSeq: this.ops.nextSeq,
+            makeEventId: () => makeId("SimEvent_"),
           });
+          for (const sev of spawned) this.ops.schedule(sev);
           break;
         }
 
         case "statusApply": {
           if (!target) throw new Error(`undefined target`);
           if (!source) throw new Error(`undefined source`);
-          this.registry.runBeforeApplyStatus({
-            read: this.read,
-            ops: this.ops,
-            ev: ev,
-            sourceId: source.id,
-            targetId: target.id,
-          });
-          this.resolvers.resolveStatusApplication(
+
+          // First resolve the status (mutates inflictions and may schedule proc hits).
+          const success = this.resolvers.resolveStatusApplication(
             source.id,
             target.id,
             ev.statusType!,
           );
+
+          // Trigger listeners only if status successfully triggered TODO why isn't this working?
+          if (!success) break;
+
+          // Then run triggers that want to react to a status application.
+          // Since same-frame events execute by descending seq, spawned events will run
+          // before any proc hits scheduled by the resolver above.
+          const spawned = this.registry.runBeforeApplyStatus({
+            read: this.read,
+            ev: ev,
+            sourceId: source.id,
+            targetId: target.id,
+            nextSeq: this.ops.nextSeq,
+            makeEventId: () => makeId("SimEvent_"),
+          });
+          for (const sev of spawned) this.ops.schedule(sev);
           break;
         }
 

@@ -33,19 +33,19 @@ class SunderingSteelDef extends WeaponDef {
     registry.registerBeforeApplyStatusForWeapon({
       weaponId: this.id,
       id: "weapon.sunderingsteel.anthemofcinder",
-      fn: ({ ops, ev, sourceId }) => {
-        // console.log(`Anthem of Cider triggered`);
-        ops.addBuffStacks({
-          targetId: sourceId,
-          buffId: BONUS_BUFF,
-          delta: 1,
-          maxStacks: MAX_STACKS,
-          logOnChange: {
-            cat: "buff",
-            format: (before, after) =>
-              `Anthem of Cider stacks ${before} -> ${after} (trigger=${ev.statusType})`,
+      fn: ({ ev, sourceId, nextSeq, makeEventId }) => {
+        // Each trigger adds 1 stack by applying the buff once.
+        return [
+          {
+            id: makeEventId(),
+            type: "buffApply",
+            frame: ev.frame,
+            seq: nextSeq(),
+            sourceId: sourceId,
+            targetId: sourceId,
+            buffId: BONUS_BUFF as any,
           },
-        });
+        ];
       },
     });
   }
