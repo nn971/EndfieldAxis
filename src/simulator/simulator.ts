@@ -112,6 +112,7 @@ type SimResolvers = {
     sourceId: SimEntityId,
     targetId: SimEntityId,
     statusType: SimStatusType,
+    ref?: string,
   ) => boolean;
   resolveBuffApplication: (
     sourceId: SimEntityId,
@@ -220,8 +221,8 @@ export class SimWorld {
         resolveBuffExpiration(self, entityId, buffId),
       resolveInflictionExpiration: (sourceId, inflictionType) =>
         resolveInflictionExpiration(self, sourceId, inflictionType),
-      resolveStatusApplication: (sourceId, targetId, statusType) =>
-        resolveStatusApplication(self, sourceId, targetId, statusType),
+      resolveStatusApplication: (sourceId, targetId, statusType, ref) =>
+        resolveStatusApplication(self, sourceId, targetId, statusType, ref),
     };
   }
 
@@ -501,64 +502,22 @@ export class SimWorld {
           if (!target) throw new Error(`undefined target`);
           if (!source) throw new Error(`undefined source`);
 
-          // TODO handle this with a onVulnerableApply listener inside CrystalDef.
-          // Crystal consumption is triggered by applying a physical status to a crystaled enemy.
-          // We schedule these consequence events BEFORE resolving the status so that any proc hits
-          // (scheduled during resolveStatusApplication) get larger seq and therefore execute earlier.
-          const hasCrystal = Boolean((target as any).buffs?.["buff.crystal"]);
-          if (hasCrystal) {
-            const endId = "endministrator";
-            const endExists = Boolean(this.read.env.entitiesById[endId]);
-            const baseRef = (ev as any).ref;
-
-            // (1) Talent buff: applied after crystal burst damage.
-            if (endExists) {
-              this.ops.schedule({
-                id: makeId("SimEvent_"),
-                type: "buffApply",
-                frame: ev.frame,
-                seq: this.ops.nextSeq(),
-                sourceId: endId,
-                targetId: endId,
-                buffId: "buff.endministrator.talent1.atkInc" as any,
-                ref: baseRef,
-              } as SimEvent);
-            }
-
-            // (2) Remove crystal after the burst damage.
-            this.ops.schedule({
-              id: makeId("SimEvent_"),
-              type: "buffRemove",
-              frame: ev.frame,
-              seq: this.ops.nextSeq(),
-              sourceId: target.id,
-              buffId: "buff.crystal" as any,
-              ref: baseRef,
-            } as SimEvent);
-
-            // (3) Burst hit, seen as Endministrator combo-skill damage.
-            if (endExists) {
-              this.ops.schedule({
-                id: makeId("SimEvent_"),
-                type: "hit",
-                frame: ev.frame,
-                seq: this.ops.nextSeq(),
-                sourceId: endId,
-                targetId: target.id,
-                damageType: "physical" as any,
-                hitTypes: { comboSkill: true },
-                skillType: "comboSkill" as any,
-                dmgMultiplier: 3.2,
-                ref: baseRef,
-              } as SimEvent);
-            }
-          }
+          const consumeTriggers = this.registry.runOnStatusApplyForBuff({
+            read: this.read,
+            ev,
+            sourceId: source.id,
+            targetId: target.id,
+            nextSeq: this.ops.nextSeq,
+            makeEventId: () => makeId("SimEvent_"),
+          });
+          for (const sev of consumeTriggers) this.ops.schedule(sev);
 
           // First resolve the status (mutates inflictions and may schedule proc hits).
           const success = this.resolvers.resolveStatusApplication(
             source.id,
             target.id,
             ev.statusType!,
+            ev.id,
           );
 
           // Trigger listeners only if status successfully triggered TODO why isn't this working?
@@ -609,6 +568,15 @@ export class SimWorld {
             "buff",
             `BUFF ${ev.buffId} removed (entity=${(owner as any).name})`,
           );
+
+          const spawned = this.registry.runAfterBuffRemove({
+            read: this.read,
+            ev,
+            sourceId: ev.sourceId,
+            nextSeq: this.ops.nextSeq,
+            makeEventId: () => makeId("SimEvent_"),
+          });
+          for (const sev of spawned) this.ops.schedule(sev);
           break;
         }
 
@@ -629,6 +597,16 @@ export class SimWorld {
             stacks: ev.inflictionStacks,
             lastApplyFrame: this.read.nowInFrames,
           } as SimInfliction);
+
+          const spawned = this.registry.runOnInflictionApplyForBuff({
+            read: this.read,
+            ev,
+            sourceId: source.id,
+            targetId: target.id,
+            nextSeq: this.ops.nextSeq,
+            makeEventId: () => makeId("SimEvent_"),
+          });
+          for (const sev of spawned) this.ops.schedule(sev);
 
           this.ops.schedule({
             id: makeEventId(),

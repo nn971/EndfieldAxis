@@ -81,6 +81,7 @@ function scheduleApplyInfliction(
   sourceId: SimEntityId,
   targetId: SimEntityId,
   inflictionType: DamageType,
+  ref?: string,
 ): void {
   const id = makeEventId();
   world.ops.schedule({
@@ -92,6 +93,7 @@ function scheduleApplyInfliction(
     targetId,
     inflictionType: inflictionType,
     inflictionStacks: 1,
+    ref,
   } as SimEvent);
   // world.ops.schedule({
   //   id: makeEventId(),
@@ -139,6 +141,7 @@ export function resolveStatusApplication(
   sourceId: SimEntityId,
   targetId: SimEntityId,
   statusType: SimStatusType,
+  ref?: string,
 ) {
   const source = self.read.getEntity(sourceId);
   if (!source) throw new Error(`Unknown source with sourceId=${sourceId}`);
@@ -256,7 +259,7 @@ export function resolveStatusApplication(
   }
 
   if (shouldAddVulnerable) {
-    scheduleApplyInfliction(self, sourceId, targetId, "physical");
+    scheduleApplyInfliction(self, sourceId, targetId, "physical", ref);
     const after = Math.min(4, current + 1);
 
     self.ops.log(

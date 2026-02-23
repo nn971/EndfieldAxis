@@ -64,6 +64,30 @@ export type BeforeApplyStatusTrigger = (
   ctx: BeforeApplyStatusTriggerContext,
 ) => SimEvent[];
 
+export type OnStatusApplyForBuffTriggerContext = {
+  read: SimRead;
+  ev: Extract<SimEvent, { type: "statusApply" }>;
+  sourceId: SimEntityId;
+  targetId: SimEntityId;
+  nextSeq: () => number;
+  makeEventId: () => string;
+};
+export type OnStatusApplyForBuffTrigger = (
+  ctx: OnStatusApplyForBuffTriggerContext,
+) => SimEvent[];
+
+export type OnInflictionApplyForBuffTriggerContext = {
+  read: SimRead;
+  ev: Extract<SimEvent, { type: "inflictionApply" }>;
+  sourceId: SimEntityId;
+  targetId: SimEntityId;
+  nextSeq: () => number;
+  makeEventId: () => string;
+};
+export type OnInflictionApplyForBuffTrigger = (
+  ctx: OnInflictionApplyForBuffTriggerContext,
+) => SimEvent[];
+
 export type AfterBuffApplyTriggerContext = {
   read: SimRead;
   ev: Extract<SimEvent, { type: "buffApply" }>;
@@ -76,6 +100,17 @@ export type AfterBuffApplyTriggerContext = {
 };
 export type AfterBuffApplyTrigger = (
   ctx: AfterBuffApplyTriggerContext,
+) => SimEvent[];
+
+export type AfterBuffRemoveTriggerContext = {
+  read: SimRead;
+  ev: Extract<SimEvent, { type: "buffRemove" }>;
+  sourceId: SimEntityId;
+  nextSeq: () => number;
+  makeEventId: () => string;
+};
+export type AfterBuffRemoveTrigger = (
+  ctx: AfterBuffRemoveTriggerContext,
 ) => SimEvent[];
 
 export type OnCastTriggerContext = {
@@ -118,8 +153,20 @@ export class SimRegistry {
     ListenerEntry<BeforeApplyStatusTrigger>[]
   > = {};
 
+  private onStatusApplyForBuffByBuffId: Partial<
+    Record<BuffId, ListenerEntry<OnStatusApplyForBuffTrigger>[]>
+  > = {};
+
+  private onInflictionApplyForBuffByBuffId: Partial<
+    Record<BuffId, ListenerEntry<OnInflictionApplyForBuffTrigger>[]>
+  > = {};
+
   private afterBuffApplyByBuffId: Partial<
     Record<BuffId, ListenerEntry<AfterBuffApplyTrigger>[]>
+  > = {};
+
+  private afterBuffRemoveByBuffId: Partial<
+    Record<BuffId, ListenerEntry<AfterBuffRemoveTrigger>[]>
   > = {};
 
   private onCastStartGlobal: ListenerEntry<OnCastTrigger>[] = [];
@@ -214,6 +261,51 @@ export class SimRegistry {
     });
   }
 
+  registerOnStatusApplyForBuff(params: {
+    buffId: BuffId;
+    id: string;
+    fn: OnStatusApplyForBuffTrigger;
+    priority?: number;
+  }): void {
+    const list = (this.onStatusApplyForBuffByBuffId[params.buffId] ??=
+      []) as ListenerEntry<OnStatusApplyForBuffTrigger>[];
+    list.push({
+      id: params.id,
+      fn: params.fn,
+      priority: params.priority ?? 0,
+    });
+  }
+
+  registerOnInflictionApplyForBuff(params: {
+    buffId: BuffId;
+    id: string;
+    fn: OnInflictionApplyForBuffTrigger;
+    priority?: number;
+  }): void {
+    const list = (this.onInflictionApplyForBuffByBuffId[params.buffId] ??=
+      []) as ListenerEntry<OnInflictionApplyForBuffTrigger>[];
+    list.push({
+      id: params.id,
+      fn: params.fn,
+      priority: params.priority ?? 0,
+    });
+  }
+
+  registerAfterBuffRemoveForBuff(params: {
+    buffId: BuffId;
+    id: string;
+    fn: AfterBuffRemoveTrigger;
+    priority?: number;
+  }): void {
+    const list = (this.afterBuffRemoveByBuffId[params.buffId] ??=
+      []) as ListenerEntry<AfterBuffRemoveTrigger>[];
+    list.push({
+      id: params.id,
+      fn: params.fn,
+      priority: params.priority ?? 0,
+    });
+  }
+
   registerOnCastStartGlobal(params: {
     id: string;
     fn: OnCastTrigger;
@@ -251,8 +343,17 @@ export class SimRegistry {
     for (const key of Object.keys(this.beforeApplyStatusByWeaponId)) {
       sortEntries(this.beforeApplyStatusByWeaponId[key]!);
     }
+    for (const key of Object.keys(this.onStatusApplyForBuffByBuffId)) {
+      sortEntries(this.onStatusApplyForBuffByBuffId[key as BuffId]!);
+    }
+    for (const key of Object.keys(this.onInflictionApplyForBuffByBuffId)) {
+      sortEntries(this.onInflictionApplyForBuffByBuffId[key as BuffId]!);
+    }
     for (const key of Object.keys(this.afterBuffApplyByBuffId)) {
       sortEntries(this.afterBuffApplyByBuffId[key as BuffId]!);
+    }
+    for (const key of Object.keys(this.afterBuffRemoveByBuffId)) {
+      sortEntries(this.afterBuffRemoveByBuffId[key as BuffId]!);
     }
     sortEntries(this.onCastStartGlobal);
     sortEntries(this.onCastEndGlobal);
@@ -307,9 +408,57 @@ export class SimRegistry {
     return out;
   }
 
+  runOnStatusApplyForBuff(ctx: OnStatusApplyForBuffTriggerContext): SimEvent[] {
+    const target = ctx.read.getEntity(ctx.targetId);
+    const buffIds = Object.keys((target as any).buffs ?? {}) as BuffId[];
+    if (buffIds.length === 0) return [];
+
+    const out: SimEvent[] = [];
+    for (const buffId of buffIds) {
+      const list = this.onStatusApplyForBuffByBuffId[buffId];
+      if (!list || list.length === 0) continue;
+      for (const e of list) {
+        const spawned = e.fn(ctx) ?? [];
+        for (const ev of spawned) out.push(ev);
+      }
+    }
+    return out;
+  }
+
+  runOnInflictionApplyForBuff(
+    ctx: OnInflictionApplyForBuffTriggerContext,
+  ): SimEvent[] {
+    const target = ctx.read.getEntity(ctx.targetId);
+    const buffIds = Object.keys((target as any).buffs ?? {}) as BuffId[];
+    if (buffIds.length === 0) return [];
+
+    const out: SimEvent[] = [];
+    for (const buffId of buffIds) {
+      const list = this.onInflictionApplyForBuffByBuffId[buffId];
+      if (!list || list.length === 0) continue;
+      for (const e of list) {
+        const spawned = e.fn(ctx) ?? [];
+        for (const ev of spawned) out.push(ev);
+      }
+    }
+    return out;
+  }
+
   runAfterBuffApply(ctx: AfterBuffApplyTriggerContext): SimEvent[] {
     const list = this.afterBuffApplyByBuffId[ctx.ev.buffId];
     if (!list || list.length === 0) return [];
+    const out: SimEvent[] = [];
+    for (const e of list) {
+      const spawned = e.fn(ctx) ?? [];
+      for (const ev of spawned) out.push(ev);
+    }
+    return out;
+  }
+
+  runAfterBuffRemove(ctx: AfterBuffRemoveTriggerContext): SimEvent[] {
+    const list = this.afterBuffRemoveByBuffId[ctx.ev.buffId];
+    if (!list || list.length === 0) return [];
+
     const out: SimEvent[] = [];
     for (const e of list) {
       const spawned = e.fn(ctx) ?? [];

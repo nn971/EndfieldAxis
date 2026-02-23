@@ -1,5 +1,6 @@
 import { applyBuff, physicalHit } from "../../simulator/skillOps";
 import { OperatorDef, OperatorDefInit } from "./OperatorDef";
+import type { SimRegistry } from "../../simulator/listeners/registry";
 
 class EndministratorDef extends OperatorDef {
   constructor() {
@@ -64,8 +65,28 @@ class EndministratorDef extends OperatorDef {
     } satisfies OperatorDefInit);
   }
 
-  override registerSimPlugins(registry: any): void {
-    // No unique plugins for Endministrator as of now.
+  override registerSimPlugins(registry: SimRegistry): void {
+    registry.registerAfterBuffRemoveForBuff({
+      buffId: "buff.crystal",
+      id: "operator.endministrator.talent1.onCrystalConsumed",
+      fn: ({ read, ev, nextSeq, makeEventId }) => {
+        if (!read.env.entitiesById[this.id]) return [];
+        // Only respond to crystal removals caused by explicit consume flow.
+        if (ev.ref === undefined || ev.ref === null) return [];
+        return [
+          {
+            id: makeEventId(),
+            type: "buffApply",
+            frame: ev.frame,
+            seq: nextSeq(),
+            sourceId: this.id,
+            targetId: this.id,
+            buffId: "buff.endministrator.talent1.atkInc" as any,
+            ref: ev.id,
+          },
+        ];
+      },
+    });
   }
 }
 
