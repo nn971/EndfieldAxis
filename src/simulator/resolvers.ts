@@ -6,38 +6,103 @@ import {
   type SimBuff,
 } from "../types/simulator/infliction";
 import { BuffId } from "../data/buffs/BuffDef";
-import { buildDamageContext } from "./damage/damageEngine";
 import { SimWorld } from "./simulator";
 import buffsData from "../data/buffs";
 import { DamageType } from "../types/operator";
+import { HitTypes } from "./damage/damageEngine";
 
 // TODO: come up with a way to configure this
-const DEFAULT_INFLICTION_DURATION_FRAMES = 1800;
-
-// Placeholder while reverse-engineering crush scaling.
-// TODO: replace with real scaling from gameplay data.
-const CRUSH_BURST_SKILL_MUL_PER_STACK = 1;
+export const DEFAULT_INFLICTION_DURATION_FRAMES = 1800;
 
 const EVENT_PREFIX = "SimEvent_";
 function makeEventId() {
   return makeId(EVENT_PREFIX);
 }
 
-function scheduleInflictionExpire(
+function computePhysicalStatusSpecialMul(
   world: SimWorld,
+  sourceId: SimEntityId,
+  statusType: SimStatusType,
+  vulnerableConsumed: number = 0,
+): number {
+  const build = world.read.getBuild(sourceId);
+  const rawLevel = Number(build?.level ?? 1);
+  const level = Number.isFinite(rawLevel)
+    ? Math.min(90, Math.max(1, rawLevel))
+    : 1;
+
+  const rawArts = Number(build?.restStat?.artsIntensity ?? 0);
+  const artsIntensity = Number.isFinite(rawArts) ? rawArts : 0;
+
+  const levelMul = 1 + (level - 1) / 392;
+  const artsMul = 1 + artsIntensity / 100;
+
+  const consumed = Math.max(0, Number(vulnerableConsumed ?? 0));
+
+  let baseMul = 1;
+  switch (statusType) {
+    case "lift":
+    case "knockDown":
+      baseMul = 1.2;
+      break;
+    case "crush":
+      baseMul = 1.5 * (1 + consumed);
+      break;
+    case "breach":
+      baseMul = 0.5 * (1 + consumed);
+      break;
+    default:
+      baseMul = 1;
+  }
+
+  return Math.round(baseMul * levelMul * artsMul * 1000) / 1000;
+}
+
+/** WARNING: should not in use */
+// function scheduleInflictionExpire(
+//   world: SimWorld,
+//   targetId: SimEntityId,
+//   inflictionType: DamageType,
+// ): void {
+//   world.ops.schedule({
+//     id: makeEventId(),
+//     type: "inflictionExpire",
+//     frame: world.read.nowInFrames + DEFAULT_INFLICTION_DURATION_FRAMES,
+//     seq: world.ops.nextSeq(),
+//     sourceId: targetId,
+//     targetId,
+//     inflictionType,
+//     ref: "auto",
+//   } as SimEvent);
+// }
+
+function scheduleApplyInfliction(
+  world: SimWorld,
+  sourceId: SimEntityId,
   targetId: SimEntityId,
   inflictionType: DamageType,
 ): void {
+  const id = makeEventId();
   world.ops.schedule({
-    id: makeEventId(),
-    type: "inflictionExpire",
-    frame: world.read.nowInFrames + DEFAULT_INFLICTION_DURATION_FRAMES,
+    id: id,
+    type: "inflictionApply",
+    frame: world.read.nowInFrames,
     seq: world.ops.nextSeq(),
-    sourceId: targetId,
+    sourceId,
     targetId,
-    inflictionType,
-    ref: "auto",
+    inflictionType: inflictionType,
+    inflictionStacks: 1,
   } as SimEvent);
+  // world.ops.schedule({
+  //   id: makeEventId(),
+  //   type: "inflictionExpire",
+  //   frame: world.read.nowInFrames + DEFAULT_INFLICTION_DURATION_FRAMES,
+  //   seq: world.ops.nextSeq(),
+  //   sourceId: targetId,
+  //   targetId,
+  //   inflictionType,
+  //   ref: id,
+  // } as SimEvent);
 }
 
 function scheduleBuffExpire(
@@ -81,111 +146,39 @@ export function resolveStatusApplication(
   const target = self.read.getEntity(targetId);
   if (!target) throw new Error(`Unknown target with targetId=${targetId}`);
 
+  let shouldAddVulnerable =
+    statusType === "lift" ||
+    statusType === "breach" ||
+    statusType === "crush" ||
+    statusType === "knockDown";
+  let shouldRemoveVulnerable = false;
+
+  const current = (target as any).inflictions.physical?.stacks ?? 0;
   switch (statusType) {
     case "lift": {
-      const current = (target as any).inflictions.physical?.stacks ?? 0;
+      if (current <= 0) break;
 
-      if (current <= 0) {
-        self.ops.upsertInfliction(targetId, {
-          type: "physical",
-          stacks: 1,
-          lastApplyFrame: self.read.nowInFrames,
-        } as SimInfliction);
-
-        scheduleInflictionExpire(self, targetId, "physical");
-        self.ops.log(
-          "buff",
-          `INFLICTION vulnerable apply (by LIFT, target=${(target as any).name})`,
-        );
-        return false;
-      } else {
-        // Has vulnerable: add 1 stack (cap 4) and trigger lift proc damage.
-        const before = current;
-        const after = Math.min(4, before + 1);
-        self.ops.upsertInfliction(targetId, {
-          type: "physical",
-          stacks: after,
-          lastApplyFrame: self.read.nowInFrames,
-        } as SimInfliction);
-
-        scheduleInflictionExpire(self, targetId, "physical");
-
-        self.ops.log(
-          "buff",
-          `LIFT: vulnerable stacks ${before} -> ${after} (target=${(target as any).name})`,
-        );
-
-        // Schedule lift proc damage as a hit event so it can interleave with other same-frame effects.
-        self.ops.schedule({
-          id: makeEventId(),
-          type: "hit",
-          frame: self.read.nowInFrames,
-          seq: self.ops.nextSeq(),
-          sourceId,
-          targetId,
-          damageType: "physical" as any,
-          HitType: "lift",
-          dmgMultiplier: 1,
-        } as SimEvent);
-
-        // const ctx = buildDamageContext({
-        //   registry: self.registry,
-        //   read: self.read,
-        //   frame: self.read.nowInFrames,
-        //   kind: "lift",
-        //   sourceId,
-        //   targetId,
-        //   dmgSkillMultiplier: 1,
-        //   meta: {
-        //     note: `liftProc stacksBefore=${before} stacksAfter=${after}`,
-        //   },
-        // });
-
-        // const res = self.damageModel.compute(ctx);
-        // self.ops.applyDamage(targetId, res.amount);
-        // const targetAfter = self.read.getEntity(targetId);
-
-        // // TODO: replace debug log with exact breakdown UI.
-        // self.ops.log(
-        //   "dmg",
-        //   `  DMG(liftProc)=${res.amount} incomingInc=${res.breakdown.rcvDmgIncMul.toFixed(
-        //     2,
-        //   )} special=${res.breakdown.specialMul.toFixed(2)} hp=${(targetAfter as any).hp}`,
-        //   ctx,
-        //   res.breakdown,
-        //   res.amount,
-        // );
-
-        return true;
-      }
+      // Has vulnerable: add 1 stack (cap 4) and trigger Lift damage.
+      // Schedule Lift damage as a hit event so it can interleave with other same-frame effects.
+      self.ops.schedule({
+        id: makeEventId(),
+        type: "hit",
+        frame: self.read.nowInFrames,
+        seq: self.ops.nextSeq(),
+        sourceId,
+        targetId,
+        damageType: "physical",
+        hitTypes: { lift: true }, // TODO currently status damages benefits from no other hitTypes.
+        dmgMultiplier: computePhysicalStatusSpecialMul(self, sourceId, "lift"),
+      } as SimEvent);
+      break;
     }
 
     case "crush": {
-      const current = (target as any).inflictions.physical?.stacks ?? 0;
-
-      if (current <= 0) {
-        self.ops.upsertInfliction(targetId, {
-          type: "physical",
-          stacks: 1,
-          lastApplyFrame: self.read.nowInFrames,
-        } as SimInfliction);
-
-        scheduleInflictionExpire(self, targetId, "physical");
-        self.ops.log(
-          "buff",
-          `INFLICTION vulnerable apply (by CRUSH, target=${(target as any).name})`,
-        );
-        return false;
-      }
+      if (current <= 0) break;
 
       // Has vulnerable: consume all stacks and trigger crush burst damage.
-      const consumed = current;
-      self.ops.removeInfliction(targetId, "physical");
-
-      self.ops.log(
-        "buff",
-        `CRUSHED: vulnerable consumed=${consumed} (target=${(target as any).name})`,
-      );
+      shouldRemoveVulnerable = true;
 
       // Schedule crush burst damage as a hit event so it can interleave with other same-frame effects.
       self.ops.schedule({
@@ -195,48 +188,91 @@ export function resolveStatusApplication(
         seq: self.ops.nextSeq(),
         sourceId,
         targetId,
-        damageType: "physical" as any,
-        HitType: "crush",
+        damageType: "physical",
+        hitTypes: { crush: true }, // TODO currently status damages benefits from no other hitTypes.
         // TEMP: more stacks => larger skill multiplier.
-        dmgMultiplier: consumed * CRUSH_BURST_SKILL_MUL_PER_STACK,
+        dmgMultiplier: computePhysicalStatusSpecialMul(
+          self,
+          sourceId,
+          "crush",
+          current,
+        ),
+      } as SimEvent);
+      break;
+    }
+
+    case "knockDown": {
+      if (current <= 0) break;
+
+      self.ops.schedule({
+        id: makeEventId(),
+        type: "hit",
+        frame: self.read.nowInFrames,
+        seq: self.ops.nextSeq(),
+        sourceId,
+        targetId,
+        damageType: "physical",
+        hitTypes: { knockDown: true }, // TODO currently status damages benefits from no other hitTypes.
+        dmgMultiplier: computePhysicalStatusSpecialMul(
+          self,
+          sourceId,
+          "knockDown",
+        ),
+      } as SimEvent);
+      break;
+    }
+    case "breach": {
+      // TODO: Add breached (or other name) debuff to enemy
+
+      if (current <= 0) break;
+
+      shouldRemoveVulnerable = true;
+
+      self.ops.schedule({
+        id: makeEventId(),
+        type: "hit",
+        frame: self.read.nowInFrames,
+        seq: self.ops.nextSeq(),
+        sourceId,
+        targetId,
+        damageType: "physical",
+        hitTypes: { breach: true }, // TODO currently status damages benefits from no other hitTypes.
+        dmgMultiplier: computePhysicalStatusSpecialMul(
+          self,
+          sourceId,
+          "breach",
+          current,
+        ),
       } as SimEvent);
 
-      // const ctx = buildDamageContext({
-      //   registry: self.registry,
-      //   read: self.read,
-      //   frame: self.read.nowInFrames,
-      //   kind: "crush",
-      //   sourceId,
-      //   targetId,
-      //   // TEMP: more stacks => larger skill multiplier.
-      //   dmgSkillMultiplier: consumed * CRUSH_BURST_SKILL_MUL_PER_STACK,
-      //   meta: {
-      //     note: `crushBurst consumed=${consumed}`,
-      //   },
-      // });
-
-      // const res = self.damageModel.compute(ctx);
-      // self.ops.applyDamage(targetId, res.amount);
-      // const targetAfter = self.read.getEntity(targetId);
-
-      // // TODO: exact crush scaling & rounding
-      // self.ops.log(
-      //   "dmg",
-      //   `  DMG(crushBurst)=${res.amount} incomingInc=${res.breakdown.rcvDmgIncMul.toFixed(
-      //     2,
-      //   )} special=${res.breakdown.specialMul.toFixed(2)} hp=${(targetAfter as any).hp}`,
-      //   ctx,
-      //   res.breakdown,
-      //   res.amount,
-      // );
-
-      return true;
+      // TODO
+      console.warn(`TODO breach debuff not handled yet`);
+      break;
     }
 
     default: {
       throw new Error(`Unhandled statusType=${statusType}`);
     }
   }
+
+  if (shouldAddVulnerable) {
+    scheduleApplyInfliction(self, sourceId, targetId, "physical");
+    const after = Math.min(4, current + 1);
+
+    self.ops.log(
+      "buff",
+      `${statusType}: vulnerable stacks ${current} -> ${after} (target=${(target as any).name})`,
+    );
+  } else if (shouldRemoveVulnerable) {
+    self.ops.removeInfliction(targetId, "physical");
+
+    self.ops.log(
+      "buff",
+      `${statusType}: vulnerable consumed=${current} (target=${(target as any).name})`,
+    );
+  }
+
+  return current >= 1;
 }
 
 export function resolveBuffApplication(

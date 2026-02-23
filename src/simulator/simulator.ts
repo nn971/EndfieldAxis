@@ -11,18 +11,25 @@ import type {
   SimEnv,
   SimEvent,
 } from "../types/simulator/simulator";
-import { makeId } from "../shared/lib/id";
-import type { DamageContext, DamageModel } from "./damage/damageModel";
+import type { DamageBonusLogEntry } from "./damage/damageBonuses";
+import type {
+  DamageBreakdown,
+  DamageContext,
+  DamageModel,
+} from "./damage/damageModel";
 import { pushLog, type SimLog, type SimLogEntryCat } from "./log";
 import { SimRegistry } from "./listeners/registry";
 
-import { buildDamageContext } from "./damage/damageEngine";
+import { makeId } from "../shared/lib/id";
+
+import { buildDamageContext, HitType, HitTypes } from "./damage/damageEngine";
 // import { dispatchAfterHit } from "./listeners/handlers";
 import { createDefaultDamageModel } from "./damage/damageModel";
 
 // import resolver methods
 import "./resolvers";
 import {
+  DEFAULT_INFLICTION_DURATION_FRAMES,
   resolveBuffApplication,
   resolveBuffExpiration,
   resolveInflictionExpiration,
@@ -44,6 +51,11 @@ import { BuffId } from "../data/buffs/BuffDef";
  * - world.read: intended read-only access
  * - world.ops: intended mutation access (the only place that should mutate)
  */
+
+const EVENT_PREFIX = "SimEvent_";
+function makeEventId() {
+  return makeId(EVENT_PREFIX);
+}
 
 export type SimRead = {
   readonly nowInFrames: number;
@@ -69,7 +81,7 @@ export type SimOps = {
     cat: SimLogEntryCat,
     message: string,
     ctx?: DamageContext,
-    breakdown?: Record<string, unknown>,
+    breakdown?: DamageBreakdown,
     amount?: number,
   ) => void;
   /** Apply raw damage (integer) to target hp. */
@@ -249,7 +261,7 @@ export class SimWorld {
     cat: SimLogEntryCat,
     message: string,
     ctx?: DamageContext,
-    breakdown?: Record<string, unknown>,
+    breakdown?: DamageBreakdown,
     amount?: number,
   ): void {
     pushLog(
@@ -408,27 +420,42 @@ export class SimWorld {
           if (!target) throw new Error(`undefined target`);
           if (!source) throw new Error(`undefined source`);
 
-          const dmgSkillMultiplier = Number(ev.dmgMultiplier ?? 1);
+          const hitTypes = {} as HitTypes;
 
-          // Determine damage kind by inspecting the parent event.
-          // - If parent is statusApply(lift/crush), treat this as a status burst.
-          // - Otherwise treat as normal physical damage.
-          let kind: any = "physical";
+          // // Skill category tag (for listeners / future gating).
+          // if (ev.skillType) {
+          //   hitTypes[ev.skillType] = true;
+          // }
+
+          // // Physical status burst tag (lift/knockDown/crush/breach).
+          // const directStatusHitType =
+          //   ev.HitType === "lift" ||
+          //   ev.HitType === "knockDown" ||
+          //   ev.HitType === "crush" ||
+          //   ev.HitType === "breach"
+          //     ? (ev.HitType as SimStatusType)
+          //     : null;
+
+          // let statusHitType: SimStatusType | null = directStatusHitType;
+
+          // // Fallback: infer status from parent statusApply event.
           const ref = (ev as any).ref;
           if (typeof ref === "string") {
             const parent = this.read.getEvent(ref);
             if (parent?.type === "statusApply") {
               const st = (parent as any).statusType;
-              if (st === "lift") kind = "lift";
-              else if (st === "crush") kind = "crush";
+              hitTypes[st as SimStatusType] = true;
             }
           }
+
+          const dmgSkillMultiplier = Number(ev.dmgMultiplier ?? 1);
 
           const ctx = buildDamageContext({
             registry: this.registry,
             read: this.read,
             frame: ev.frame,
-            kind,
+            damageType: ev.damageType,
+            hitTypes: hitTypes,
             sourceId: source.id,
             targetId: target.id,
             dmgSkillMultiplier,
@@ -446,7 +473,13 @@ export class SimWorld {
 
           this.ops.log(
             "dmg",
-            `"${source.name}" hit "${target.name}" for ${res.amount} damage by ${ev.HitType} (hp left: ${(targetAfter as any).hp})`,
+            `"${source.name}" hit "${target.name}" for ${res.amount} damage by [${Object.keys(
+              ev.hitTypes ?? {},
+            )
+              .map(k => {
+                ev.hitTypes[k as HitType] ? k.toString() : "";
+              })
+              .join(", ")}] (hp left: ${(targetAfter as any).hp})`,
             ctx,
             res.breakdown,
             res.amount,
@@ -468,6 +501,7 @@ export class SimWorld {
           if (!target) throw new Error(`undefined target`);
           if (!source) throw new Error(`undefined source`);
 
+          // TODO handle this with a onVulnerableApply listener inside CrystalDef.
           // Crystal consumption is triggered by applying a physical status to a crystaled enemy.
           // We schedule these consequence events BEFORE resolving the status so that any proc hits
           // (scheduled during resolveStatusApplication) get larger seq and therefore execute earlier.
@@ -512,7 +546,7 @@ export class SimWorld {
                 sourceId: endId,
                 targetId: target.id,
                 damageType: "physical" as any,
-                HitType: "normal",
+                hitTypes: { comboSkill: true },
                 skillType: "comboSkill" as any,
                 dmgMultiplier: 3.2,
                 ref: baseRef,
@@ -583,6 +617,29 @@ export class SimWorld {
           if (!ev.sourceId)
             throw new Error(`event with type buffExpire but no sourceId`);
           this.resolvers.resolveBuffExpiration(ev.sourceId, ev.buffId!);
+          break;
+        }
+
+        case "inflictionApply": {
+          if (!target) throw new Error(`undefined target`);
+          if (!source) throw new Error(`undefined source`);
+
+          this.ops.upsertInfliction(target.id, {
+            type: ev.inflictionType,
+            stacks: ev.inflictionStacks,
+            lastApplyFrame: this.read.nowInFrames,
+          } as SimInfliction);
+
+          this.ops.schedule({
+            id: makeEventId(),
+            type: "inflictionExpire",
+            frame: this.read.nowInFrames + DEFAULT_INFLICTION_DURATION_FRAMES,
+            seq: this.ops.nextSeq(),
+            sourceId: target.id,
+            targetId: undefined,
+            inflictionType: ev.inflictionType,
+            ref: ev.id,
+          } as SimEvent);
           break;
         }
 

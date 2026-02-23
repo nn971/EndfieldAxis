@@ -1,5 +1,6 @@
 import { BuffId } from "../../data/buffs/BuffDef";
 import { DmgType, SkillType } from "../../data/operators/OperatorDef";
+import { HitTypes } from "../../simulator/damage/damageEngine";
 import { DamageType } from "../operator";
 import type {
   SimInfliction,
@@ -52,16 +53,8 @@ export type SimEvent =
       sourceId: SimEntityId;
       targetId: SimEntityId;
       damageType: DmgType;
-      /** HitType feeds DamageModel special multiplier logic. */
-      // TODO The categories here should be organized more appropriately. Or maybe define some helper function like isSkillHit(), isStatusHit()?
-      HitType?: // | "normalAttack"
-        // | "normalSkill"
-        // | "comboSkill"
-        // | "ultimate" // hits by skills
-        "normal" | "lift" | "crush" | "knockDown" | "breach"; // hits by physical statuses
-      /** If this hit was produced by compiling a skill cast, the originating skillType. */
-      skillType?: SkillType;
-      dmgMultiplier?: number; // TODO
+      hitTypes: HitTypes;
+      dmgMultiplier?: number; // skillMultiplier or statusMultiplier
     })
   | (SimEventBase & {
       type: "statusApply";
@@ -79,7 +72,6 @@ export type SimEvent =
   | (SimEventBase & {
       type: "inflictionExpire";
       sourceId: SimEntityId;
-      targetId: SimEntityId;
       inflictionType: DamageType;
       ref: string;
     })

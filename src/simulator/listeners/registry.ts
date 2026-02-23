@@ -1,7 +1,6 @@
 import type { SimBuff } from "../../types/simulator/infliction";
 import type { SimEntityId, SimEvent } from "../../types/simulator/simulator";
 import type { DamageBonusCollector } from "../damage/damageBonuses";
-import type { DamageKind } from "../damage/damageModel";
 import type { SimOps, SimRead } from "../simulator";
 import operatorsData from "../../data/operators";
 import buffsData from "../../data/buffs";
@@ -9,6 +8,7 @@ import weaponsData from "../../data/weapons";
 import { BuffId } from "../../data/buffs/BuffDef";
 import { WeaponId } from "../../data/weapons/WeaponDef";
 import { OperatorId } from "../../data/operators/OperatorDef";
+import { DamageType } from "../../types/operator";
 
 /**
  * Listener/registry layer:
@@ -20,7 +20,7 @@ export type DamageBonusListenerContext = {
   read: SimRead;
   /** The event that caused this damage. For status procs, this can be undefined. */
   ev?: SimEvent;
-  kind: DamageKind;
+  type: DamageType;
   sourceId: SimEntityId;
   targetId: SimEntityId;
   collector: DamageBonusCollector;
@@ -74,8 +74,9 @@ export type AfterBuffApplyTriggerContext = {
   /** Allocate a unique id for spawned events. */
   makeEventId: () => string;
 };
-export type AfterBuffApplyTrigger = (ctx: AfterBuffApplyTriggerContext) =>
-  SimEvent[];
+export type AfterBuffApplyTrigger = (
+  ctx: AfterBuffApplyTriggerContext,
+) => SimEvent[];
 
 export type OnCastTriggerContext = {
   read: SimRead;

@@ -1,4 +1,6 @@
-import { SimEnv } from "../types/simulator/simulator";
+import type { SimEnv } from "../types/simulator/simulator";
+import { DAMAGE_BUCKETS } from "./damage/damageBonuses";
+import type { DamageBreakdown } from "./damage/damageModel";
 import type { DamageContext } from "./damage/damageModel";
 
 export type SimLogEntryCat = "sim" | "act" | "buff" | "stat" | "dmg" | "dev";
@@ -11,7 +13,7 @@ export type SimLogEntry =
   | (SimLogEntryBase & {
       cat: "dmg";
       ctx: DamageContext;
-      breakdown: Record<string, unknown>;
+      breakdown: DamageBreakdown;
       amount: number;
     })
   | (SimLogEntryBase & {
@@ -33,7 +35,7 @@ export function pushLog(
 
   // these are required for damage log entries
   ctx?: DamageContext,
-  breakdown?: Record<string, unknown>,
+  breakdown?: DamageBreakdown,
   amount?: number,
 ): void {
   if (logEntryType === "dmg") {
@@ -72,9 +74,16 @@ export function summarizeLog(
       const tag = `[${entry.cat.toUpperCase()}]`;
       if (entry.cat === "dmg") {
         serialized.push(`${fmtFrame(entry.frame)} ${tag} ${entry.message}`);
-        // serialized.push(
-        //   `breakdown: ${JSON.stringify(entry.breakdown.bonusLog, null, 2)} | amount: ${entry.amount}`,
-        // );
+        const breakdownLog = entry.breakdown.bonusLog
+          .map(
+            ({ bucket, addValue, isRatio, note }) =>
+              `bucket=${bucket}, +${addValue}, ${note}`,
+          )
+          .join("\n     ");
+        serialized.push(
+          `     Final multiplier: ${entry.breakdown.dmgFinalMultiplier}, also gained from: \n     ` +
+            breakdownLog,
+        );
       } else {
         serialized.push(`${fmtFrame(entry.frame)} ${tag} ${entry.message}`);
       }

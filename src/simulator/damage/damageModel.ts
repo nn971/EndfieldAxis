@@ -1,6 +1,6 @@
-import OperatorsData from "../../data/operators";
+import operatorsData from "../../data/operators";
 import weaponsData from "../../data/weapons";
-import type { OperatorBuild } from "../../types/operator";
+import type { DamageType, OperatorBuild } from "../../types/operator";
 import type {
   OperatorAttributeType,
   OperatorStatSnapshot,
@@ -16,11 +16,9 @@ import type { DamageBonusLogEntry, DamageBonusSnapshot } from "./damageBonuses";
  *   3) apply the returned integer damage to HP
  */
 
-export type DamageKind = "physical" | "lift" | "crush";
-
 export type DamageContext = {
   frame: number;
-  kind: DamageKind;
+  type: DamageType;
 
   source: SimEntity;
   target: SimEntity;
@@ -60,7 +58,7 @@ export type DamageBreakdown = {
   atkFinal: number;
 
   // Multipliers
-  dmgSkillMultiplier: number;
+  dmgFinalMultiplier: number; // should serve as either skill multiplier or status multiplier
   dmgIncMul: number;
   dmgAmpMul: number;
   rcvDmgIncMul: number;
@@ -69,12 +67,13 @@ export type DamageBreakdown = {
   resistanceMul: number;
   staggerMul: number;
   criticalHitMul: number;
-  specialMul: number;
+
+  specialMul: number; // Link; Not yet realized
 
   // Debug atoms used
   bonusLog: DamageBonusLogEntry[];
 
-  // Final
+  // Total damage
   rawDamage: number;
 };
 
@@ -142,6 +141,7 @@ function interpolateLevelStat(
   return roundingPolicy.roundScaledStat(raw);
 }
 
+/** WARNING: should not in use */
 function getLevelStats(params: {
   level: number;
   roundingPolicy: RoundingPolicy;
@@ -185,6 +185,7 @@ function getLevelStats(params: {
   };
 }
 
+/** WARNING: should not in use */
 function getAttributeValue(
   stats: OperatorStatSnapshot,
   attributeType?: OperatorAttributeType,
@@ -203,7 +204,7 @@ export function createDefaultDamageModel(params?: {
       const bonuses = ctx.bonuses;
 
       // --- Attack stage ---
-      const opDef = OperatorsData[ctx.source.id];
+      const opDef = operatorsData[ctx.source.id];
       if (!opDef)
         throw new Error(`Operator not found: ${JSON.stringify(ctx.source.id)}`);
 
@@ -221,46 +222,47 @@ export function createDefaultDamageModel(params?: {
         weaponAttack = Number(restStat.weaponAttack ?? 0);
         attributeBonusRatio = Number(restStat.attributesBonusRatio ?? 0);
       } else {
+        throw new Error(`Can not find operator build for id=${ctx.source.id}`);
         // if (!ctx.source) throw new Error(`unhandled case: damage with no source`);
         // --- Attack stage ---
-        const operatorLevel = clampOperatorLevel(
-          Number(ctx.sourceBuild?.level ?? 1),
-        );
-        levelStats = getLevelStats({
-          level: operatorLevel,
-          roundingPolicy,
-          level1: opDef?.stats?.level1,
-          level90: opDef?.stats?.level90,
-        });
-        operatorAttack = Number(levelStats.attack ?? 0);
+        // const operatorLevel = clampOperatorLevel(
+        //   Number(ctx.sourceBuild?.level ?? 1),
+        // );
+        // levelStats = getLevelStats({
+        //   level: operatorLevel,
+        //   roundingPolicy,
+        //   level1: opDef?.stats?.level1,
+        //   level90: opDef?.stats?.level90,
+        // });
+        // operatorAttack = Number(levelStats.attack ?? 0);
 
-        const weapon = ctx.sourceBuild?.weapon;
-        let weaponAttack = 0;
-        if (weapon != undefined && weapon.id != null) {
-          const weaponDef = weaponsData[weapon.id];
-          if (!weaponDef) {
-            console.warn(`Weapon not found: ${JSON.stringify(weapon.id)}`);
-          } else {
-            const weaponLevel = clampWeaponLevel(Number(weapon.level));
-            weaponAttack = interpolateLevelStat(
-              weaponLevel,
-              weaponDef?.atkStat?.level1 ?? 0,
-              weaponDef?.atkStat?.level90 ?? 0,
-              roundingPolicy,
-            );
-          }
-        }
+        // const weapon = ctx.sourceBuild?.weapon;
+        // let weaponAttack = 0;
+        // if (weapon != undefined && weapon.id != null) {
+        //   const weaponDef = weaponsData[weapon.id];
+        //   if (!weaponDef) {
+        //     console.warn(`Weapon not found: ${JSON.stringify(weapon.id)}`);
+        //   } else {
+        //     const weaponLevel = clampWeaponLevel(Number(weapon.level));
+        //     weaponAttack = interpolateLevelStat(
+        //       weaponLevel,
+        //       weaponDef?.atkStat?.level1 ?? 0,
+        //       weaponDef?.atkStat?.level90 ?? 0,
+        //       roundingPolicy,
+        //     );
+        //   }
+        // }
 
-        const mainAttributePoints = getAttributeValue(
-          levelStats,
-          opDef?.attributes?.main,
-        );
-        const secondaryAttributePoints = getAttributeValue(
-          levelStats,
-          opDef?.attributes?.sub,
-        );
-        attributeBonusRatio =
-          mainAttributePoints * 0.005 + secondaryAttributePoints * 0.002;
+        // const mainAttributePoints = getAttributeValue(
+        //   levelStats,
+        //   opDef?.attributes?.main,
+        // );
+        // const secondaryAttributePoints = getAttributeValue(
+        //   levelStats,
+        //   opDef?.attributes?.sub,
+        // );
+        // attributeBonusRatio =
+        //   mainAttributePoints * 0.005 + secondaryAttributePoints * 0.002;
       }
 
       const atkIncRatio = bonuses.atkIncRatio;
@@ -287,9 +289,22 @@ export function createDefaultDamageModel(params?: {
       const staggerMul = factorFromSum(bonuses.staggerMul);
       const criticalHitMul = factorFromSum(bonuses.criticalHitMul);
 
-      // SpecialMultiplier only applies to lift / crush damage kinds.
-      const specialMul =
-        ctx.kind === "physical" ? 1 : factorFromSum(bonuses.specialMul);
+      // TODO move these booleans elsewhere
+      // const isPhysicalStatusDamage = Boolean(
+      //   (ctx.meta as any)?.isPhysicalStatusDamage,
+      // );
+      // const statusSpecialMulRaw = Number(
+      //   (ctx.meta as any)?.statusSpecialMul ?? 1,
+      // );
+      // const statusSpecialMul = Number.isFinite(statusSpecialMulRaw)
+      //   ? statusSpecialMulRaw
+      //   : 1;
+
+      // Only status damage benefits from SpecialMultiplier.
+      // const specialMul = isPhysicalStatusDamage
+      //   ? statusSpecialMul * factorFromSum(bonuses.specialMul)
+      //   : 1;
+      const specialMul = 1;
 
       const rawDamage =
         atkFinal *
@@ -316,7 +331,7 @@ export function createDefaultDamageModel(params?: {
           attributeBonusRatio,
           atkFinal: atkFinal,
 
-          dmgSkillMultiplier,
+          dmgFinalMultiplier: dmgSkillMultiplier,
           dmgIncMul: dmgIncRatio,
           dmgAmpMul: dmgAmpRatio,
           rcvDmgIncMul: rcvDmgIncRatio,

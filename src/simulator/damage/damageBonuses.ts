@@ -33,7 +33,7 @@ export const DAMAGE_BUCKETS: readonly DamageBucket[] = [
 export type DamageBonusLogEntry = {
   bucket: DamageBucket;
   addValue: number;
-  isRatio?: boolean;
+  isRatio?: boolean; // TODO make use of this
   /** Debug label shown in breakdown. */
   note?: string;
 };

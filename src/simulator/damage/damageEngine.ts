@@ -3,13 +3,15 @@ import type {
   SimEntityId,
   SimEvent,
 } from "../../types/simulator/simulator";
-import type { DamageContext, DamageKind } from "./damageModel";
+import type { DamageType } from "../../types/operator";
+import type { DamageContext } from "./damageModel";
 import {
   DamageBonusCollector,
   type DamageBonusSnapshot,
 } from "./damageBonuses";
 import type { SimRegistry } from "../listeners/registry";
 import type { SimRead } from "../simulator";
+import { SimStatusType } from "../../types/simulator/infliction";
 
 /**
  * DamageEngine builds the DamageContext fed into DamageModel.
@@ -20,11 +22,11 @@ function collectDamageBonuses(params: {
   registry: SimRegistry;
   read: SimRead;
   ev?: SimEvent;
-  kind: DamageKind;
+  type: DamageType;
   sourceId: SimEntityId;
   targetId: SimEntityId;
 }): DamageBonusSnapshot {
-  const { registry, read, ev, kind, sourceId, targetId } = params;
+  const { registry, read, ev, type, sourceId, targetId } = params;
   const collector = new DamageBonusCollector();
 
   const source = read.getEntity(sourceId);
@@ -34,7 +36,7 @@ function collectDamageBonuses(params: {
   registry.runGlobalDamageBonus({
     read,
     ev,
-    kind,
+    type,
     sourceId,
     targetId,
     collector,
@@ -46,7 +48,7 @@ function collectDamageBonuses(params: {
     registry.runBuffDamageBonus({
       read,
       ev,
-      kind,
+      type,
       sourceId,
       targetId,
       collector,
@@ -61,7 +63,7 @@ function collectDamageBonuses(params: {
     registry.runBuffDamageBonus({
       read,
       ev,
-      kind,
+      type,
       sourceId,
       targetId,
       collector,
@@ -73,11 +75,24 @@ function collectDamageBonuses(params: {
   return collector.snapshot();
 }
 
+/** Special multiplier should depend and only depend on this.
+ * Is there a better way?
+ */
+export type HitType =
+  | "normalAttack"
+  | "normalSkill"
+  | "comboSkill"
+  | "ultimate"
+  | SimStatusType;
+
+export type HitTypes = Partial<Record<HitType, boolean>>;
+
 export function buildDamageContext(params: {
   registry: SimRegistry;
   read: SimRead;
   frame: number;
-  kind: DamageKind;
+  damageType: DamageType;
+  hitTypes: HitTypes;
   sourceId: SimEntityId;
   targetId: SimEntityId;
   dmgSkillMultiplier: number;
@@ -89,7 +104,7 @@ export function buildDamageContext(params: {
     registry: params.registry,
     read: params.read,
     ev: params.ev,
-    kind: params.kind,
+    type: params.damageType,
     sourceId: params.sourceId,
     targetId: params.targetId,
   });
@@ -118,8 +133,8 @@ export function buildDamageContext(params: {
     }
 
     // Damage increase bonuses
-    // TODO Currently, normal hit damage is always kind="physical".
-    if (params.kind === "physical") {
+    // console.log(params.damageType);
+    if (params.damageType === "physical") {
       const phys = Number(rs.dmgIncRatio?.physical ?? 0);
       if (Number.isFinite(phys) && phys !== 0) {
         bonuses.dmgIncRatio += phys;
@@ -146,17 +161,17 @@ export function buildDamageContext(params: {
     }
 
     // TODO Special multiplier only applies to lift/crush damage kinds in DamageModel.
-    if (params.kind === "lift" || params.kind === "crush") {
-      const arts = Number(rs.artsIntensity ?? 0);
-      if (Number.isFinite(arts) && arts !== 0) {
-        bonuses.specialMul += arts;
-        bonuses.log.push({
-          bucket: "specialMul",
-          addValue: arts,
-          note: "restStat.artsIntensity",
-        });
-      }
-    }
+    // if (params.type === "lift" || params.type === "crush") {
+    //   const arts = Number(rs.artsIntensity ?? 0);
+    //   if (Number.isFinite(arts) && arts !== 0) {
+    //     bonuses.specialMul += arts;
+    //     bonuses.log.push({
+    //       bucket: "specialMul",
+    //       addValue: arts,
+    //       note: "restStat.artsIntensity",
+    //     });
+    //   }
+    // }
 
     // TODO Stagger efficiency (placeholder hook until staggered enemy logic is implemented)
     // const stag = Number(rs.staggerEfficiency ?? 0);
@@ -175,7 +190,7 @@ export function buildDamageContext(params: {
 
   return {
     frame: params.frame,
-    kind: params.kind,
+    type: params.damageType,
     source: source as unknown as SimEntity,
     target: target as unknown as SimEntity,
     dmgSkillMultiplier: params.dmgSkillMultiplier,
