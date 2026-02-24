@@ -2,6 +2,7 @@ import operatorsData from "../data/operators";
 import { makeId } from "../shared/lib/id";
 import { SkillType } from "../data/operators/OperatorDef";
 import type { SimEvent } from "../types/simulator/simulator";
+import type { OperatorBuild } from "../types/operator";
 
 const EVENT_PREFIX = "SimEvent_";
 function makeEventId() {
@@ -14,8 +15,16 @@ export function compileSkillCast(params: {
   targetId: string;
   startFrame: number;
   nextSeq: () => number;
+  buildByOperatorId?: Record<string, OperatorBuild>;
 }): SimEvent[] {
-  const { sourceId, skillType, targetId, startFrame, nextSeq } = params;
+  const {
+    sourceId,
+    skillType,
+    targetId,
+    startFrame,
+    nextSeq,
+    buildByOperatorId,
+  } = params;
   const operator = operatorsData[sourceId];
   if (!operator) {
     console.warn(
@@ -60,6 +69,7 @@ export function compileSkillCast(params: {
       targetId,
       startFrame,
       skillType,
+      sourceBuild: buildByOperatorId?.[sourceId],
       nextSeq,
       makeEventId,
     });

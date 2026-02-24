@@ -26,6 +26,18 @@ type TabProps = {
 };
 
 export function OperatorBuildTab({ operatorId, build, onCommit }: TabProps) {
+  const setSkillRank = (
+    skillType: "normalAttack" | "normalSkill" | "comboSkill" | "ultimate",
+    rank: number,
+  ) => {
+    onCommit(operatorId, {
+      skillRanks: {
+        ...build.skillRanks,
+        [skillType]: rank,
+      },
+    });
+  };
+
   return (
     <div>
       <PreviewSlider
@@ -74,6 +86,36 @@ export function OperatorBuildTab({ operatorId, build, onCommit }: TabProps) {
         max={4}
         value={build.trustRank}
         onCommit={v => onCommit(operatorId, { trustRank: v })}
+      />
+
+      <div className="mt-4 text-xs text-zinc-400">Skill ranks</div>
+      <PreviewSlider
+        label="Normal Attack Rank"
+        min={1}
+        max={12}
+        value={build.skillRanks.normalAttack}
+        onCommit={v => setSkillRank("normalAttack", v)}
+      />
+      <PreviewSlider
+        label="Normal Skill Rank"
+        min={1}
+        max={12}
+        value={build.skillRanks.normalSkill}
+        onCommit={v => setSkillRank("normalSkill", v)}
+      />
+      <PreviewSlider
+        label="Combo Skill Rank"
+        min={1}
+        max={12}
+        value={build.skillRanks.comboSkill}
+        onCommit={v => setSkillRank("comboSkill", v)}
+      />
+      <PreviewSlider
+        label="Ultimate Rank"
+        min={1}
+        max={12}
+        value={build.skillRanks.ultimate}
+        onCommit={v => setSkillRank("ultimate", v)}
       />
     </div>
   );

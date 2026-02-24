@@ -1,16 +1,30 @@
 import { BuffDef } from "../../BuffDef";
 import type { SimRegistry } from "../../../../simulator/listeners/registry";
 import type { SimEvent } from "../../../../types/simulator/simulator";
+import type { SimRead } from "../../../../simulator/simulator";
 
 const ENDMINISTRATOR_ID = "endministrator";
+const CRYSTAL_SHATTER_MUL_BY_CS_RANK = [
+  1.78, 1.96, 2.13, 2.31, 2.49, 2.67, 2.84, 3.02, 3.2, 3.42, 3.69, 4.0,
+] as const;
+
+function getEndministratorComboRank(read: SimRead): number {
+  const rank = Number(read.getBuild(ENDMINISTRATOR_ID)?.skillRanks?.comboSkill ?? 9);
+  if (!Number.isFinite(rank)) return 9;
+  return Math.max(1, Math.min(12, Math.round(rank)));
+}
 
 function spawnCrystalConsumeEvents(params: {
+  read: SimRead;
   frame: number;
   targetId: string;
   nextSeq: () => number;
   makeEventId: () => string;
   ref?: string | null;
 }): SimEvent[] {
+  const csRank = getEndministratorComboRank(params.read);
+  const crystalShatterMul = CRYSTAL_SHATTER_MUL_BY_CS_RANK[csRank - 1] ?? 3.2;
+
   return [
     {
       id: params.makeEventId(),
@@ -30,7 +44,7 @@ function spawnCrystalConsumeEvents(params: {
       targetId: params.targetId,
       damageType: "physical",
       hitTypes: { comboSkill: true },
-      dmgMultiplier: 3.2,
+      dmgMultiplier: crystalShatterMul,
       ref: params.ref,
     } as SimEvent,
   ];
@@ -79,6 +93,7 @@ class CrystalBuffDef extends BuffDef {
         }
 
         return spawnCrystalConsumeEvents({
+          read,
           frame: ev.frame,
           targetId,
           nextSeq,
@@ -104,6 +119,7 @@ class CrystalBuffDef extends BuffDef {
         }
 
         return spawnCrystalConsumeEvents({
+          read,
           frame: ev.frame,
           targetId,
           nextSeq,

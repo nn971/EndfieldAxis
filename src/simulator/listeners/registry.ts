@@ -365,6 +365,10 @@ export class SimRegistry {
   }
 
   finalize(): void {
+    /** TODO Fix the order of these so that it triggers as real game does,
+     *  and of course in the same order during each simulation.
+     *  Note: Priorly triggered events happens later, due to the seq.
+     */
     sortEntries(this.globalDamageBonus);
     sortEntries(this.afterHitGlobal);
     for (const key of Object.keys(this.afterHitByOperatorId)) {
@@ -372,6 +376,9 @@ export class SimRegistry {
     }
     sortEntries(this.onCastStartGlobal);
     sortEntries(this.onCastEndGlobal);
+    /** within onStatusApply: Swordmancer prior than Sundering Steel
+     *                        Swordmancer prior than Crystal Shattered
+     */
     sortEntries(this.onStatusApplyGlobal);
     for (const key of Object.keys(this.onStatusApplyByWielderWeaponId)) {
       sortEntries(this.onStatusApplyByWielderWeaponId[key as WeaponId]!);

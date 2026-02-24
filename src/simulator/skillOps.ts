@@ -9,11 +9,42 @@ export type SkillCompileContext = {
   startFrame: number;
   /** Skill type is carried by hit events so listeners can distinguish skill hits from normal attacks. */
   skillType: SkillType;
+  sourceBuild?: {
+    skillRanks?: Record<string, number>;
+  };
   nextSeq: () => number;
   makeEventId: () => string;
 };
 
 export type SkillOpFn = (ctx: SkillCompileContext) => SimEvent[];
+
+function clampSkillRank(rank: number): number {
+  if (!Number.isFinite(rank)) return 9;
+  return Math.max(1, Math.min(12, Math.round(rank)));
+}
+
+export function getSkillRank(
+  ctx: SkillCompileContext,
+  skillType: SkillType = ctx.skillType,
+): number {
+  const rank = Number(ctx.sourceBuild?.skillRanks?.[skillType] ?? 9);
+  return clampSkillRank(rank);
+}
+
+/** Rank table format: [lv1..lv9, m1, m2, m3]. */
+export function pickSkillValueByRank(
+  ctx: SkillCompileContext,
+  table: readonly number[],
+  skillType: SkillType = ctx.skillType,
+): number {
+  if (!Array.isArray(table) || table.length !== 12) {
+    throw new Error(
+      `pickSkillValueByRank requires a 12-value table, got length=${table?.length ?? 0}`,
+    );
+  }
+  const rank = getSkillRank(ctx, skillType);
+  return Number(table[rank - 1] ?? table[8]);
+}
 
 export function physicalHit(
   frame: number,
@@ -86,4 +117,27 @@ export function applyBuff(frame: number, buffId: BuffId): SkillOpFn {
     };
     return [ev];
   };
+}
+
+export function physicalHitByRank(
+  frame: number,
+  opts: {
+    rankTable: readonly number[];
+    rankSkillType?: SkillType;
+    dmgType?: DmgType;
+    withStatus?: boolean;
+    statusType?: SimStatusType;
+  },
+): SkillOpFn {
+  return ctx =>
+    physicalHit(frame, {
+      dmgType: opts.dmgType,
+      dmgMultiplier: pickSkillValueByRank(
+        ctx,
+        opts.rankTable,
+        opts.rankSkillType ?? ctx.skillType,
+      ),
+      withStatus: opts.withStatus,
+      statusType: opts.statusType,
+    })(ctx);
 }

@@ -10,6 +10,7 @@ import { compileSkillCast } from "../../simulator/compilers";
 import type { SimEvent, SimEntity } from "../../types/simulator/simulator";
 import type { SkillBox } from "../../types/editor";
 import type { SimRenderBar, SimRenderCache, SimRenderMarker } from "../../types/editor";
+import type { OperatorBuild } from "../../types/operator";
 import OperatorsData from "../../data/operators";
 import { summarizeLog } from "../../simulator/log";
 import { loadSimRegistry } from "../../simulator/listeners/registry";
@@ -119,8 +120,9 @@ function compileSkillBoxes(params: {
   skillBoxes: SkillBox[];
   targetId: string;
   nextSeq: () => number;
+  buildByOperatorId: Record<string, OperatorBuild>;
 }): SimEvent[] {
-  const { skillBoxes, targetId, nextSeq } = params;
+  const { skillBoxes, targetId, nextSeq, buildByOperatorId } = params;
 
   // Deterministic ordering when multiple boxes have same frame
   const sorted = [...skillBoxes].sort((a, b) => {
@@ -140,6 +142,7 @@ function compileSkillBoxes(params: {
       targetId,
       startFrame: box.startFrame,
       nextSeq,
+      buildByOperatorId,
     });
     out.push(...evs);
   }
@@ -195,6 +198,7 @@ export default function SimPanel() {
       skillBoxes,
       targetId,
       nextSeq: world.ops.nextSeq,
+      buildByOperatorId,
     });
     for (const ev of events) world.ops.schedule(ev);
 
