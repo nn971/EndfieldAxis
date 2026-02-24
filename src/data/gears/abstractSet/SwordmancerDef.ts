@@ -71,7 +71,7 @@ export abstract class SwordmancerDef extends GearsDef {
     if (SwordmancerDef.simPluginRegistered) return;
     SwordmancerDef.simPluginRegistered = true;
 
-    registry.registerOnStatusApplyGlobal({
+    registry.registerOnStatusApply({
       id: "set.swordmancer.status-proc",
       fn: ctx => {
         const sourceBuild = ctx.read.getBuild(ctx.sourceId);

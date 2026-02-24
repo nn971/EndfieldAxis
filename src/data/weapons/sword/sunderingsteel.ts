@@ -30,7 +30,7 @@ class SunderingSteelDef extends WeaponDef {
     const MAX_STACKS = 2;
     const BONUS_BUFF = "weapon.sunderingsteel.atkIncRatio";
 
-    registry.registerBeforeApplyStatusForWeapon({
+    registry.registerOnStatusApplyIfWielded({
       weaponId: this.id,
       id: "weapon.sunderingsteel.anthemofcinder",
       fn: ({ ev, sourceId, nextSeq, makeEventId }) => {

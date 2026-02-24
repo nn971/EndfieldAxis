@@ -30,10 +30,12 @@ class GrandVisionDef extends WeaponDef {
 
   override registerSimPlugins(registry: SimRegistry): void {
     // When the wielder applies Crystal, prime Long Wish for 20s.
-    registry.registerAfterBuffApplyForBuff({
+    registry.registerOnBuffApplyForBuff({
       buffId: "buff.crystal",
       id: "weapon.grandvision.longWish.prime",
       fn: ({ read, ev, sourceId, nextSeq, makeEventId }) => {
+        if (!sourceId) return [];
+
         const build = read.getBuild(sourceId);
         if (!build || build.weapon.id !== this.id) return [];
 
@@ -84,9 +86,11 @@ class GrandVisionDef extends WeaponDef {
     });
 
     // Activate Long Wish during the next battle-skill or ultimate cast.
-    registry.registerOnCastStartGlobal({
+    registry.registerOnCastStart({
       id: "weapon.grandvision.longWish.activate",
       fn: ({ read, ev, sourceId, nextSeq, makeEventId }) => {
+        if (!sourceId) return [];
+
         const build = read.getBuild(sourceId);
         if (!build || build.weapon.id !== this.id) return [];
         if (
@@ -118,9 +122,11 @@ class GrandVisionDef extends WeaponDef {
     });
 
     // Consume Long Wish at cast end.
-    registry.registerOnCastEndGlobal({
+    registry.registerOnCastEnd({
       id: "weapon.grandvision.longWish.consume",
       fn: ({ read, ev, sourceId, nextSeq, makeEventId }) => {
+        if (!sourceId) return [];
+
         const build = read.getBuild(sourceId);
         if (!build || build.weapon.id !== this.id) return [];
         if (

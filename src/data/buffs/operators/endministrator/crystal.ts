@@ -62,11 +62,13 @@ class CrystalBuffDef extends BuffDef {
       },
     });
 
-    registry.registerOnStatusApplyForBuff({
-      buffId: this.id,
+    registry.registerOnStatusApply({
       id: "buff.crystal.consume.onStatusApply",
       fn: ({ read, ev, targetId, nextSeq, makeEventId }) => {
         if (!read.env.entitiesById[ENDMINISTRATOR_ID]) return [];
+
+        const target = read.getEntity(targetId);
+        if (!(target as any).buffs?.["buff.crystal"]) return [];
         if (
           ev.statusType !== "lift" &&
           ev.statusType !== "knockDown" &&
@@ -86,11 +88,13 @@ class CrystalBuffDef extends BuffDef {
       },
     });
 
-    registry.registerOnInflictionApplyForBuff({
-      buffId: this.id,
+    registry.registerOnInflictionApply({
       id: "buff.crystal.consume.onInflictionApply",
       fn: ({ read, ev, targetId, nextSeq, makeEventId }) => {
         if (!read.env.entitiesById[ENDMINISTRATOR_ID]) return [];
+
+        const target = read.getEntity(targetId);
+        if (!(target as any).buffs?.["buff.crystal"]) return [];
         if (ev.inflictionType !== "physical") return [];
 
         // Skip inflictions spawned by statusApply to avoid double consume.

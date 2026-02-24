@@ -536,22 +536,7 @@ export class SimWorld {
           );
 
           // Trigger listeners only if status successfully triggered.
-          // console.log(success);
           if (success) {
-            // Then run triggers that want to react to a status application.
-            // Since same-frame events execute by descending seq, spawned events will run
-            // before any proc hits scheduled by the resolver above.
-            spawned = this.registry.runBeforeApplyStatus({
-              read: this.read,
-              ev: ev,
-              sourceId: source.id,
-              targetId: target.id,
-              nextSeq: this.ops.nextSeq,
-              makeEventId: () => makeId("SimEvent_"),
-            });
-            for (const sev of spawned) this.ops.schedule(sev);
-
-            // TODO The triggers about StatusApply are redundant
             spawned = this.registry.runOnStatusApply({
               read: this.read,
               ev,
@@ -567,16 +552,6 @@ export class SimWorld {
             }
           }
 
-          spawned = this.registry.runOnStatusApplyForBuff({
-            read: this.read,
-            ev,
-            sourceId: source.id,
-            targetId: target.id,
-            nextSeq: this.ops.nextSeq,
-            makeEventId: () => makeId("SimEvent_"),
-          });
-          for (const sev of spawned) this.ops.schedule(sev);
-
           break;
         }
 
@@ -589,7 +564,7 @@ export class SimWorld {
             ev.buffId!,
           );
 
-          const spawned = this.registry.runAfterBuffApply({
+          const spawned = this.registry.runOnBuffApply({
             read: this.read,
             ev: ev,
             sourceId: source.id,
@@ -611,7 +586,7 @@ export class SimWorld {
             `BUFF ${ev.buffId} removed (entity=${(owner as any).name})`,
           );
 
-          const spawned = this.registry.runAfterBuffRemove({
+          const spawned = this.registry.runOnBuffConsumed({
             read: this.read,
             ev,
             sourceId: ev.sourceId,
@@ -646,7 +621,7 @@ export class SimWorld {
             `${ev.inflictionType} infliction stacks ${current} -> ${after} (target=${(target as any).name})`,
           );
 
-          const spawned = this.registry.runOnInflictionApplyForBuff({
+          const spawned = this.registry.runOnInflictionApply({
             read: this.read,
             ev,
             sourceId: source.id,

@@ -66,7 +66,7 @@ class EndministratorDef extends OperatorDef {
   }
 
   override registerSimPlugins(registry: SimRegistry): void {
-    registry.registerAfterBuffRemoveForBuff({
+    registry.registerOnBuffConsumedForBuff({
       buffId: "buff.crystal",
       id: "operator.endministrator.talent1.onCrystalConsumed",
       fn: ({ read, ev, nextSeq, makeEventId }) => {
