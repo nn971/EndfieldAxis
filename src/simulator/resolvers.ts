@@ -19,6 +19,7 @@ function makeEventId() {
   return makeId(EVENT_PREFIX);
 }
 
+/** compute the special multiplier for physical status */
 function computePhysicalStatusSpecialMul(
   world: SimWorld,
   sourceId: SimEntityId,
@@ -34,7 +35,7 @@ function computePhysicalStatusSpecialMul(
   const rawArts = Number(build?.restStat?.artsIntensity ?? 0);
   const artsIntensity = Number.isFinite(rawArts) ? rawArts : 0;
 
-  const levelMul = 1 + (level - 1) / 392;
+  const levelMul = 1 + (level + 9) / 426.5; // TODO this formula need to be verified by tons of real data
   const artsMul = 1 + artsIntensity / 100;
 
   const consumed = Math.max(0, Number(vulnerableConsumed ?? 0));
@@ -52,10 +53,16 @@ function computePhysicalStatusSpecialMul(
       baseMul = 0.5 * (1 + consumed);
       break;
     default:
+      console.warn(
+        `unknown statusType ${statusType} when computing special multiplier`,
+      );
       baseMul = 1;
   }
 
-  return Math.round(baseMul * levelMul * artsMul * 1000) / 1000;
+  const finalMul = baseMul * levelMul * artsMul;
+  // console.log(baseMul, levelMul, artsMul, finalMul);
+
+  return finalMul;
 }
 
 /** WARNING: should not in use */
@@ -181,6 +188,7 @@ export function resolveStatusApplication(
       if (current <= 0) break;
 
       // Has vulnerable: consume all stacks and trigger crush burst damage.
+      shouldAddVulnerable = false;
       shouldRemoveVulnerable = true;
 
       // Schedule crush burst damage as a hit event so it can interleave with other same-frame effects.
@@ -229,7 +237,9 @@ export function resolveStatusApplication(
 
       if (current <= 0) break;
 
+      // Has vulnerable: consume all stacks and trigger breach burst damage.
       shouldRemoveVulnerable = true;
+      shouldAddVulnerable = false;
 
       self.ops.schedule({
         id: makeEventId(),
@@ -262,10 +272,10 @@ export function resolveStatusApplication(
     scheduleApplyInfliction(self, sourceId, targetId, "physical", ref);
     const after = Math.min(4, current + 1);
 
-    self.ops.log(
-      "buff",
-      `${statusType}: vulnerable stacks ${current} -> ${after} (target=${(target as any).name})`,
-    );
+    // self.ops.log(
+    //   "buff",
+    //   `${statusType}: vulnerable stacks ${current} -> ${after} (target=${(target as any).name})`,
+    // );
   } else if (shouldRemoveVulnerable) {
     self.ops.removeInfliction(targetId, "physical");
 

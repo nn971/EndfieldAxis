@@ -74,15 +74,22 @@ export function summarizeLog(
       const tag = `[${entry.cat.toUpperCase()}]`;
       if (entry.cat === "dmg") {
         serialized.push(`${fmtFrame(entry.frame)} ${tag} ${entry.message}`);
-        const breakdownLog = entry.breakdown.bonusLog
+        const breakdown = entry.breakdown;
+        const breakdownBonusLog = breakdown.bonusLog
           .map(
             ({ bucket, addValue, isRatio, note }) =>
               `bucket=${bucket}, +${addValue}, ${note}`,
           )
           .join("\n     ");
         serialized.push(
-          `     Final multiplier: ${entry.breakdown.dmgFinalMultiplier}, also gained from: \n     ` +
-            breakdownLog,
+          `     Base attack: ${breakdown.operatorAttack + breakdown.weaponAttack}, Attack increase ratio: ${breakdown.atkIncRatio}, Attributes bonus: ${breakdown.attributeBonusRatio}, Final attack: ${breakdown.atkFinal}`,
+        );
+        serialized.push(
+          `     Raw outcoming: ${breakdown.rawOutcoming}, Raw damage: ${breakdown.rawDamage}`,
+        );
+        serialized.push(
+          `     Final multiplier: ${breakdown.dmgFinalMultiplier}, also gained from: \n     ` +
+            breakdownBonusLog,
         );
       } else {
         serialized.push(`${fmtFrame(entry.frame)} ${tag} ${entry.message}`);

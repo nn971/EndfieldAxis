@@ -17,6 +17,13 @@ import {
 
 /** also serves as infliction type */
 export type DamageType = "physical" | "heat" | "electric" | "cryo" | "nature";
+export const DAMAGE_TYPE_LIST = [
+  "physical",
+  "heat",
+  "electric",
+  "cryo",
+  "nature",
+] as DamageType[];
 
 export type RestStatBonusBucket =
   | "baseAtk" // only used for add operatorAtk and weaponAtk

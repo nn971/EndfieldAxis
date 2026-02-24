@@ -11,6 +11,7 @@ import type {
 import { getWeaponSkillRestBonus } from "../../data/weapons/weaponSkillStats";
 import { makeEmptyRestStat } from "./solutionSlice";
 import { gearsSetData } from "../../data/gears";
+import { defaultRoundingPolicy } from "../../simulator/damage/damageModel";
 
 const MAX_LEVEL = 90;
 
@@ -29,7 +30,7 @@ function interpolateLevelStat(
   const clamped = clampLevel(level);
   const t = (clamped - 1) / 89;
   const raw = lv1 + (lv90 - lv1) * t;
-  return Math.max(0, Math.round(raw));
+  return defaultRoundingPolicy.roundScaledStat(raw);
 }
 
 function applyRestStatAddValue(

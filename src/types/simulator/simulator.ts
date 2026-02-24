@@ -101,7 +101,7 @@ export type SimEntity = {
   id: SimEntityId;
   name: string;
   hp: number;
-  inflictions: Record<string, SimInfliction>;
+  inflictions: Record<DamageType, SimInfliction>;
 
   buffs: Record<string, SimBuff>;
 

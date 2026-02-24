@@ -1,4 +1,4 @@
-import type { OperatorBuild } from "../types/operator";
+import { DAMAGE_TYPE_LIST, type OperatorBuild } from "../types/operator";
 import type {
   SimBuff,
   SimInfliction,
@@ -89,10 +89,10 @@ export type SimOps = {
   upsertBuff: (targetId: SimEntityId, buff: SimBuff) => void;
   removeBuff: (targetId: SimEntityId, buffId: BuffId) => void;
   /**
-   * Add stacks to a buff (creating it if missing), clamping to [0, maxStacks].
-   * Optionally emits a log entry when stacks change.
-   */
-  // addBuffStacks: (params: {
+  //  * Add stacks to a buff (creating it if missing), clamping to [0, maxStacks].
+  //  * Optionally emits a log entry when stacks change.
+  //  */
+  // // addBuffStacks: (params: {
   //   targetId: SimEntityId;
   //   buffId: BuffId;
   //   delta: number;
@@ -102,7 +102,11 @@ export type SimOps = {
   //     format: (before: number, after: number) => string;
   //   };
   // }) => void;
-  upsertInfliction: (targetId: SimEntityId, inf: SimInfliction) => void;
+  addInfliction: (
+    targetId: SimEntityId,
+    inflictionType: DamageType,
+    stacks: number,
+  ) => void;
   removeInfliction: (targetId: SimEntityId, inflictionType: DamageType) => void;
 };
 
@@ -143,6 +147,17 @@ function sortEventsInPlace(queue: SimEvent[]): void {
   });
 }
 
+function setEmptyInflictions(e: SimEntity): void {
+  const inflictions = e.inflictions as Record<DamageType, SimInfliction>;
+  for (const type of DAMAGE_TYPE_LIST) {
+    inflictions[type] ??= {
+      type: type,
+      stacks: 0,
+      lastApplyFrame: -1,
+    };
+  }
+}
+
 export class SimWorld {
   // Publicly readable, but mutations should go through ops.
   public readonly env: SimEnv;
@@ -167,6 +182,7 @@ export class SimWorld {
     const entitiesById: Record<string, SimEntity> = {};
     for (const e of init.entities) {
       entitiesById[e.id] = e;
+      setEmptyInflictions(e);
     }
     this.env = { entitiesById };
     this.nowInFrames = init.nowInFrames ?? 0;
@@ -209,7 +225,8 @@ export class SimWorld {
       upsertBuff: (targetId, buff) => this.upsertBuff(targetId, buff),
       removeBuff: (targetId, buffId) => this.removeBuff(targetId, buffId),
       // addBuffStacks: params => this.addBuffStacks(params),
-      upsertInfliction: (targetId, inf) => this.upsertInfliction(targetId, inf),
+      addInfliction: (targetId, inflictionType, stacks) =>
+        this.addInfliction(targetId, inflictionType, stacks),
       removeInfliction: (targetId, inflictionType) =>
         this.removeInfliction(targetId, inflictionType),
     };
@@ -338,19 +355,25 @@ export class SimWorld {
   //   }
   // }
 
-  private upsertInfliction(targetId: SimEntityId, inf: SimInfliction): void {
-    const ent = this.getEntityOrThrow(targetId);
-    (ent as any).inflictions ??= {};
-    (ent as any).inflictions[inf.type] = inf;
+  private addInfliction(
+    entityId: SimEntityId,
+    inflictionType: DamageType,
+    stacks: number = 1,
+  ): void {
+    const ent = this.getEntityOrThrow(entityId);
+    const currentStacks = ent.inflictions[inflictionType].stacks;
+    const afterStacks = Math.min(currentStacks + stacks, 4);
+    ent.inflictions[inflictionType].stacks = afterStacks;
+    ent.inflictions[inflictionType].lastApplyFrame = this.nowInFrames;
   }
 
   private removeInfliction(
-    targetId: SimEntityId,
+    entityId: SimEntityId,
     inflictionType: DamageType,
   ): void {
-    const ent = this.getEntityOrThrow(targetId);
-    if (!(ent as any).inflictions) return;
-    delete (ent as any).inflictions[inflictionType];
+    const ent = this.getEntityOrThrow(entityId);
+    ent.inflictions[inflictionType].stacks = 0;
+    ent.inflictions[inflictionType].lastApplyFrame = -1;
   }
 
   public runSim(maxSteps: number = 10000) {
@@ -502,6 +525,8 @@ export class SimWorld {
           if (!target) throw new Error(`undefined target`);
           if (!source) throw new Error(`undefined source`);
 
+          let spawned = [];
+
           // First resolve the status (mutates inflictions and may schedule proc hits).
           const success = this.resolvers.resolveStatusApplication(
             source.id,
@@ -513,21 +538,6 @@ export class SimWorld {
           // Trigger listeners only if status successfully triggered.
           // console.log(success);
           if (success) {
-            // TODO The triggers about StatusApply are redundant
-            let spawned = this.registry.runOnStatusApply({
-              read: this.read,
-              ev,
-              sourceId: source.id,
-              targetId: target.id,
-              nextSeq: this.ops.nextSeq,
-              makeEventId: () => makeId("SimEvent_"),
-            });
-
-            for (const sev of spawned) {
-              // console.log(sev);
-              this.ops.schedule(sev);
-            }
-
             // Then run triggers that want to react to a status application.
             // Since same-frame events execute by descending seq, spawned events will run
             // before any proc hits scheduled by the resolver above.
@@ -540,9 +550,24 @@ export class SimWorld {
               makeEventId: () => makeId("SimEvent_"),
             });
             for (const sev of spawned) this.ops.schedule(sev);
+
+            // TODO The triggers about StatusApply are redundant
+            spawned = this.registry.runOnStatusApply({
+              read: this.read,
+              ev,
+              sourceId: source.id,
+              targetId: target.id,
+              nextSeq: this.ops.nextSeq,
+              makeEventId: () => makeId("SimEvent_"),
+            });
+
+            for (const sev of spawned) {
+              // console.log(sev);
+              this.ops.schedule(sev);
+            }
           }
 
-          const spawned = this.registry.runOnStatusApplyForBuff({
+          spawned = this.registry.runOnStatusApplyForBuff({
             read: this.read,
             ev,
             sourceId: source.id,
@@ -609,11 +634,17 @@ export class SimWorld {
           if (!target) throw new Error(`undefined target`);
           if (!source) throw new Error(`undefined source`);
 
-          this.ops.upsertInfliction(target.id, {
-            type: ev.inflictionType,
-            stacks: ev.inflictionStacks,
-            lastApplyFrame: this.read.nowInFrames,
-          } as SimInfliction);
+          const current = target.inflictions[ev.inflictionType].stacks;
+          this.ops.addInfliction(
+            target.id,
+            ev.inflictionType,
+            ev.inflictionStacks,
+          );
+          const after = target.inflictions[ev.inflictionType].stacks;
+          this.ops.log(
+            "buff",
+            `${ev.inflictionType} infliction stacks ${current} -> ${after} (target=${(target as any).name})`,
+          );
 
           const spawned = this.registry.runOnInflictionApplyForBuff({
             read: this.read,
