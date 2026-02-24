@@ -1,6 +1,11 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import operatorsData from "../../data/operators";
-import type { SkillBox, SolutionState } from "../../types/editor";
+import {
+  makeEmptySimRenderCache,
+  type SimRenderCache,
+  type SkillBox,
+  type SolutionState,
+} from "../../types/editor";
 import type { OperatorId, SkillType } from "../../data/operators/OperatorDef";
 import type { OperatorBuild, RestStatSnapshot } from "../../types/operator";
 import { statUpdater } from "./statUpdater";
@@ -102,6 +107,7 @@ function initState(): SolutionState {
     teamOperatorIds,
     skillBoxes: initialSkillBoxes,
     buildByOperatorId,
+    simRenderCache: makeEmptySimRenderCache(),
   };
 }
 
@@ -131,6 +137,9 @@ export const solutionSlice = createSlice({
         }
       }
       return action.payload;
+    },
+    simRenderCacheReplaced(state, action: PayloadAction<SimRenderCache>) {
+      state.simRenderCache = action.payload;
     },
     laneReordered(state, action: PayloadAction<{ from: number; to: number }>) {
       const { from, to } = action.payload;
@@ -214,6 +223,7 @@ export const {
   operatorBuildPatched,
   skillBoxAdded,
   skillBoxDeleted,
+  simRenderCacheReplaced,
 } = solutionSlice.actions;
 
 export default solutionSlice.reducer;

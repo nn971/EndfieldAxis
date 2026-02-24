@@ -1,8 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { SkillBox } from "../../types/editor";
+import type {
+  SimRenderBar,
+  SimRenderMarker,
+  SimRenderCache,
+  SkillBox,
+} from "../../types/editor";
 import type { SkillType } from "../../data/operators/OperatorDef";
 import operatorsData from "../../data/operators";
 import { moveItem } from "../../shared/lib/utils";
+import placeholderImg from "../../assets/default/placeholder.jpg";
 
 const SKILL_TABS: { key: SkillType; label: string }[] = [
   { key: "normalAttack", label: "Normal Attack" },
@@ -14,6 +20,7 @@ const SKILL_TABS: { key: SkillType; label: string }[] = [
 type Props = {
   teamOperatorIds: string[];
   skillBoxes: SkillBox[];
+  simRenderCache: SimRenderCache;
   onLaneLabelClick?: (laneIndex: number) => void;
   onCommitLaneReorder?: (from: number, to: number) => void;
   onCommitSkillBoxPatch?: (
@@ -34,6 +41,7 @@ type Props = {
 export default function AxisEditor({
   teamOperatorIds,
   skillBoxes,
+  simRenderCache,
   onLaneLabelClick,
   onCommitLaneReorder,
   onCommitSkillBoxPatch,
@@ -45,6 +53,13 @@ export default function AxisEditor({
   const UPPER_GUTTER_HEIGHT = 20;
   const LANE_HEIGHT = 100;
   const SKILL_BOX_HEIGHT = 30;
+  const BUFF_BAR_HEIGHT = 8;
+  const BAR_ROW_PITCH = 12;
+  const MARKER_ROW_PITCH = 18;
+  const BAR_BAND_OFFSET = 12;
+  const MARKER_BAND_OFFSET = 56;
+  const RENDERED_LANE_COUNT = 5;
+  const ENEMY_LANE_INDEX = 4;
 
   const MINOR = 12;
   const MAJOR = 60;
@@ -352,6 +367,79 @@ export default function AxisEditor({
           ?.durationFrames ?? DEFAULT_NEW_BOX_DURATION)
       : DEFAULT_NEW_BOX_DURATION;
 
+  const laneLabels = useMemo(
+    () => [...effectiveTeamOperatorIds, "enemy"],
+    [effectiveTeamOperatorIds],
+  );
+
+  const laneIndexByOwnerId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (let i = 0; i < effectiveTeamOperatorIds.length; i += 1) {
+      map.set(effectiveTeamOperatorIds[i], i);
+    }
+    return map;
+  }, [effectiveTeamOperatorIds]);
+
+  const toLaneIndex = (ownerId: string): number =>
+    laneIndexByOwnerId.get(ownerId) ?? ENEMY_LANE_INDEX;
+
+  const barRowById = useMemo(() => {
+    const byLane: Record<number, number[]> = {};
+    const rows = new Map<string, number>();
+    const sorted = [...simRenderCache.bars].sort((a, b) => {
+      const laneDelta = toLaneIndex(a.ownerId) - toLaneIndex(b.ownerId);
+      if (laneDelta !== 0) return laneDelta;
+      if (a.startFrame !== b.startFrame) return a.startFrame - b.startFrame;
+      if (a.endFrame !== b.endFrame) return a.endFrame - b.endFrame;
+      return a.id.localeCompare(b.id);
+    });
+
+    for (const bar of sorted) {
+      const laneIndex = toLaneIndex(bar.ownerId);
+      const laneRows = (byLane[laneIndex] ??= []);
+      let rowIndex = laneRows.findIndex(
+        lastEnd => bar.startFrame > lastEnd + 2,
+      );
+      if (rowIndex < 0) {
+        rowIndex = laneRows.length;
+        laneRows.push(bar.endFrame);
+      } else {
+        laneRows[rowIndex] = Math.max(laneRows[rowIndex], bar.endFrame);
+      }
+      rows.set(bar.id, rowIndex);
+    }
+
+    return rows;
+  }, [simRenderCache.bars, laneIndexByOwnerId]);
+
+  const markerRowById = useMemo(() => {
+    const byLane: Record<number, number[]> = {};
+    const rows = new Map<string, number>();
+    const sorted = [...simRenderCache.markers].sort((a, b) => {
+      const laneDelta = toLaneIndex(a.ownerId) - toLaneIndex(b.ownerId);
+      if (laneDelta !== 0) return laneDelta;
+      if (a.frame !== b.frame) return a.frame - b.frame;
+      return a.id.localeCompare(b.id);
+    });
+
+    for (const marker of sorted) {
+      const laneIndex = toLaneIndex(marker.ownerId);
+      const laneRows = (byLane[laneIndex] ??= []);
+      let rowIndex = laneRows.findIndex(
+        lastFrame => marker.frame > lastFrame + 10,
+      );
+      if (rowIndex < 0) {
+        rowIndex = laneRows.length;
+        laneRows.push(marker.frame);
+      } else {
+        laneRows[rowIndex] = marker.frame;
+      }
+      rows.set(marker.id, rowIndex);
+    }
+
+    return rows;
+  }, [simRenderCache.markers, laneIndexByOwnerId]);
+
   return (
     <div className="p-4 border border-zinc-700 rounded bg-zinc-900">
       <h2 className="text-lg font-semibold mb-2">Axis Editor</h2>
@@ -380,7 +468,9 @@ export default function AxisEditor({
       {/* axis area */}
       <div
         className="relative mt-4 mb-4 overflow-hidden border border-zinc-700 rounded bg-zinc-900"
-        style={{ height: UPPER_GUTTER_HEIGHT + 4 * LANE_HEIGHT }}
+        style={{
+          height: UPPER_GUTTER_HEIGHT + RENDERED_LANE_COUNT * LANE_HEIGHT,
+        }}
       >
         {/* left gutter with lane labels */}
         <div
@@ -389,11 +479,17 @@ export default function AxisEditor({
         >
           <div
             className="relative"
-            style={{ top: UPPER_GUTTER_HEIGHT, height: 4 * LANE_HEIGHT }}
+            style={{
+              top: UPPER_GUTTER_HEIGHT,
+              height: RENDERED_LANE_COUNT * LANE_HEIGHT,
+            }}
           >
-            {[0, 1, 2, 3].map(laneIndex => {
-              const opId = effectiveTeamOperatorIds[laneIndex];
-              const name = operatorsData[opId]?.name ?? opId ?? "—";
+            {[0, 1, 2, 3, 4].map(laneIndex => {
+              const opId = laneLabels[laneIndex];
+              const name =
+                laneIndex === ENEMY_LANE_INDEX
+                  ? "Enemy"
+                  : (operatorsData[opId]?.name ?? opId ?? "—");
 
               return (
                 <div
@@ -405,16 +501,22 @@ export default function AxisEditor({
                     width: LEFT_GUTTER_WIDTH,
                   }}
                 >
-                  <button
-                    type="button"
-                    className="h-full w-full text-xs bg-zinc-800 hover:bg-zinc-700 select-none touch-none cursor-grab active:cursor-grabbing"
-                    onPointerDown={e => onLanePointerDown(e, laneIndex)}
-                    onPointerMove={onLanePointerMove}
-                    onPointerUp={onLanePointerUp}
-                    onPointerCancel={onLanePointerCancel}
-                  >
-                    {name}
-                  </button>
+                  {laneIndex === ENEMY_LANE_INDEX ? (
+                    <div className="h-full w-full text-xs bg-zinc-800 flex items-center justify-center text-zinc-300">
+                      {name}
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="h-full w-full text-xs bg-zinc-800 hover:bg-zinc-700 select-none touch-none cursor-grab active:cursor-grabbing"
+                      onPointerDown={e => onLanePointerDown(e, laneIndex)}
+                      onPointerMove={onLanePointerMove}
+                      onPointerUp={onLanePointerUp}
+                      onPointerCancel={onLanePointerCancel}
+                    >
+                      {name}
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -424,7 +526,7 @@ export default function AxisEditor({
         <div
           className="absolute relative overflow-x-auto overflow-y-hidden"
           style={{
-            height: UPPER_GUTTER_HEIGHT + 4 * LANE_HEIGHT,
+            height: UPPER_GUTTER_HEIGHT + RENDERED_LANE_COUNT * LANE_HEIGHT,
             left: LEFT_GUTTER_WIDTH,
             right: 0,
           }}
@@ -463,9 +565,78 @@ export default function AxisEditor({
               left: 0,
               top: UPPER_GUTTER_HEIGHT,
               width: AXIS_LENTH_IN_FRAMES,
-              height: 4 * LANE_HEIGHT,
+              height: RENDERED_LANE_COUNT * LANE_HEIGHT,
             }}
           >
+            {simRenderCache.bars.map(bar => {
+              const laneIndex = toLaneIndex(bar.ownerId);
+              const width = Math.max(2, bar.endFrame - bar.startFrame);
+              const rowIndex = barRowById.get(bar.id) ?? 0;
+              const top =
+                laneIndex * LANE_HEIGHT +
+                BAR_BAND_OFFSET +
+                rowIndex * BAR_ROW_PITCH;
+              return (
+                <div key={bar.id}>
+                  <div
+                    className={`absolute border ${bar.type === "buff" ? "bg-sky-500/50 border-sky-300" : "bg-rose-500/45 border-rose-300"}`}
+                    style={{
+                      left: bar.startFrame,
+                      top,
+                      width,
+                      height: BUFF_BAR_HEIGHT,
+                    }}
+                  />
+                  <img
+                    src={placeholderImg}
+                    alt={bar.effectId}
+                    className="absolute size-4 rounded-sm border border-zinc-200/60"
+                    style={{
+                      left: bar.startFrame - 2,
+                      top: top - 5,
+                    }}
+                  />
+                  {bar.refreshFrames.map((refreshFrame, idx) => (
+                    <div
+                      key={`${bar.id}-refresh-${idx}`}
+                      className="absolute w-[2px] bg-amber-300"
+                      style={{
+                        left: refreshFrame,
+                        top: top - 4,
+                        height: BUFF_BAR_HEIGHT + 8,
+                      }}
+                    />
+                  ))}
+                </div>
+              );
+            })}
+
+            {simRenderCache.markers.map(marker => {
+              const laneIndex = toLaneIndex(marker.ownerId);
+              const rowIndex = markerRowById.get(marker.id) ?? 0;
+              const top =
+                laneIndex * LANE_HEIGHT +
+                MARKER_BAND_OFFSET +
+                rowIndex * MARKER_ROW_PITCH;
+              return (
+                <div key={marker.id}>
+                  <img
+                    src={placeholderImg}
+                    alt={marker.effectId}
+                    className="absolute size-4 rounded-sm border border-zinc-200/60"
+                    style={{
+                      left: marker.frame - 2,
+                      top,
+                    }}
+                  />
+                  <div
+                    className="absolute w-[2px] bg-emerald-300"
+                    style={{ left: marker.frame + 6, top, height: 18 }}
+                  />
+                </div>
+              );
+            })}
+
             {/* adding skill box preview */}
             {addSkillDrag?.overAxis &&
               addSkillDrag.laneIndex != null &&

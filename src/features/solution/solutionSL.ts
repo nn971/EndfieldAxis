@@ -1,4 +1,8 @@
-import type { SolutionState, SkillBox } from "../../types/editor";
+import {
+  makeEmptySimRenderCache,
+  type SolutionState,
+  type SkillBox,
+} from "../../types/editor";
 
 // Bump this when you change the serialized shape.
 export const CURRENT_SOLUTION_VERSION = 1;
@@ -37,12 +41,23 @@ function canonicalizeSolution(sol: SolutionState): SolutionState {
   };
 }
 
+function stripRuntimeFields(sol: SolutionState): SolutionState {
+  return {
+    ...sol,
+    simRenderCache: makeEmptySimRenderCache(),
+  };
+}
+
 export function serializeSolution(sol: SolutionState): string {
   const normalized: SolutionState = {
     ...sol,
     version: sol.version ?? CURRENT_SOLUTION_VERSION,
   };
-  return JSON.stringify(canonicalizeSolution(normalized), null, 2);
+  return JSON.stringify(
+    stripRuntimeFields(canonicalizeSolution(normalized)),
+    null,
+    2,
+  );
 }
 
 export function deserializeSolution(
@@ -74,12 +89,20 @@ function migrateToCurrent(
   const version = typeof raw.version === "number" ? raw.version : 0;
   if (version === 0) {
     // Only migrate if it looks like a v1 solution minus the version field.
-    const candidate: any = { ...raw, version: CURRENT_SOLUTION_VERSION };
+    const candidate: any = {
+      ...raw,
+      version: CURRENT_SOLUTION_VERSION,
+      simRenderCache: makeEmptySimRenderCache(),
+    };
     return { ok: true, solution: candidate as SolutionState };
   }
 
   if (version === CURRENT_SOLUTION_VERSION) {
-    return { ok: true, solution: raw as unknown as SolutionState };
+    const next = {
+      ...(raw as unknown as SolutionState),
+      simRenderCache: makeEmptySimRenderCache(),
+    };
+    return { ok: true, solution: next };
   }
 
   return {

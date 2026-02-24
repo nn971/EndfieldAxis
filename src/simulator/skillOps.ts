@@ -1,5 +1,5 @@
 import { BuffId } from "../data/buffs/BuffDef";
-import type { DmgType } from "../data/operators/OperatorDef";
+import type { DmgType, SkillType } from "../data/operators/OperatorDef";
 import type { SimStatusType } from "../types/simulator/infliction";
 import type { SimEvent } from "../types/simulator/simulator";
 
@@ -8,7 +8,7 @@ export type SkillCompileContext = {
   targetId: string;
   startFrame: number;
   /** Skill type is carried by hit events so listeners can distinguish skill hits from normal attacks. */
-  skillType: string;
+  skillType: SkillType;
   nextSeq: () => number;
   makeEventId: () => string;
 };
@@ -41,9 +41,9 @@ export function physicalHit(
       targetId: ctx.targetId,
 
       damageType: (opts.dmgType ?? "physical") as any,
-      // TODO implement this
-      HitType: "normal",
-      skillType: ctx.skillType as any,
+      hitTypes: {
+        [ctx.skillType as SkillType]: true,
+      },
       dmgMultiplier: opts.dmgMultiplier,
     };
 

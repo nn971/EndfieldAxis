@@ -163,6 +163,7 @@ export class SimWorld {
   public readonly env: SimEnv;
   public nowInFrames: number;
   public readonly log: SimLog = [];
+  public readonly processedEvents: SimEvent[] = [];
 
   private queue: SimEvent[] = [];
   private seqCounter = 1;
@@ -395,6 +396,7 @@ export class SimWorld {
       this.ops.advanceToFrame(ev.frame);
 
       this.currentEvent = ev;
+      this.processedEvents.push(ev);
 
       const source = ev.sourceId
         ? (this.read.getEntity(ev.sourceId) as SimEntity)

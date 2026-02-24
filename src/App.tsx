@@ -13,6 +13,7 @@ import {
 } from "./features/solution/solutionSlice";
 import {
   selectBuildByOperatorId,
+  selectSimRenderCache,
   selectSkillBoxes,
   selectTeamOperatorIds,
 } from "./features/solution/selectors";
@@ -38,6 +39,7 @@ export default function App() {
   const teamOperatorIds = useAppSelector(selectTeamOperatorIds);
   const skillBoxes = useAppSelector(selectSkillBoxes);
   const buildByOperatorId = useAppSelector(selectBuildByOperatorId);
+  const simRenderCache = useAppSelector(selectSimRenderCache);
 
   const [selectedLane, setSelectedLane] = useState<number | null>(null);
 
@@ -69,6 +71,7 @@ export default function App() {
             <AxisEditor
               teamOperatorIds={teamOperatorIds}
               skillBoxes={skillBoxes}
+              simRenderCache={simRenderCache}
               onLaneLabelClick={laneIndex => setSelectedLane(laneIndex)}
               onCommitLaneReorder={(from, to) => {
                 dispatch(laneReordered({ from, to }));

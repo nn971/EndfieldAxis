@@ -1,5 +1,40 @@
 import { OperatorBuild, SkillType } from "./operator";
 
+export type SimRenderBarType = "buff" | "infliction";
+export type SimRenderMarkerType = "status" | "buffRefresh";
+
+export interface SimRenderBar {
+  id: string;
+  type: SimRenderBarType;
+  ownerId: string;
+  effectId: string;
+  startFrame: number;
+  endFrame: number;
+  refreshFrames: number[];
+}
+
+export interface SimRenderMarker {
+  id: string;
+  type: SimRenderMarkerType;
+  ownerId: string;
+  effectId: string;
+  frame: number;
+}
+
+export interface SimRenderCache {
+  bars: SimRenderBar[];
+  markers: SimRenderMarker[];
+  simEndFrame: number;
+}
+
+export function makeEmptySimRenderCache(): SimRenderCache {
+  return {
+    bars: [],
+    markers: [],
+    simEndFrame: 0,
+  };
+}
+
 export interface SkillBox {
   id: string;
   operatorId: string;
@@ -19,4 +54,5 @@ export interface SolutionState {
   teamOperatorIds: string[]; // length 4
   skillBoxes: SkillBox[];
   buildByOperatorId: Record<string, OperatorBuild>;
+  simRenderCache: SimRenderCache;
 }

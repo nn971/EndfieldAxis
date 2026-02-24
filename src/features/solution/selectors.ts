@@ -7,3 +7,4 @@ export const selectTeamOperatorIds = (s: RootState) =>
 export const selectSkillBoxes = (s: RootState) => s.solution.skillBoxes;
 export const selectBuildByOperatorId = (s: RootState) =>
   s.solution.buildByOperatorId;
+export const selectSimRenderCache = (s: RootState) => s.solution.simRenderCache;

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useAppSelector } from "../../app/hooks";
+import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import {
   selectBuildByOperatorId,
   selectSkillBoxes,
@@ -9,10 +9,111 @@ import { createDefaultDamageModel } from "../../simulator/damage/damageModel";
 import { compileSkillCast } from "../../simulator/compilers";
 import type { SimEvent, SimEntity } from "../../types/simulator/simulator";
 import type { SkillBox } from "../../types/editor";
+import type { SimRenderBar, SimRenderCache, SimRenderMarker } from "../../types/editor";
 import OperatorsData from "../../data/operators";
 import { summarizeLog } from "../../simulator/log";
 import { loadSimRegistry } from "../../simulator/listeners/registry";
 import { SimWorld } from "../../simulator/simulator";
+import { simRenderCacheReplaced } from "../solution/solutionSlice";
+
+function buildSimRenderCache(events: SimEvent[]): SimRenderCache {
+  const bars: SimRenderBar[] = [];
+  const markers: SimRenderMarker[] = [];
+
+  type ActiveBar = SimRenderBar & { key: string };
+  const activeByKey = new Map<string, ActiveBar>();
+
+  let simEndFrame = 0;
+
+  function closeBar(key: string, frame: number) {
+    const active = activeByKey.get(key);
+    if (!active) return;
+    active.endFrame = Math.max(active.startFrame + 1, frame);
+    bars.push(active);
+    activeByKey.delete(key);
+  }
+
+  for (const ev of events) {
+    simEndFrame = Math.max(simEndFrame, ev.frame);
+    if (ev.type === "statusApply") {
+      markers.push({
+        id: `status:${ev.id}`,
+        type: "status",
+        ownerId: ev.targetId,
+        effectId: ev.statusType,
+        frame: ev.frame,
+      });
+      continue;
+    }
+
+    if (ev.type === "buffApply") {
+      const ownerId = ev.targetId;
+      const key = `buff:${ownerId}:${ev.buffId}`;
+      const active = activeByKey.get(key);
+      if (active) {
+        active.refreshFrames.push(ev.frame);
+        markers.push({
+          id: `buff-refresh:${ev.id}`,
+          type: "buffRefresh",
+          ownerId,
+          effectId: ev.buffId,
+          frame: ev.frame,
+        });
+      } else {
+        activeByKey.set(key, {
+          id: `bar:${key}:${ev.id}`,
+          key,
+          type: "buff",
+          ownerId,
+          effectId: ev.buffId,
+          startFrame: ev.frame,
+          endFrame: ev.frame,
+          refreshFrames: [],
+        });
+      }
+      continue;
+    }
+
+    if (ev.type === "buffExpire" || ev.type === "buffRemove") {
+      if (!ev.sourceId) continue;
+      closeBar(`buff:${ev.sourceId}:${ev.buffId}`, ev.frame);
+      continue;
+    }
+
+    if (ev.type === "inflictionApply") {
+      const ownerId = ev.targetId;
+      const key = `infliction:${ownerId}:${ev.inflictionType}`;
+      const active = activeByKey.get(key);
+      if (active) {
+        active.endFrame = Math.max(active.endFrame, ev.frame);
+      } else {
+        activeByKey.set(key, {
+          id: `bar:${key}:${ev.id}`,
+          key,
+          type: "infliction",
+          ownerId,
+          effectId: ev.inflictionType,
+          startFrame: ev.frame,
+          endFrame: ev.frame,
+          refreshFrames: [],
+        });
+      }
+      continue;
+    }
+
+    if (ev.type === "inflictionExpire") {
+      if (!ev.sourceId) continue;
+      closeBar(`infliction:${ev.sourceId}:${ev.inflictionType}`, ev.frame);
+    }
+  }
+
+  for (const active of activeByKey.values()) {
+    active.endFrame = Math.max(active.startFrame + 1, simEndFrame);
+    bars.push(active);
+  }
+
+  return { bars, markers, simEndFrame };
+}
 
 function compileSkillBoxes(params: {
   skillBoxes: SkillBox[];
@@ -46,6 +147,7 @@ function compileSkillBoxes(params: {
 }
 
 export default function SimPanel() {
+  const dispatch = useAppDispatch();
   const [logText, setLogText] = useState("");
   const teamOperatorIds = useAppSelector(selectTeamOperatorIds);
   const skillBoxes = useAppSelector(selectSkillBoxes);
@@ -97,6 +199,7 @@ export default function SimPanel() {
     for (const ev of events) world.ops.schedule(ev);
 
     world.runSim();
+    dispatch(simRenderCacheReplaced(buildSimRenderCache(world.processedEvents)));
 
     const finalWorldDescription = JSON.stringify(world.env, null, 2);
     setLogText(
@@ -125,7 +228,10 @@ export default function SimPanel() {
           <button
             type="button"
             className="px-3 py-1 text-xs rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700"
-            onClick={() => setLogText("")}
+            onClick={() => {
+              setLogText("");
+              dispatch(simRenderCacheReplaced({ bars: [], markers: [], simEndFrame: 0 }));
+            }}
           >
             Clear
           </button>
