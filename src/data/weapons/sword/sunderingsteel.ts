@@ -1,6 +1,9 @@
 import { SimRegistry } from "../../../simulator/listeners/registry";
 import { WeaponDef } from "../WeaponDef";
 
+export const SUNDERING_STEEL_ON_STATUS_APPLY_PLUGIN_ID =
+  "weapon.sunderingsteel.anthemofcinder";
+
 class SunderingSteelDef extends WeaponDef {
   constructor() {
     super({
@@ -32,7 +35,7 @@ class SunderingSteelDef extends WeaponDef {
 
     registry.registerOnStatusApplyIfWielded({
       weaponId: this.id,
-      id: "weapon.sunderingsteel.anthemofcinder",
+      id: SUNDERING_STEEL_ON_STATUS_APPLY_PLUGIN_ID,
       fn: ({ ev, sourceId, nextSeq, makeEventId }) => {
         // Each trigger adds 1 stack by applying the buff once.
         return [

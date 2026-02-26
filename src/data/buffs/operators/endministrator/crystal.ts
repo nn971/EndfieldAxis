@@ -4,6 +4,8 @@ import type { SimEvent } from "../../../../types/simulator/simulator";
 import type { SimRead } from "../../../../simulator/simulator";
 
 const ENDMINISTRATOR_ID = "endministrator";
+export const CRYSTAL_ON_STATUS_APPLY_PLUGIN_ID = "buff.crystal.consume.onStatusApply";
+
 const CRYSTAL_SHATTER_MUL_BY_CS_RANK = [
   1.78, 1.96, 2.13, 2.31, 2.49, 2.67, 2.84, 3.02, 3.2, 3.42, 3.69, 4.0,
 ] as const;
@@ -77,7 +79,7 @@ class CrystalBuffDef extends BuffDef {
     });
 
     registry.registerOnStatusApply({
-      id: "buff.crystal.consume.onStatusApply",
+      id: CRYSTAL_ON_STATUS_APPLY_PLUGIN_ID,
       fn: ({ read, ev, targetId, nextSeq, makeEventId }) => {
         if (!read.env.entitiesById[ENDMINISTRATOR_ID]) return [];
 

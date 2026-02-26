@@ -10,6 +10,10 @@ import { BuffId } from "../../data/buffs/BuffDef";
 import { WeaponId } from "../../data/weapons/WeaponDef";
 import { OperatorId } from "../../data/operators/OperatorDef";
 import { DamageType } from "../../types/operator";
+import {
+  sortPluginsByGameOrder,
+  type PluginOrderingBucket,
+} from "./pluginOrder";
 
 /**
  * Listener/registry layer:
@@ -121,10 +125,13 @@ type ListenerEntry<TFn> = {
   fn: TFn;
 };
 
-function sortEntries<TFn>(arr: ListenerEntry<TFn>[]): void {
-  arr.sort((a, b) => {
-    if (a.priority !== b.priority) return a.priority - b.priority;
-    return a.id.localeCompare(b.id);
+function sortEntries<TFn>(
+  arr: ListenerEntry<TFn>[],
+  bucket: PluginOrderingBucket,
+): void {
+  sortPluginsByGameOrder({
+    entries: arr,
+    bucket,
   });
 }
 
@@ -369,35 +376,50 @@ export class SimRegistry {
      *  and of course in the same order during each simulation.
      *  Note: Priorly triggered events happens later, due to the seq.
      */
-    sortEntries(this.globalDamageBonus);
-    sortEntries(this.afterHitGlobal);
+    sortEntries(this.globalDamageBonus, "globalDamageBonus");
+    sortEntries(this.afterHitGlobal, "afterHitGlobal");
     for (const key of Object.keys(this.afterHitByOperatorId)) {
-      sortEntries(this.afterHitByOperatorId[key as OperatorId]!);
+      sortEntries(
+        this.afterHitByOperatorId[key as OperatorId]!,
+        "afterHitByOperatorId",
+      );
     }
-    sortEntries(this.onCastStartGlobal);
-    sortEntries(this.onCastEndGlobal);
+    sortEntries(this.onCastStartGlobal, "onCastStartGlobal");
+    sortEntries(this.onCastEndGlobal, "onCastEndGlobal");
     /** within onStatusApply: Swordmancer prior than Sundering Steel
      *                        Swordmancer prior than Crystal Shattered
      */
-    sortEntries(this.onStatusApplyGlobal);
+    sortEntries(this.onStatusApplyGlobal, "onStatusApplyGlobal");
     for (const key of Object.keys(this.onStatusApplyByWielderWeaponId)) {
-      sortEntries(this.onStatusApplyByWielderWeaponId[key as WeaponId]!);
+      sortEntries(
+        this.onStatusApplyByWielderWeaponId[key as WeaponId]!,
+        "onStatusApplyByWielderWeaponId",
+      );
     }
-    sortEntries(this.onBuffApplyGlobal);
+    sortEntries(this.onBuffApplyGlobal, "onBuffApplyGlobal");
     for (const key of Object.keys(this.onBuffApplyByBuffId)) {
-      sortEntries(this.onBuffApplyByBuffId[key as BuffId]!);
+      sortEntries(
+        this.onBuffApplyByBuffId[key as BuffId]!,
+        "onBuffApplyByBuffId",
+      );
     }
-    sortEntries(this.onBuffConsumedGlobal);
+    sortEntries(this.onBuffConsumedGlobal, "onBuffConsumedGlobal");
     for (const key of Object.keys(this.onBuffConsumedByBuffId)) {
-      sortEntries(this.onBuffConsumedByBuffId[key as BuffId]!);
+      sortEntries(
+        this.onBuffConsumedByBuffId[key as BuffId]!,
+        "onBuffConsumedByBuffId",
+      );
     }
-    sortEntries(this.onInflictionApplyGlobal);
+    sortEntries(this.onInflictionApplyGlobal, "onInflictionApplyGlobal");
     for (const key of Object.keys(this.onInflictionApplyByBuffId)) {
-      sortEntries(this.onInflictionApplyByBuffId[key as BuffId]!);
+      sortEntries(
+        this.onInflictionApplyByBuffId[key as BuffId]!,
+        "onInflictionApplyByBuffId",
+      );
     }
-    sortEntries(this.onInflictionConsumedGlobal);
+    sortEntries(this.onInflictionConsumedGlobal, "onInflictionConsumedGlobal");
     for (const key of Object.keys(this.buffDamageBonus)) {
-      sortEntries(this.buffDamageBonus[key as BuffId]!);
+      sortEntries(this.buffDamageBonus[key as BuffId]!, "buffDamageBonus");
     }
   }
 

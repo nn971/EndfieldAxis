@@ -12,6 +12,9 @@ const physicalStatusTypes: SimStatusType[] = [
   "breach",
 ];
 
+export const SWORDMANCER_ON_STATUS_APPLY_PLUGIN_ID =
+  "set.swordmancer.status-proc";
+
 function countSetPieces(build: OperatorBuild, set: GearSetBonusData): number {
   return Object.values(build.gears).filter(
     slot => !!slot.gearId && set.gearIds.includes(slot.gearId),
@@ -72,7 +75,7 @@ export abstract class SwordmancerDef extends GearsDef {
     SwordmancerDef.simPluginRegistered = true;
 
     registry.registerOnStatusApply({
-      id: "set.swordmancer.status-proc",
+      id: SWORDMANCER_ON_STATUS_APPLY_PLUGIN_ID,
       fn: ctx => {
         const sourceBuild = ctx.read.getBuild(ctx.sourceId);
 
