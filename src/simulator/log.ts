@@ -66,6 +66,7 @@ export function pushLog(
 export function summarizeLog(
   log: SimLog,
   categories: SimLogEntryCat[],
+  detailedDmg: boolean = true,
 ): string {
   const serialized: string[] = [];
 
@@ -74,7 +75,7 @@ export function summarizeLog(
       const tag = `[${entry.cat.toUpperCase()}]`;
       serialized.push(`${fmtFrame(entry.frame)} ${tag} ${entry.message}`);
 
-      if (entry.cat === "dmg") {
+      if (detailedDmg && entry.cat === "dmg") {
         const breakdown = entry.breakdown;
         const breakdownBonusLog = breakdown.bonusLog
           .map(

@@ -1,4 +1,5 @@
 import { DAMAGE_TYPE_LIST, type OperatorBuild } from "../types/operator";
+import operatorsData from "../data/operators";
 import type {
   SimBuff,
   SimInfliction,
@@ -10,6 +11,7 @@ import type {
   SimEntityId,
   SimEnv,
   SimEvent,
+  SimComboState,
 } from "../types/simulator/simulator";
 import type { DamageBonusLogEntry } from "./damage/damageBonuses";
 import type {
@@ -53,6 +55,7 @@ import { BuffId } from "../data/buffs/BuffDef";
  */
 
 const EVENT_PREFIX = "SimEvent_";
+export const COMBO_AVAILABLE_WINDOW_FRAMES = 300;
 function makeEventId() {
   return makeId(EVENT_PREFIX);
 }
@@ -138,6 +141,7 @@ type SimWorldInit = {
   futureEvents?: SimEvent[];
   registry: SimRegistry;
   damageModel?: DamageModel;
+  teamOperatorIds?: string[];
 };
 
 /** Larger seq happens first in the same frame */
@@ -174,6 +178,9 @@ export class SimWorld {
 
   private readonly eventById = new Map<string, SimEvent>();
   private currentEvent: SimEvent | null = null;
+  private readonly teamOperatorOrder: string[];
+  private readonly comboQueue: SimEntityId[] = [];
+  private readonly blockedCastStartIds = new Set<string>();
 
   public readonly read: SimRead;
   public readonly ops: SimOps;
@@ -185,9 +192,11 @@ export class SimWorld {
     for (const e of init.entities) {
       entitiesById[e.id] = e;
       setEmptyInflictions(e);
+      this.ensureComboState(e);
     }
     this.env = { entitiesById };
     this.nowInFrames = init.nowInFrames ?? 0;
+    this.teamOperatorOrder = [...(init.teamOperatorIds ?? [])];
 
     if (init.futureEvents && init.futureEvents.length > 0) {
       // Clone to avoid accidental external mutation.
@@ -286,7 +295,157 @@ export class SimWorld {
   }
 
   private advanceToFrame(frame: number): void {
+    const delta = Math.max(0, frame - this.nowInFrames);
     this.nowInFrames = frame;
+    if (delta <= 0) return;
+
+    for (const ent of Object.values(this.env.entitiesById)) {
+      const combo = ent.combo;
+      if (!combo) continue;
+      combo.cooldown = Math.max(0, combo.cooldown - delta);
+      if (combo.pending && combo.availableUntilFrame < frame) {
+        combo.pending = false;
+        combo.availableUntilFrame = -1;
+        this.removeFromComboQueue(ent.id);
+      }
+    }
+  }
+
+  private ensureComboState(entity: SimEntity): void {
+    if (entity.type !== "operator") return;
+    entity.combo ??= {
+      cooldown: 0,
+      pending: false,
+      availableUntilFrame: -1,
+      lastTriggerFrame: -1,
+    } satisfies SimComboState;
+  }
+
+  private removeFromComboQueue(operatorId: SimEntityId): void {
+    const idx = this.comboQueue.indexOf(operatorId);
+    if (idx >= 0) this.comboQueue.splice(idx, 1);
+  }
+
+  private getTeamOrderIndex(operatorId: SimEntityId): number {
+    const idx = this.teamOperatorOrder.indexOf(operatorId);
+    return idx >= 0 ? idx : Number.MAX_SAFE_INTEGER;
+  }
+
+  private triggerCombo(operatorId: SimEntityId, frame: number): boolean {
+    const ent = this.getEntityOrThrow(operatorId);
+    if (ent.type !== "operator") return false;
+    const combo = ent.combo;
+    if (!combo) return false;
+    if (combo.cooldown > 0) return false;
+
+    combo.lastTriggerFrame = frame;
+    combo.availableUntilFrame = frame + COMBO_AVAILABLE_WINDOW_FRAMES;
+
+    if (combo.pending) {
+      this.removeFromComboQueue(operatorId);
+      this.comboQueue.unshift(operatorId);
+      return true;
+    }
+
+    combo.pending = true;
+
+    const myOrder = this.getTeamOrderIndex(operatorId);
+    let insertAt = this.comboQueue.length;
+    for (let i = 0; i < this.comboQueue.length; i++) {
+      const queuedId = this.comboQueue[i]!;
+      const queuedCombo = this.getEntityOrThrow(queuedId).combo;
+      if (!queuedCombo) continue;
+      if (queuedCombo.lastTriggerFrame !== frame) continue;
+
+      const queuedOrder = this.getTeamOrderIndex(queuedId);
+      if (myOrder < queuedOrder) {
+        insertAt = i;
+        break;
+      }
+    }
+
+    this.comboQueue.splice(insertAt, 0, operatorId);
+    return true;
+  }
+
+  private scheduleComboTriggerElapse(
+    operatorId: SimEntityId,
+    triggerEventId: string,
+    frame: number,
+  ): void {
+    this.ops.schedule({
+      id: makeEventId(),
+      type: "comboTriggerElapse",
+      frame: frame + COMBO_AVAILABLE_WINDOW_FRAMES,
+      seq: this.ops.nextSeq(),
+      sourceId: operatorId,
+      ref: triggerEventId,
+    });
+  }
+
+  private getComboCooldownFrames(operatorId: SimEntityId): number {
+    const opDef = operatorsData[operatorId];
+    const cooldownTable = opDef?.getComboCooldownSecondsByRank() ?? null;
+    if (!cooldownTable || cooldownTable.length === 0) return 0;
+
+    const build = this.read.getBuild(operatorId);
+    const rank = Math.max(
+      1,
+      Math.floor(Number(build?.skillRanks?.comboSkill ?? 9)),
+    );
+    const cooldownSec = Number(
+      cooldownTable[Math.min(cooldownTable.length - 1, rank - 1)] ?? 0,
+    );
+    const cdr = Math.max(
+      0,
+      Number(build?.restStat?.comboCooldownReduction ?? 0),
+    );
+    return Math.max(1, Math.round(cooldownSec * (1 - cdr) * 60));
+  }
+
+  private validateComboCast(ev: Extract<SimEvent, { type: "castStart" }>): {
+    isLegal: boolean;
+    reason?: string;
+  } {
+    if (ev.skillType !== "comboSkill") return { isLegal: true };
+
+    const source = this.getEntityOrThrow(ev.sourceId);
+    const combo = source.combo;
+    if (!combo)
+      return { isLegal: false, reason: "operator has no combo state" };
+    if (combo.cooldown > 0)
+      return { isLegal: false, reason: "combo is on cooldown" };
+    if (!combo.pending)
+      return { isLegal: false, reason: "combo was not triggered" };
+    if (ev.frame > combo.availableUntilFrame) {
+      combo.pending = false;
+      combo.availableUntilFrame = -1;
+      this.removeFromComboQueue(ev.sourceId);
+      return { isLegal: false, reason: "combo trigger expired" };
+    }
+    if (this.comboQueue[0] !== ev.sourceId) {
+      return { isLegal: false, reason: "combo is not first in pending queue" };
+    }
+
+    this.removeFromComboQueue(ev.sourceId);
+    combo.pending = false;
+    combo.availableUntilFrame = -1;
+
+    const cooldownFrames = this.getComboCooldownFrames(ev.sourceId);
+    combo.cooldown = cooldownFrames;
+
+    if (cooldownFrames > 0) {
+      this.ops.schedule({
+        id: makeEventId(),
+        type: "comboCooldownEnd",
+        frame: ev.frame + cooldownFrames,
+        seq: this.ops.nextSeq(),
+        sourceId: ev.sourceId,
+        ref: ev.id,
+      });
+    }
+
+    return { isLegal: true };
   }
 
   // ----- Log -----
@@ -328,48 +487,6 @@ export class SimWorld {
     delete (ent as any).buffs[buffId];
   }
 
-  // private addBuffStacks(params: {
-  //   targetId: SimEntityId;
-  //   buffId: BuffId;
-  //   delta: number;
-  //   maxStacks: number;
-  //   logOnChange?: {
-  //     cat: SimLogEntryCat;
-  //     format: (before: number, after: number) => string;
-  //   };
-  // }): void {
-  //   const ent = this.getEntityOrThrow(params.targetId);
-  //   ent.buffs ??= {};
-  //   const existing = ent.buffs[params.buffId] as SimBuff | undefined;
-  //   const before = Math.max(0, Number((existing as any)?.stacks ?? 0));
-  //   const after = Math.max(
-  //     0,
-  //     Math.min(
-  //       params.maxStacks,
-  //       before + Math.trunc(Number(params.delta) || 0),
-  //     ),
-  //   );
-
-  //   if (!existing) {
-  //     ent.buffs[params.buffId] = {
-  //       id: params.buffId,
-  //       stacks: after,
-  //       lastApplyFrame: this.nowInFrames,
-  //     } as any;
-  //   } else {
-  //     (existing as any).stacks = after;
-  //     (existing as any).lastApplyFrame = this.nowInFrames;
-  //     ent.buffs[params.buffId] = existing;
-  //   }
-
-  //   if (params.logOnChange && before !== after) {
-  //     this.appendLog(
-  //       params.logOnChange.cat,
-  //       params.logOnChange.format(before, after),
-  //     );
-  //   }
-  // }
-
   private addInfliction(
     entityId: SimEntityId,
     inflictionType: DamageType,
@@ -410,6 +527,22 @@ export class SimWorld {
       this.ops.advanceToFrame(ev.frame);
 
       this.currentEvent = ev;
+
+      // Block combo skill casting when invalid; we shall not do that right now.
+      // if (
+      //   ev.type !== "castStart" &&
+      //   ev.ref &&
+      //   this.blockedCastStartIds.has(ev.ref)
+      // ) {
+      //   continue;
+      // }
+
+      if (ev.type === "castStart") {
+        const validation = this.validateComboCast(ev);
+        ev.comboValidation = validation;
+        if (!validation.isLegal) this.blockedCastStartIds.add(ev.id);
+      }
+
       this.processedEvents.push(ev);
 
       const source = ev.sourceId
@@ -421,6 +554,16 @@ export class SimWorld {
 
       switch (ev.type) {
         case "castStart": {
+          const comboLegal = ev.comboValidation?.isLegal ?? true;
+          const comboReason = ev.comboValidation?.reason;
+          if (!comboLegal) {
+            this.ops.log(
+              "act",
+              `"${source?.name}" failed to cast "${ev.skillType}" (${comboReason ?? "illegal combo cast"})`,
+            );
+            break;
+          }
+
           this.ops.log(
             "act",
             `"${source?.name}" cast "${ev.skillType}" on "${target?.name}"`,
@@ -657,6 +800,47 @@ export class SimWorld {
             ev.sourceId,
             ev.inflictionType!,
           );
+          break;
+        }
+
+        case "comboTriggered": {
+          const sourceId = ev.sourceId;
+          const sourceEnt = this.read.getEntity(sourceId);
+          if (sourceEnt.type !== "operator") break;
+
+          const accepted = this.triggerCombo(sourceId, ev.frame);
+          if (!accepted) break;
+
+          this.scheduleComboTriggerElapse(sourceId, ev.id, ev.frame);
+          this.ops.log("act", `"${sourceEnt.name}" combo triggered`);
+          break;
+        }
+
+        case "comboTriggerElapse": {
+          const sourceId = ev.sourceId;
+          const sourceEnt = this.read.getEntity(sourceId);
+          if (sourceEnt.type !== "operator") break;
+
+          const combo = sourceEnt.combo;
+          if (!combo) break;
+          if (!combo.pending) break;
+          if (combo.availableUntilFrame > ev.frame) break;
+
+          combo.pending = false;
+          combo.availableUntilFrame = -1;
+          this.removeFromComboQueue(sourceId);
+          this.ops.log("act", `"${sourceEnt.name}" combo trigger elapsed`);
+          break;
+        }
+
+        case "comboCooldownEnd": {
+          const sourceId = ev.sourceId;
+          const sourceEnt = this.read.getEntity(sourceId);
+          if (sourceEnt.type !== "operator") break;
+
+          const combo = sourceEnt.combo;
+          if (!combo) break;
+          combo.cooldown = 0;
           break;
         }
 

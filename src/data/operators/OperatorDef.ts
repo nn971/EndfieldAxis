@@ -1,4 +1,6 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
+import type { SimRead } from "../../simulator/simulator";
+import type { SimEvent } from "../../types/simulator/simulator";
 import { WeaponType } from "../weapons/WeaponDef";
 
 /**
@@ -62,7 +64,12 @@ export type OperatorDefInit = {
   };
 };
 
-export class OperatorDef {
+export type ComboTriggerContext = {
+  read: SimRead;
+  ev: SimEvent;
+};
+
+export abstract class OperatorDef {
   public readonly id: OperatorId;
   public readonly name: string;
   public readonly avatar: string;
@@ -87,6 +94,10 @@ export class OperatorDef {
     this.stats = init.stats;
     this.weaponType = init.weaponType;
     this.skills = init.skills;
+  }
+
+  getComboCooldownSecondsByRank(): readonly number[] | null {
+    return null;
   }
 
   /**

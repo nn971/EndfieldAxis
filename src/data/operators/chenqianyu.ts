@@ -1,7 +1,10 @@
-import { HitTypes } from "../../simulator/damage/damageEngine";
 import type { SimRegistry } from "../../simulator/listeners/registry";
 import { physicalHitByRank } from "../../simulator/skillOps";
-import { OperatorDef, OperatorDefInit } from "./OperatorDef";
+import {
+  ComboTriggerContext,
+  OperatorDef,
+  OperatorDefInit,
+} from "./OperatorDef";
 
 const NS_DMG_MUL = [
   1.69, 1.86, 2.03, 2.19, 2.36, 2.53, 2.7, 2.87, 3.04, 3.25, 3.5, 3.8,
@@ -9,6 +12,10 @@ const NS_DMG_MUL = [
 
 const CS_DMG_MUL = [
   1.2, 1.32, 1.44, 1.56, 1.68, 1.8, 1.92, 2.04, 2.16, 2.31, 2.49, 2.7,
+] as const;
+
+const CS_COOLDOWN_SECONDS = [
+  16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 15,
 ] as const;
 
 const ULT_SLASH_DMG_MUL = [
@@ -121,8 +128,30 @@ class ChenQianyuDef extends OperatorDef {
     } satisfies OperatorDefInit);
   }
 
+  override getComboCooldownSecondsByRank(): readonly number[] | null {
+    return CS_COOLDOWN_SECONDS;
+  }
+
   override registerSimPlugins(registry: SimRegistry): void {
     const BONUS_BUFF = "buff.chenqianyu.talent1.atkInc" as const;
+
+    registry.registerOnInflictionApply({
+      id: "operator.chenqianyu.combo.triggerOnVulnerableApply",
+      fn: ({ ev, nextSeq, makeEventId }) => {
+        if (ev.inflictionType !== "physical") return [];
+        return [
+          {
+            id: makeEventId(),
+            type: "comboTriggered",
+            frame: ev.frame,
+            seq: nextSeq(),
+            sourceId: this.id,
+            targetId: ev.targetId,
+            ref: ev.id,
+          },
+        ];
+      },
+    });
 
     registry.registerAfterHitForOperator({
       operatorId: this.id,

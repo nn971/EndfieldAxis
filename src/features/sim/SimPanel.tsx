@@ -9,13 +9,22 @@ import { createDefaultDamageModel } from "../../simulator/damage/damageModel";
 import { compileSkillCast } from "../../simulator/compilers";
 import type { SimEvent, SimEntity } from "../../types/simulator/simulator";
 import type { SkillBox } from "../../types/editor";
-import type { SimRenderBar, SimRenderCache, SimRenderMarker } from "../../types/editor";
-import type { OperatorBuild } from "../../types/operator";
+import type {
+  SimRenderBar,
+  SimRenderCache,
+  SimRenderMarker,
+} from "../../types/editor";
+import {
+  DAMAGE_TYPE_LIST,
+  DamageType,
+  type OperatorBuild,
+} from "../../types/operator";
 import OperatorsData from "../../data/operators";
 import { summarizeLog } from "../../simulator/log";
 import { loadSimRegistry } from "../../simulator/listeners/registry";
 import { SimWorld } from "../../simulator/simulator";
 import { simRenderCacheReplaced } from "../solution/solutionSlice";
+import { SimInfliction } from "../../types/simulator/infliction";
 
 function buildSimRenderCache(events: SimEvent[]): SimRenderCache {
   const bars: SimRenderBar[] = [];
@@ -149,6 +158,19 @@ function compileSkillBoxes(params: {
   return out;
 }
 
+function getEmptyInfliction(): Record<DamageType, SimInfliction> {
+  return Object.fromEntries(
+    DAMAGE_TYPE_LIST.map(type => [
+      type,
+      {
+        type: type,
+        stacks: 0,
+        lastApplyFrame: -1,
+      },
+    ]),
+  ) as Record<DamageType, SimInfliction>;
+}
+
 export default function SimPanel() {
   const dispatch = useAppDispatch();
   const [logText, setLogText] = useState("");
@@ -172,15 +194,21 @@ export default function SimPanel() {
         name: OperatorsData[operatorId]?.name ?? operatorId,
         type: "operator" as const,
         hp: 999999,
-        inflictions: {},
+        inflictions: getEmptyInfliction(),
         buffs: {},
+        combo: {
+          cooldown: 0,
+          pending: false,
+          availableUntilFrame: -1,
+          lastTriggerFrame: -1,
+        },
       })),
       {
         id: targetId,
         name: "Enemy1",
         type: "enemy",
         hp: 999999,
-        inflictions: {},
+        inflictions: getEmptyInfliction(),
         buffs: {},
       },
     ];
@@ -192,6 +220,7 @@ export default function SimPanel() {
       futureEvents: [],
       registry,
       damageModel: createDefaultDamageModel(),
+      teamOperatorIds,
     });
 
     const events = compileSkillBoxes({
@@ -203,11 +232,17 @@ export default function SimPanel() {
     for (const ev of events) world.ops.schedule(ev);
 
     world.runSim();
-    dispatch(simRenderCacheReplaced(buildSimRenderCache(world.processedEvents)));
+    dispatch(
+      simRenderCacheReplaced(buildSimRenderCache(world.processedEvents)),
+    );
 
     const finalWorldDescription = JSON.stringify(world.env, null, 2);
     setLogText(
-      summarizeLog(world.log, ["sim", "act", "buff", "stat", "dmg", "dev"]) +
+      summarizeLog(
+        world.log,
+        ["sim", "act", "buff", "stat", "dmg", "dev"],
+        true,
+      ) +
         "\n\n" +
         `Final world state:\n${finalWorldDescription}`,
     );
@@ -234,7 +269,13 @@ export default function SimPanel() {
             className="px-3 py-1 text-xs rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700"
             onClick={() => {
               setLogText("");
-              dispatch(simRenderCacheReplaced({ bars: [], markers: [], simEndFrame: 0 }));
+              dispatch(
+                simRenderCacheReplaced({
+                  bars: [],
+                  markers: [],
+                  simEndFrame: 0,
+                }),
+              );
             }}
           >
             Clear

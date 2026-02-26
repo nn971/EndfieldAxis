@@ -1,14 +1,6 @@
-import {
-  applyBuff,
-  physicalHitByRank,
-  pickSkillValueByRank,
-} from "../../simulator/skillOps";
+import { applyBuff, physicalHitByRank } from "../../simulator/skillOps";
 import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 import type { SimRegistry } from "../../simulator/listeners/registry";
-import { compileSkillCast } from "../../simulator/compilers";
-
-const ENDMINISTRATOR_COMBO_COOLDOWN_BUFF =
-  "buff.endministrator.comboSkill.cooldown";
 
 const NS_DMG_MUL = [
   1.56, 1.71, 1.87, 2.02, 2.18, 2.34, 2.49, 2.65, 2.8, 3.0, 3.23, 3.5,
@@ -110,7 +102,37 @@ class EndministratorDef extends OperatorDef {
     } satisfies OperatorDefInit);
   }
 
+  override getComboCooldownSecondsByRank(): readonly number[] | null {
+    return CS_COOLDOWN_SECONDS;
+  }
+
   override registerSimPlugins(registry: SimRegistry): void {
+    registry.registerAfterHit({
+      id: "operator.endministrator.combo.triggerOnAllyComboHit",
+      fn: ({ read, ev, sourceId, nextSeq, makeEventId }) => {
+        if (sourceId === this.id) return [];
+        const source = read.getEntity(sourceId);
+        if (source.type !== "operator") return [];
+
+        const parent = ev.ref ? read.getEvent(ev.ref) : null;
+        const isComboHit =
+          parent?.type === "castStart" && parent.skillType === "comboSkill";
+        if (!isComboHit) return [];
+
+        return [
+          {
+            id: makeEventId(),
+            type: "comboTriggered",
+            frame: ev.frame,
+            seq: nextSeq(),
+            sourceId: this.id,
+            targetId: ev.targetId,
+            ref: ev.id,
+          },
+        ];
+      },
+    });
+
     registry.registerOnBuffConsumedForBuff({
       buffId: "buff.crystal",
       id: "operator.endministrator.talent1.onCrystalConsumed",
@@ -185,88 +207,6 @@ class EndministratorDef extends OperatorDef {
             buffId: "buff.endministrator.potential2.teamAtkShare.low" as any,
             ref: ev.id,
           }));
-      },
-    });
-
-    // registry.registerAfterHit({
-    //   id: "operator.endministrator.combo.autoTrigger",
-    //   fn: ({ read, ev, sourceId, nextSeq }) => {
-    //     if (!read.env.entitiesById[this.id]) return [];
-    //     if (sourceId === this.id) return [];
-    //     if (!ev.hitTypes?.comboSkill) return [];
-
-    //     const me = read.getEntity(this.id);
-    //     if ((me as any).buffs?.[ENDMINISTRATOR_COMBO_COOLDOWN_BUFF]) return [];
-
-    //     const targetId = (ev as any).targetId;
-    //     if (!targetId) return [];
-
-    //     const myBuild = read.getBuild(this.id);
-
-    //     return compileSkillCast({
-    //       sourceId: this.id,
-    //       skillType: "comboSkill",
-    //       targetId,
-    //       startFrame: ev.frame,
-    //       nextSeq,
-    //       buildByOperatorId: myBuild ? { [this.id]: myBuild } : undefined,
-    //     });
-    //   },
-    // });
-
-    registry.registerOnCastStart({
-      id: "operator.endministrator.combo.cooldown",
-      fn: ({ read, ev, sourceId, nextSeq, makeEventId }) => {
-        if (sourceId !== this.id) return [];
-        if (ev.skillType !== "comboSkill") return [];
-
-        const me = read.getEntity(this.id);
-        if ((me as any).buffs?.[ENDMINISTRATOR_COMBO_COOLDOWN_BUFF]) return [];
-
-        const cooldownSec = pickSkillValueByRank(
-          {
-            sourceId: this.id,
-            targetId: this.id,
-            startFrame: ev.frame,
-            skillType: "comboSkill",
-            sourceBuild: read.getBuild(this.id),
-            nextSeq,
-            makeEventId,
-          },
-          CS_COOLDOWN_SECONDS,
-          "comboSkill",
-        );
-
-        const cdr = Math.max(
-          0,
-          Number(read.getBuild(this.id)?.restStat?.comboCooldownReduction ?? 0),
-        );
-        const cooldownFrames = Math.max(
-          1,
-          Math.round(cooldownSec * (1 - cdr) * 60),
-        );
-
-        return [
-          {
-            id: makeEventId(),
-            type: "buffApply",
-            frame: ev.frame,
-            seq: nextSeq(),
-            sourceId: this.id,
-            targetId: this.id,
-            buffId: ENDMINISTRATOR_COMBO_COOLDOWN_BUFF as any,
-            ref: ev.id,
-          },
-          {
-            id: makeEventId(),
-            type: "buffRemove",
-            frame: ev.frame + cooldownFrames,
-            seq: nextSeq(),
-            sourceId: this.id,
-            buffId: ENDMINISTRATOR_COMBO_COOLDOWN_BUFF as any,
-            ref: ev.id,
-          },
-        ];
       },
     });
   }

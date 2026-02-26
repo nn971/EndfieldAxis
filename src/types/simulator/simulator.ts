@@ -18,7 +18,10 @@ export type SimEventType =
   | "inflictionExpire" // expire an infliction, either by duration or by dispel
   | "buffApply" // apply a timed buff/debuff (e.g. enemy crystal)
   | "buffRemove" // remove a buff immediately (e.g. crystal consumed)
-  | "buffExpire"; // expire a timed buff/debuff
+  | "buffExpire" // expire a timed buff/debuff
+  | "comboTriggered" // combo trigger activated for an operator
+  | "comboTriggerElapse" // combo trigger availability window elapsed
+  | "comboCooldownEnd"; // combo cooldown has ended
 // | string;
 
 export type SimEventBase = {
@@ -41,6 +44,10 @@ export type SimEvent =
       sourceId: SimEntityId;
       targetId?: SimEntityId;
       skillType: SkillType;
+      comboValidation?: {
+        isLegal: boolean;
+        reason?: string;
+      };
     })
   | (SimEventBase & {
       type: "castEnd";
@@ -93,11 +100,38 @@ export type SimEvent =
       sourceId: SimEntityId; // entity who owns the buff
       buffId: BuffId;
       ref: string;
+    })
+  | (SimEventBase & {
+      type: "comboTriggered";
+      sourceId: SimEntityId;
+      targetId?: SimEntityId;
+    })
+  | (SimEventBase & {
+      type: "comboTriggerElapse";
+      sourceId: SimEntityId;
+      ref: string;
+    })
+  | (SimEventBase & {
+      type: "comboCooldownEnd";
+      sourceId: SimEntityId;
+      ref: string;
     });
 
 export type SimEventSequence = SimEvent[];
 
 export type SimEntityId = string;
+
+export type SimComboState = {
+  /** Remaining combo cooldown in frames. */
+  cooldown: number;
+  /** Whether combo is currently triggered and waiting for cast. */
+  pending: boolean;
+  /** Latest frame (inclusive) where the pending combo can still be cast. */
+  availableUntilFrame: number;
+  /** Last frame this combo was triggered. */
+  lastTriggerFrame: number;
+};
+
 export type SimEntity = {
   id: SimEntityId;
   name: string;
@@ -105,6 +139,9 @@ export type SimEntity = {
   inflictions: Record<DamageType, SimInfliction>;
 
   buffs: Record<string, SimBuff>;
+
+  /** Operator-only combo runtime state. */
+  combo?: SimComboState;
 
   type: string; //TODO implement this
 };
