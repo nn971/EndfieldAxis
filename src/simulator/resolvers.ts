@@ -145,6 +145,7 @@ function scheduleBuffExpire(
 
 export function resolveStatusApplication(
   self: SimWorld,
+  triggerPlugins: () => void,
   sourceId: SimEntityId,
   targetId: SimEntityId,
   statusType: SimStatusType,
@@ -178,9 +179,33 @@ export function resolveStatusApplication(
         sourceId,
         targetId,
         damageType: "physical",
-        hitTypes: { lift: true }, // TODO currently status damages benefits from no other hitTypes.
+        hitTypes: { lift: true },
         dmgMultiplier: computePhysicalStatusSpecialMul(self, sourceId, "lift"),
       } as SimEvent);
+
+      triggerPlugins();
+      break;
+    }
+    case "knockDown": {
+      if (current <= 0) break;
+
+      self.ops.schedule({
+        id: makeEventId(),
+        type: "hit",
+        frame: self.read.nowInFrames,
+        seq: self.ops.nextSeq(),
+        sourceId,
+        targetId,
+        damageType: "physical",
+        hitTypes: { knockDown: true }, // TODO currently status damages benefits from no other hitTypes.
+        dmgMultiplier: computePhysicalStatusSpecialMul(
+          self,
+          sourceId,
+          "knockDown",
+        ),
+      } as SimEvent);
+
+      triggerPlugins();
       break;
     }
 
@@ -190,6 +215,8 @@ export function resolveStatusApplication(
       // Has vulnerable: consume all stacks and trigger crush burst damage.
       shouldAddVulnerable = false;
       shouldRemoveVulnerable = true;
+
+      triggerPlugins();
 
       // Schedule crush burst damage as a hit event so it can interleave with other same-frame effects.
       self.ops.schedule({
@@ -212,26 +239,6 @@ export function resolveStatusApplication(
       break;
     }
 
-    case "knockDown": {
-      if (current <= 0) break;
-
-      self.ops.schedule({
-        id: makeEventId(),
-        type: "hit",
-        frame: self.read.nowInFrames,
-        seq: self.ops.nextSeq(),
-        sourceId,
-        targetId,
-        damageType: "physical",
-        hitTypes: { knockDown: true }, // TODO currently status damages benefits from no other hitTypes.
-        dmgMultiplier: computePhysicalStatusSpecialMul(
-          self,
-          sourceId,
-          "knockDown",
-        ),
-      } as SimEvent);
-      break;
-    }
     case "breach": {
       // TODO: Add breached (or other name) debuff to enemy
 
@@ -240,6 +247,8 @@ export function resolveStatusApplication(
       // Has vulnerable: consume all stacks and trigger breach burst damage.
       shouldRemoveVulnerable = true;
       shouldAddVulnerable = false;
+
+      triggerPlugins();
 
       self.ops.schedule({
         id: makeEventId(),
@@ -284,8 +293,6 @@ export function resolveStatusApplication(
       `${statusType}: vulnerable consumed=${current} (target=${(target as any).name})`,
     );
   }
-
-  return current >= 1;
 }
 
 export function resolveBuffApplication(

@@ -76,7 +76,7 @@ function collectDamageBonuses(params: {
 }
 
 /** Special multiplier should depend and only depend on this.
- * Is there a better way?
+ *  TODO: Is there a better way?
  */
 export type HitType =
   | "normalAttack"

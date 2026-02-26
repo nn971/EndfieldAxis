@@ -96,7 +96,6 @@ export abstract class SwordmancerDef extends GearsDef {
             sourceId: ctx.sourceId,
             targetId: ctx.targetId,
             damageType: set.statusProc.damageType,
-            hitTypes: { normalSkill: true },
             dmgMultiplier: set.statusProc.dmgMultiplier,
             ref: ctx.ev.id,
           } satisfies SimEvent,

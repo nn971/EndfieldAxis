@@ -72,8 +72,9 @@ export function summarizeLog(
   for (const entry of log) {
     if (categories.includes(entry.cat)) {
       const tag = `[${entry.cat.toUpperCase()}]`;
+      serialized.push(`${fmtFrame(entry.frame)} ${tag} ${entry.message}`);
+
       if (entry.cat === "dmg") {
-        serialized.push(`${fmtFrame(entry.frame)} ${tag} ${entry.message}`);
         const breakdown = entry.breakdown;
         const breakdownBonusLog = breakdown.bonusLog
           .map(
@@ -91,8 +92,6 @@ export function summarizeLog(
           `     Final multiplier: ${breakdown.dmgFinalMultiplier}, also gained from: \n     ` +
             breakdownBonusLog,
         );
-      } else {
-        serialized.push(`${fmtFrame(entry.frame)} ${tag} ${entry.message}`);
       }
     }
   }

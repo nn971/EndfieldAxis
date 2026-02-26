@@ -113,11 +113,12 @@ export type SimOps = {
 type SimResolvers = {
   /** should return whether the status is triggered */
   resolveStatusApplication: (
+    triggerPlugins: () => void,
     sourceId: SimEntityId,
     targetId: SimEntityId,
     statusType: SimStatusType,
     ref?: string,
-  ) => boolean;
+  ) => void;
   resolveBuffApplication: (
     sourceId: SimEntityId,
     targetId: SimEntityId,
@@ -239,8 +240,21 @@ export class SimWorld {
         resolveBuffExpiration(self, entityId, buffId),
       resolveInflictionExpiration: (sourceId, inflictionType) =>
         resolveInflictionExpiration(self, sourceId, inflictionType),
-      resolveStatusApplication: (sourceId, targetId, statusType, ref) =>
-        resolveStatusApplication(self, sourceId, targetId, statusType, ref),
+      resolveStatusApplication: (
+        triggerPlugins,
+        sourceId,
+        targetId,
+        statusType,
+        ref,
+      ) =>
+        resolveStatusApplication(
+          self,
+          triggerPlugins,
+          sourceId,
+          targetId,
+          statusType,
+          ref,
+        ),
     };
   }
 
@@ -499,13 +513,7 @@ export class SimWorld {
 
           this.ops.log(
             "dmg",
-            `"${source.name}" hit "${target.name}" for ${res.amount} damage by [${Object.keys(
-              ev.hitTypes ?? {},
-            )
-              .map(k => {
-                ev.hitTypes[k as HitType] ? k.toString() : "";
-              })
-              .join(", ")}] (hp left: ${(targetAfter as any).hp})`,
+            `"${source.name}" hit "${target.name}" for ${res.amount} damage (hp left: ${(targetAfter as any).hp})`,
             ctx,
             res.breakdown,
             res.amount,
@@ -527,19 +535,8 @@ export class SimWorld {
           if (!target) throw new Error(`undefined target`);
           if (!source) throw new Error(`undefined source`);
 
-          let spawned = [];
-
-          // First resolve the status (mutates inflictions and may schedule proc hits).
-          const success = this.resolvers.resolveStatusApplication(
-            source.id,
-            target.id,
-            ev.statusType!,
-            ev.id,
-          );
-
-          // Trigger listeners only if status successfully triggered.
-          if (success) {
-            spawned = this.registry.runOnStatusApply({
+          const triggerPlugins = () => {
+            const spawned = this.registry.runOnStatusApply({
               read: this.read,
               ev,
               sourceId: source.id,
@@ -552,7 +549,14 @@ export class SimWorld {
               // console.log(sev);
               this.ops.schedule(sev);
             }
-          }
+          };
+          this.resolvers.resolveStatusApplication(
+            triggerPlugins,
+            source.id,
+            target.id,
+            ev.statusType!,
+            ev.id,
+          );
 
           break;
         }

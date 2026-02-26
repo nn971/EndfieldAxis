@@ -29,6 +29,7 @@ export type SimEventBase = {
 
   /** Optional reference to a related event (parent / originating action). */
   ref?: string | null;
+  // org?: string | null;
 
   sourceId?: SimEntityId;
   targetId?: SimEntityId;
@@ -53,7 +54,7 @@ export type SimEvent =
       sourceId: SimEntityId;
       targetId: SimEntityId;
       damageType: DmgType;
-      hitTypes: HitTypes;
+      // hitTypes: HitTypes;
       dmgMultiplier?: number; // skillMultiplier or statusMultiplier
     })
   | (SimEventBase & {

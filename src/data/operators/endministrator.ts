@@ -188,31 +188,31 @@ class EndministratorDef extends OperatorDef {
       },
     });
 
-    registry.registerAfterHit({
-      id: "operator.endministrator.combo.autoTrigger",
-      fn: ({ read, ev, sourceId, nextSeq }) => {
-        if (!read.env.entitiesById[this.id]) return [];
-        if (sourceId === this.id) return [];
-        if (!ev.hitTypes?.comboSkill) return [];
+    // registry.registerAfterHit({
+    //   id: "operator.endministrator.combo.autoTrigger",
+    //   fn: ({ read, ev, sourceId, nextSeq }) => {
+    //     if (!read.env.entitiesById[this.id]) return [];
+    //     if (sourceId === this.id) return [];
+    //     if (!ev.hitTypes?.comboSkill) return [];
 
-        const me = read.getEntity(this.id);
-        if ((me as any).buffs?.[ENDMINISTRATOR_COMBO_COOLDOWN_BUFF]) return [];
+    //     const me = read.getEntity(this.id);
+    //     if ((me as any).buffs?.[ENDMINISTRATOR_COMBO_COOLDOWN_BUFF]) return [];
 
-        const targetId = (ev as any).targetId;
-        if (!targetId) return [];
+    //     const targetId = (ev as any).targetId;
+    //     if (!targetId) return [];
 
-        const myBuild = read.getBuild(this.id);
+    //     const myBuild = read.getBuild(this.id);
 
-        return compileSkillCast({
-          sourceId: this.id,
-          skillType: "comboSkill",
-          targetId,
-          startFrame: ev.frame,
-          nextSeq,
-          buildByOperatorId: myBuild ? { [this.id]: myBuild } : undefined,
-        });
-      },
-    });
+    //     return compileSkillCast({
+    //       sourceId: this.id,
+    //       skillType: "comboSkill",
+    //       targetId,
+    //       startFrame: ev.frame,
+    //       nextSeq,
+    //       buildByOperatorId: myBuild ? { [this.id]: myBuild } : undefined,
+    //     });
+    //   },
+    // });
 
     registry.registerOnCastStart({
       id: "operator.endministrator.combo.cooldown",

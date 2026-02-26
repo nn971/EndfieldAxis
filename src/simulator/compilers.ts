@@ -77,6 +77,7 @@ export function compileSkillCast(params: {
       // Link timeline events to the castStart event so downstream logic can
       // reconstruct provenance via SimEventBase.ref.
       (ev as any).ref ??= startEventId;
+
       events.push(ev);
     }
   }
