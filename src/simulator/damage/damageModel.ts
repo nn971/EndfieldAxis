@@ -170,7 +170,7 @@ export function createDefaultDamageModel(params?: {
       const staggerMul = 1 + bonuses.staggerMul;
       const criticalHitMul = 1 + bonuses.criticalHitMul;
 
-      const specialMul = 1; // TODO handle this
+      const specialMul = 1 + bonuses.specialMul;
 
       const rawOutcoming =
         atkFinal *

@@ -8,19 +8,42 @@ import {
 import { BuffId } from "../data/buffs/BuffDef";
 import { SimWorld } from "./simulator";
 import buffsData from "../data/buffs";
-import type {
-  ArtsInflictionType,
-  InflictionType,
+import {
+  ARTS_INFLICTION_TYPE_LIST,
+  isArtsInflictionType,
+  type ArtsInflictionType,
+  type InflictionType,
 } from "../types/simulator/infliction";
 import {
   SOLIDIFICATION_BUFF_ID,
-  SOLIDIFICATION_SHATTER_BASE_MUL,
-  SOLIDIFICATION_SHATTER_PER_STACK_MUL,
   SOLIDIFICATION_INITIAL_HIT_BASE_MUL,
   SOLIDIFICATION_INITIAL_HIT_PER_STACK_MUL,
   SOLIDIFICATION_BASE_DURATION_FRAMES,
   SOLIDIFICATION_EXTRA_DURATION_PER_STACK_FRAMES,
 } from "../data/buffs/reactions/solidification";
+import {
+  COMBUSTION_BUFF_ID,
+  COMBUSTION_INITIAL_HIT_BASE_MUL,
+  COMBUSTION_INITIAL_HIT_PER_STACK_MUL,
+  COMBUSTION_DOT_BASE_MUL,
+  COMBUSTION_DOT_PER_STACK_MUL,
+} from "../data/buffs/reactions/combustion";
+import {
+  ELECTRIFICATION_BUFF_ID,
+  ELECTRIFICATION_INITIAL_HIT_BASE_MUL,
+  ELECTRIFICATION_INITIAL_HIT_PER_STACK_MUL,
+  ELECTRIFICATION_BASE_DURATION_FRAMES,
+  ELECTRIFICATION_EXTRA_DURATION_PER_STACK_FRAMES,
+} from "../data/buffs/reactions/electrification";
+import {
+  CORROSION_BUFF_ID,
+  CORROSION_INITIAL_HIT_BASE_MUL,
+  CORROSION_INITIAL_HIT_PER_STACK_MUL,
+  CORROSION_REDUCTION_PER_SECOND_BASE,
+  CORROSION_REDUCTION_PER_SECOND_PER_STACK,
+  CORROSION_MIN_RESISTANCE_BASE,
+  CORROSION_MIN_RESISTANCE_PER_STACK,
+} from "../data/buffs/reactions/corrosion";
 
 // TODO: come up with a way to configure this
 export const DEFAULT_INFLICTION_DURATION_FRAMES = 1800;
@@ -28,15 +51,6 @@ export const DEFAULT_INFLICTION_DURATION_FRAMES = 1800;
 const EVENT_PREFIX = "SimEvent_";
 function makeEventId() {
   return makeId(EVENT_PREFIX);
-}
-
-function isArtsInfliction(type: InflictionType): type is ArtsInflictionType {
-  return (
-    type === "heat" ||
-    type === "electric" ||
-    type === "cryo" ||
-    type === "nature"
-  );
 }
 
 function scheduleApplyArtsInfliction(
@@ -208,8 +222,7 @@ export function resolveStatusApplication(
   const statusType = ev.statusType;
   const ref = ev.id;
 
-  const source = self.read.getEntity(sourceId);
-  if (!source) throw new Error(`Unknown source with sourceId=${sourceId}`);
+  const source = sourceId ? self.read.getEntity(sourceId) : null;
 
   const target = self.read.getEntity(targetId);
   if (!target) throw new Error(`Unknown target with targetId=${targetId}`);
@@ -360,8 +373,7 @@ export function resolveBuffApplication(
   const targetId = ev.targetId;
   const buffId = ev.buffId;
 
-  const source = self.read.getEntity(sourceId);
-  if (!source) throw new Error(`Unknown source with sourceId=${sourceId}`);
+  const source = sourceId ? self.read.getEntity(sourceId) : null;
 
   const target = self.read.getEntity(targetId);
   if (!target) throw new Error(`Unknown target with targetId=${targetId}`);
@@ -378,7 +390,7 @@ export function resolveBuffApplication(
     scheduleBuffExpire(self, targetId, buffId);
     self.ops.log(
       "buff",
-      `BUFF ${buffId} ${had ? "refresh" : "apply"} (source=${(source as any).name} target=${(target as any).name})`,
+      `BUFF ${buffId} ${had ? "refresh" : "apply"} (source=${(source as any)?.name ?? "system"} target=${(target as any).name})`,
     );
     return true;
   }
@@ -393,7 +405,7 @@ export function resolveBuffApplication(
   // scheduleBuffExpire(self, targetId, buffId);
   // self.ops.log(
   //   "buff",
-  //   `BUFF ${buffId} ${had ? "refresh" : "apply"} (source=${(source as any).name} target=${(target as any).name})`,
+  //   `BUFF ${buffId} ${had ? "refresh" : "apply"} (source=${(source as any)?.name ?? "system"} target=${(target as any).name})`,
   // );
   // return true;
   const def = buffsData[buffId];
@@ -407,18 +419,22 @@ export function resolveBuffApplication(
     id: buffId,
     lastApplyFrame: self.read.nowInFrames,
     stacks: afterStacks,
+    meta:
+      buffId === CORROSION_BUFF_ID && existing
+        ? (existing as any).meta
+        : ((ev as any).meta ?? (existing as any)?.meta),
   } as SimBuff);
   scheduleBuffExpire(self, targetId, buffId);
 
   if (maxStacks > 1) {
     self.ops.log(
       "buff",
-      `BUFF ${buffId} stacks ${beforeStacks} -> ${afterStacks} (source=${(source as any).name} target=${(target as any).name})`,
+      `BUFF ${buffId} stacks ${beforeStacks} -> ${afterStacks} (source=${(source as any)?.name ?? "system"} target=${(target as any).name})`,
     );
   } else {
     self.ops.log(
       "buff",
-      `BUFF ${buffId} ${had ? "refresh" : "apply"} (source=${(source as any).name} target=${(target as any).name})`,
+      `BUFF ${buffId} ${had ? "refresh" : "apply"} (source=${(source as any)?.name ?? "system"} target=${(target as any).name})`,
     );
   }
   return true;
@@ -442,7 +458,11 @@ export function resolveBuffExpiration(
       ? SOLIDIFICATION_BASE_DURATION_FRAMES +
         Number((buff as any).stacks ?? 0) *
           SOLIDIFICATION_EXTRA_DURATION_PER_STACK_FRAMES
-      : (buffsData[buffId].durationFrames ?? 0);
+      : buffId === ELECTRIFICATION_BUFF_ID
+        ? ELECTRIFICATION_BASE_DURATION_FRAMES +
+          Number((buff as any).stacks ?? 0) *
+            ELECTRIFICATION_EXTRA_DURATION_PER_STACK_FRAMES
+        : (buffsData[buffId].durationFrames ?? 0);
   if (duration <= 0) return false;
   if (self.read.nowInFrames >= buff.lastApplyFrame + duration) {
     self.ops.removeBuff(ent.id, buffId);
@@ -463,115 +483,156 @@ export function resolveInflictionApplication(
   const target = self.read.getEntity(ev.targetId ?? null);
   if (!target) throw new Error(`Unknown target with targetId=${ev.targetId}`);
 
-  const isCryoArtsInfliction = ev.inflictionType === "cryo";
-  const cryoReactionStacks = isCryoArtsInfliction
-    ? (target.inflictions.heat.stacks ?? 0) +
-      (target.inflictions.electric.stacks ?? 0) +
-      (target.inflictions.nature.stacks ?? 0)
-    : 0;
+  if (isArtsInflictionType(ev.inflictionType)) {
+    const artsType = ev.inflictionType;
+    const existingStacksByType = Object.fromEntries(
+      ARTS_INFLICTION_TYPE_LIST.map(type => [
+        type,
+        Number(target.inflictions[type].stacks ?? 0),
+      ]),
+    ) as Record<ArtsInflictionType, number>;
 
-  if (isCryoArtsInfliction && cryoReactionStacks > 0) {
-    self.ops.removeInfliction(target.id, "heat");
-    self.ops.removeInfliction(target.id, "electric");
-    self.ops.removeInfliction(target.id, "nature");
-    self.ops.removeInfliction(target.id, "cryo");
+    const currentSameTypeStacks = existingStacksByType[artsType];
+    const nonSameTypeStacks = ARTS_INFLICTION_TYPE_LIST.filter(
+      type => type !== artsType,
+    ).reduce((sum, type) => sum + existingStacksByType[type], 0);
+    const consumedArtsStacks = Object.values(existingStacksByType).reduce(
+      (sum, stacks) => sum + stacks,
+      0,
+    );
 
-    self.ops.schedule({
-      id: makeEventId(),
-      type: "hit",
-      frame: self.nowInFrames,
-      seq: self.ops.nextSeq(),
-      sourceId: source.id,
-      targetId: target.id,
-      damageType: "cryo",
-      dmgMultiplier:
-        SOLIDIFICATION_INITIAL_HIT_BASE_MUL +
-        cryoReactionStacks * SOLIDIFICATION_INITIAL_HIT_PER_STACK_MUL,
-      ref: ev.id,
-    } as SimEvent);
+    if (nonSameTypeStacks > 0) {
+      for (const type of ARTS_INFLICTION_TYPE_LIST) {
+        self.ops.removeInfliction(target.id, type);
+      }
 
-    self.ops.upsertBuff(target.id, {
-      id: SOLIDIFICATION_BUFF_ID,
-      lastApplyFrame: self.read.nowInFrames,
-      stacks: cryoReactionStacks,
-    } as SimBuff);
+      let reactionBuffId: BuffId;
+      let initialHitBaseMul: number;
+      let initialHitPerStackMul: number;
+      let buffStacks = consumedArtsStacks;
+      let buffMeta: Record<string, unknown> | undefined;
 
-    self.ops.schedule({
-      id: makeEventId(),
-      type: "buffExpire",
-      frame:
-        self.read.nowInFrames +
-        SOLIDIFICATION_BASE_DURATION_FRAMES +
-        cryoReactionStacks * SOLIDIFICATION_EXTRA_DURATION_PER_STACK_FRAMES,
-      seq: self.ops.nextSeq(),
-      sourceId: target.id,
-      buffId: SOLIDIFICATION_BUFF_ID,
-      ref: ev.id,
-    } as SimEvent);
+      switch (artsType) {
+        case "cryo":
+          reactionBuffId = SOLIDIFICATION_BUFF_ID;
+          initialHitBaseMul = SOLIDIFICATION_INITIAL_HIT_BASE_MUL;
+          initialHitPerStackMul = SOLIDIFICATION_INITIAL_HIT_PER_STACK_MUL;
+          break;
+        case "heat":
+          reactionBuffId = COMBUSTION_BUFF_ID;
+          initialHitBaseMul = COMBUSTION_INITIAL_HIT_BASE_MUL;
+          initialHitPerStackMul = COMBUSTION_INITIAL_HIT_PER_STACK_MUL;
+          buffStacks = 1;
+          buffMeta = {
+            reactionSourceId: source.id,
+            combustionTickMultiplier:
+              COMBUSTION_DOT_BASE_MUL +
+              consumedArtsStacks * COMBUSTION_DOT_PER_STACK_MUL,
+          };
+          break;
+        case "electric":
+          reactionBuffId = ELECTRIFICATION_BUFF_ID;
+          initialHitBaseMul = ELECTRIFICATION_INITIAL_HIT_BASE_MUL;
+          initialHitPerStackMul = ELECTRIFICATION_INITIAL_HIT_PER_STACK_MUL;
+          break;
+        case "nature":
+          reactionBuffId = CORROSION_BUFF_ID;
+          initialHitBaseMul = CORROSION_INITIAL_HIT_BASE_MUL;
+          initialHitPerStackMul = CORROSION_INITIAL_HIT_PER_STACK_MUL;
+          buffStacks = 1;
+          buffMeta = {
+            corrosionReductionPerSecond:
+              CORROSION_REDUCTION_PER_SECOND_BASE +
+              consumedArtsStacks * CORROSION_REDUCTION_PER_SECOND_PER_STACK,
+            corrosionMinResistanceMul:
+              CORROSION_MIN_RESISTANCE_BASE +
+              consumedArtsStacks * CORROSION_MIN_RESISTANCE_PER_STACK,
+          };
+          break;
+      }
 
+      self.ops.schedule({
+        id: makeEventId(),
+        type: "hit",
+        frame: self.nowInFrames,
+        seq: self.ops.nextSeq(),
+        sourceId: source.id,
+        targetId: target.id,
+        damageType: artsType,
+        dmgMultiplier:
+          initialHitBaseMul + consumedArtsStacks * initialHitPerStackMul,
+        ref: ev.id,
+      } as SimEvent);
+
+      self.ops.upsertBuff(target.id, {
+        id: reactionBuffId,
+        lastApplyFrame: self.read.nowInFrames,
+        stacks: buffStacks,
+        meta: buffMeta,
+      } as SimBuff);
+
+      scheduleBuffExpire(self, target.id, reactionBuffId);
+
+      const buffApplyEvent = {
+        id: makeEventId(),
+        type: "buffApply",
+        frame: ev.frame,
+        seq: self.ops.nextSeq(),
+        sourceId: source.id,
+        targetId: target.id,
+        buffId: reactionBuffId,
+        isForced: false,
+        ref: ev.id,
+      } as Extract<SimEvent, { type: "buffApply" }>;
+      const onBuffApplySpawned = self.registry.runOnBuffApply({
+        read: self.read,
+        ev: buffApplyEvent,
+        sourceId: source.id,
+        targetId: target.id,
+        nextSeq: self.ops.nextSeq,
+        makeEventId: () => makeId("SimEvent_"),
+      });
+      for (const sev of onBuffApplySpawned) self.ops.schedule(sev);
+
+      self.ops.log(
+        "buff",
+        `${reactionBuffId} triggered on ${(target as any).name}: consumed arts stacks=${consumedArtsStacks}`,
+      );
+
+      return;
+    }
+
+    const current = currentSameTypeStacks;
+    self.ops.addInfliction(target.id, ev.inflictionType, ev.inflictionStacks);
+    const after = target.inflictions[ev.inflictionType].stacks;
     self.ops.log(
       "buff",
-      `Solidification triggered on ${(target as any).name}: consumed arts stacks=${cryoReactionStacks}`,
+      `${ev.inflictionType} infliction stacks ${current} -> ${after} (target=${(target as any).name})`,
     );
 
-    const buffApplyEvent = {
-      id: makeEventId(),
-      type: "buffApply",
-      frame: ev.frame,
-      seq: self.ops.nextSeq(),
-      sourceId: source.id,
-      targetId: target.id,
-      buffId: SOLIDIFICATION_BUFF_ID,
-      ref: ev.id,
-    } as Extract<SimEvent, { type: "buffApply" }>;
-    const onBuffApplySpawned = self.registry.runOnBuffApply({
-      read: self.read,
-      ev: buffApplyEvent,
-      sourceId: source.id,
-      targetId: target.id,
-      nextSeq: self.ops.nextSeq,
-      makeEventId: () => makeId("SimEvent_"),
-    });
-    for (const sev of onBuffApplySpawned) self.ops.schedule(sev);
-
-    return;
-  }
-
-  if (
-    ev.inflictionType === "vulnerable" &&
-    (target as any).buffs?.[SOLIDIFICATION_BUFF_ID]
-  ) {
-    const reactionStacks = Number(
-      (target as any).buffs?.[SOLIDIFICATION_BUFF_ID]?.stacks ?? 0,
-    );
-
-    self.ops.removeBuff(target.id, SOLIDIFICATION_BUFF_ID);
-    self.ops.schedule({
-      id: makeEventId(),
-      type: "hit",
-      frame: ev.frame,
-      seq: self.ops.nextSeq(),
-      sourceId: source.id,
-      targetId: target.id,
-      damageType: "physical",
-      dmgMultiplier:
-        SOLIDIFICATION_SHATTER_BASE_MUL +
-        reactionStacks * SOLIDIFICATION_SHATTER_PER_STACK_MUL,
-      ref: ev.id,
-    } as SimEvent);
+    const isBurstTrigger = current > 0;
+    if (isBurstTrigger) {
+      self.ops.schedule({
+        id: makeEventId(),
+        type: "hit",
+        frame: self.read.nowInFrames + ARTS_BURST_DELAY_FRAMES,
+        seq: self.ops.nextSeq(),
+        sourceId: source.id,
+        targetId: target.id,
+        damageType: artsType,
+        dmgMultiplier: ARTS_BURST_BASE_MUL + after * ARTS_BURST_PER_STACK_MUL,
+        ref: ev.id,
+      } as SimEvent);
+    }
+  } else {
+    const current = target.inflictions[ev.inflictionType].stacks;
+    self.ops.addInfliction(target.id, ev.inflictionType, ev.inflictionStacks);
+    const after = target.inflictions[ev.inflictionType].stacks;
     self.ops.log(
       "buff",
-      `Shatter triggered by Vulnerable on ${(target as any).name}: consumed Solidification stacks=${reactionStacks}`,
+      `${ev.inflictionType} infliction stacks ${current} -> ${after} (target=${(target as any).name})`,
     );
   }
-
-  const current = target.inflictions[ev.inflictionType].stacks;
-  self.ops.addInfliction(target.id, ev.inflictionType, ev.inflictionStacks);
-  const after = target.inflictions[ev.inflictionType].stacks;
-  self.ops.log(
-    "buff",
-    `${ev.inflictionType} infliction stacks ${current} -> ${after} (target=${(target as any).name})`,
-  );
 
   const spawned = self.registry.runOnInflictionApply({
     read: self.read,
@@ -622,3 +683,6 @@ export function resolveInflictionExpiration(
   }
   return false;
 }
+export const ARTS_BURST_DELAY_FRAMES = 12;
+export const ARTS_BURST_BASE_MUL = 0.55;
+export const ARTS_BURST_PER_STACK_MUL = 0.25;

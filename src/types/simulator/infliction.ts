@@ -35,6 +35,8 @@ export type SimBuff = {
 
   /** Optional stacks for stackable buffs */
   stacks?: number;
+  /** Optional per-buff runtime payload (e.g. reaction snapshots). */
+  meta?: Record<string, unknown>;
 };
 
 export type SimInfliction = {

@@ -20,7 +20,9 @@ export type SimEventType =
   | "buffExpire" // expire a timed buff/debuff
   | "comboTriggered" // combo trigger activated for an operator
   | "comboTriggerElapse" // combo trigger availability window elapsed
-  | "comboCooldownEnd"; // combo cooldown has ended
+  | "comboCooldownEnd" // combo cooldown has ended
+  | "reactionTick" // periodic tick for reaction buffs
+  | "spRecover"; // placeholder: recover SP/energy
 // | string;
 
 export type SimEventBase = {
@@ -87,6 +89,7 @@ export type SimEvent =
       sourceId?: SimEntityId;
       targetId: SimEntityId;
       buffId: BuffId;
+      isForced?: boolean;
     })
   | (SimEventBase & {
       type: "buffRemove";
@@ -114,6 +117,18 @@ export type SimEvent =
       type: "comboCooldownEnd";
       sourceId: SimEntityId;
       ref: string;
+    })
+  | (SimEventBase & {
+      type: "reactionTick";
+      sourceId: SimEntityId;
+      targetId: SimEntityId;
+      reactionBuffId: BuffId;
+    })
+  | (SimEventBase & {
+      type: "spRecover";
+      sourceId: SimEntityId;
+      targetId?: SimEntityId;
+      amount: number;
     });
 
 export type SimEventSequence = SimEvent[];
@@ -146,6 +161,19 @@ export type SimEntity = {
 };
 
 export type SimEnv = { entitiesById: Record<SimEntityId, SimEntity> };
+
+export type SimGlobalBuffs = {
+  link?: {
+    /** Current link stacks available for the team. */
+    stacks: number;
+    /** Cast-start event id -> special multiplier for all hits from that cast. */
+    castBonusByCastStartId: Record<string, number>;
+  };
+};
+
+export type SimEnvWithGlobalBuffs = SimEnv & {
+  globalBuffs: SimGlobalBuffs;
+};
 
 // Runtime simulation world is implemented as a class in simulator layer.
 // Re-export as a type so other layers can refer to it without importing runtime values.

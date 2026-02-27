@@ -1,5 +1,5 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
-import { applyInfliction, physicalHitByRank } from "../../simulator/skillOps";
+import { artsHitByRank, physicalHitByRank } from "../../simulator/skillOps";
 import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 
 const NS_DMG_MUL = [
@@ -60,12 +60,12 @@ class EstellaDef extends OperatorDef {
           durationFrames: 52,
           icon: "ESTELLA_NS.png",
           timeline: [
-            physicalHitByRank(26, {
+            artsHitByRank(26, {
               rankTable: NS_DMG_MUL,
               rankSkillType: "normalSkill",
               dmgType: "cryo",
+              withInfliction: true,
             }),
-            applyInfliction(26, "cryo"),
           ],
         },
         comboSkill: {

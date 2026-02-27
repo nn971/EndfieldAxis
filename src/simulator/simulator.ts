@@ -10,7 +10,7 @@ import { INFLICTION_TYPE_LIST } from "../types/simulator/infliction";
 import type {
   SimEntity,
   SimEntityId,
-  SimEnv,
+  SimEnvWithGlobalBuffs,
   SimEvent,
   SimComboState,
 } from "../types/simulator/simulator";
@@ -41,14 +41,9 @@ import {
 } from "./resolvers";
 import { BuffId } from "../data/buffs/BuffDef";
 import {
-  SOLIDIFICATION_BUFF_ID,
-  SOLIDIFICATION_SHATTER_BASE_MUL,
-  SOLIDIFICATION_SHATTER_PER_STACK_MUL,
-  SOLIDIFICATION_INITIAL_HIT_BASE_MUL,
-  SOLIDIFICATION_INITIAL_HIT_PER_STACK_MUL,
-  SOLIDIFICATION_BASE_DURATION_FRAMES,
-  SOLIDIFICATION_EXTRA_DURATION_PER_STACK_FRAMES,
-} from "../data/buffs/reactions/solidification";
+  COMBUSTION_BUFF_ID,
+  COMBUSTION_DOT_INTERVAL_FRAMES,
+} from "../data/buffs/reactions/combustion";
 
 /**
  * SimWorld
@@ -74,7 +69,7 @@ function makeEventId() {
 
 export type SimRead = {
   readonly nowInFrames: number;
-  readonly env: SimEnv;
+  readonly env: SimEnvWithGlobalBuffs;
   getEntity(id: SimEntityId | null): SimEntity | null;
   /** Returns operator build if this entityId corresponds to an operator, else undefined. */
   getBuild(entityId: SimEntityId): OperatorBuild | undefined;
@@ -179,7 +174,7 @@ function setEmptyInflictions(e: SimEntity): void {
 
 export class SimWorld {
   // Publicly readable, but mutations should go through ops.
-  public readonly env: SimEnv;
+  public readonly env: SimEnvWithGlobalBuffs;
   public nowInFrames: number;
   public readonly log: SimLog = [];
   public readonly processedEvents: SimEvent[] = [];
@@ -208,7 +203,7 @@ export class SimWorld {
       setEmptyInflictions(e);
       this.ensureComboState(e);
     }
-    this.env = { entitiesById };
+    this.env = { entitiesById, globalBuffs: {} };
     this.nowInFrames = init.nowInFrames ?? 0;
     this.teamOperatorOrder = [...(init.teamOperatorIds ?? [])];
 
@@ -673,31 +668,6 @@ export class SimWorld {
         case "statusApply": {
           if (!target) throw new Error(`undefined target`);
           if (!source) throw new Error(`undefined source`);
-
-          if ((target as any).buffs?.[SOLIDIFICATION_BUFF_ID]) {
-            const reactionStacks = Number(
-              (target as any).buffs?.[SOLIDIFICATION_BUFF_ID]?.stacks ?? 0,
-            );
-            this.ops.removeBuff(target.id, SOLIDIFICATION_BUFF_ID);
-            this.ops.schedule({
-              id: makeEventId(),
-              type: "hit",
-              frame: ev.frame,
-              seq: this.ops.nextSeq(),
-              sourceId: source.id,
-              targetId: target.id,
-              damageType: "physical",
-              dmgMultiplier:
-                SOLIDIFICATION_SHATTER_BASE_MUL +
-                reactionStacks * SOLIDIFICATION_SHATTER_PER_STACK_MUL,
-              ref: ev.id,
-            } as SimEvent);
-            this.ops.log(
-              "buff",
-              `Shatter triggered by status ${ev.statusType} on ${(target as any).name}: consumed Solidification stacks=${reactionStacks}`,
-            );
-          }
-
           const triggerPlugins = () => {
             const spawned = this.registry.runOnStatusApply({
               read: this.read,
@@ -720,13 +690,12 @@ export class SimWorld {
 
         case "buffApply": {
           if (!target) throw new Error(`undefined target`);
-          if (!source) throw new Error(`undefined source`);
           this.resolvers.resolveBuffApplication(ev);
 
           const spawned = this.registry.runOnBuffApply({
             read: this.read,
             ev: ev,
-            sourceId: source.id,
+            sourceId: source?.id,
             targetId: target.id,
             nextSeq: this.ops.nextSeq,
             makeEventId: () => makeId("SimEvent_"),
@@ -776,6 +745,45 @@ export class SimWorld {
           break;
         }
 
+        case "reactionTick": {
+          const tickTarget = this.read.getEntity(ev.targetId ?? null);
+          if (!tickTarget) break;
+          if (ev.reactionBuffId !== COMBUSTION_BUFF_ID) break;
+
+          const combustion = (tickTarget as any).buffs?.[COMBUSTION_BUFF_ID] as SimBuff | undefined;
+          if (!combustion) break;
+
+          const tickSourceId = String((combustion as any).meta?.reactionSourceId ?? ev.sourceId);
+          if (!tickSourceId) break;
+
+          const tickMultiplier = Number((combustion as any).meta?.combustionTickMultiplier ?? 0);
+          if (tickMultiplier > 0) {
+            this.ops.schedule({
+              id: makeEventId(),
+              type: "hit",
+              frame: ev.frame,
+              seq: this.ops.nextSeq(),
+              sourceId: tickSourceId,
+              targetId: ev.targetId,
+              damageType: "heat",
+              dmgMultiplier: tickMultiplier,
+              ref: ev.id,
+            } as SimEvent);
+          }
+
+          this.ops.schedule({
+            id: makeEventId(),
+            type: "reactionTick",
+            frame: ev.frame + COMBUSTION_DOT_INTERVAL_FRAMES,
+            seq: this.ops.nextSeq(),
+            sourceId: tickSourceId,
+            targetId: ev.targetId,
+            reactionBuffId: COMBUSTION_BUFF_ID,
+            ref: ev.id,
+          } as SimEvent);
+          break;
+        }
+
         case "comboTriggered": {
           const sourceId = ev.sourceId;
           const sourceEnt = this.read.getEntity(sourceId);
@@ -820,6 +828,15 @@ export class SimWorld {
           const combo = sourceEnt.combo;
           if (!combo) break;
           combo.cooldown = 0;
+          break;
+        }
+
+        case "spRecover": {
+          // Placeholder for future SP/energy subsystem.
+          this.ops.log(
+            "dev",
+            `spRecover placeholder: source=${ev.sourceId}, amount=${ev.amount}`,
+          );
           break;
         }
 

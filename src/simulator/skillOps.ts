@@ -1,7 +1,9 @@
 import { BuffId } from "../data/buffs/BuffDef";
-import type { InflictionType } from "../types/simulator/infliction";
+import type {
+  InflictionType,
+  SimStatusType,
+} from "../types/simulator/infliction";
 import type { DmgType, SkillType } from "../data/operators/OperatorDef";
-import type { SimStatusType } from "../types/simulator/infliction";
 import type { SimEvent } from "../types/simulator/simulator";
 
 export type SkillCompileContext = {
@@ -102,7 +104,11 @@ export function physicalHit(
   };
 }
 
-export function applyBuff(frame: number, buffId: BuffId): SkillOpFn {
+export function applyBuff(
+  frame: number,
+  buffId: BuffId,
+  opts?: { isForced?: boolean },
+): SkillOpFn {
   return ctx => {
     const ev: SimEvent = {
       id: ctx.makeEventId(),
@@ -112,26 +118,7 @@ export function applyBuff(frame: number, buffId: BuffId): SkillOpFn {
       sourceId: ctx.sourceId,
       targetId: ctx.targetId,
       buffId,
-    };
-    return [ev];
-  };
-}
-
-export function applyInfliction(
-  frame: number,
-  inflictionType: InflictionType,
-  stacks: number = 1,
-): SkillOpFn {
-  return ctx => {
-    const ev: SimEvent = {
-      id: ctx.makeEventId(),
-      type: "inflictionApply",
-      frame: ctx.startFrame + frame,
-      seq: ctx.nextSeq(),
-      sourceId: ctx.sourceId,
-      targetId: ctx.targetId,
-      inflictionType,
-      inflictionStacks: Math.max(1, Math.floor(Number(stacks) || 1)),
+      isForced: opts?.isForced,
     };
     return [ev];
   };
@@ -158,4 +145,79 @@ export function physicalHitByRank(
       withStatus: opts.withStatus,
       statusType: opts.statusType,
     })(ctx);
+}
+
+export function artsHit(
+  frame: number,
+  opts: {
+    dmgType: Exclude<DmgType, "physical">;
+    dmgMultiplier?: number;
+  },
+): SkillOpFn {
+  return physicalHit(frame, {
+    dmgType: opts.dmgType,
+    dmgMultiplier: opts.dmgMultiplier,
+  });
+}
+
+export function artsHitByRank(
+  frame: number,
+  opts: {
+    rankTable: readonly number[];
+    rankSkillType?: SkillType;
+    dmgType: Exclude<DmgType, "physical">;
+    withInfliction?: boolean;
+  },
+): SkillOpFn {
+  return ctx => {
+    const events = artsHit(frame, {
+      dmgType: opts.dmgType,
+      dmgMultiplier: pickSkillValueByRank(
+        ctx,
+        opts.rankTable,
+        opts.rankSkillType ?? ctx.skillType,
+      ),
+    })(ctx);
+
+    if (opts.withInfliction) {
+      events.push({
+        id: ctx.makeEventId(),
+        type: "inflictionApply",
+        frame: ctx.startFrame + frame,
+        seq: ctx.nextSeq(),
+        sourceId: ctx.sourceId,
+        targetId: ctx.targetId,
+        inflictionType: opts.dmgType as InflictionType,
+        inflictionStacks: 1,
+      } satisfies SimEvent);
+    }
+
+    return events;
+  };
+}
+
+export function spRecoverByRank(
+  frame: number,
+  opts: {
+    rankTable: readonly number[];
+    rankSkillType?: SkillType;
+    ratio?: number;
+  },
+): SkillOpFn {
+  return ctx => {
+    const amount =
+      pickSkillValueByRank(ctx, opts.rankTable, opts.rankSkillType) *
+      Number(opts.ratio ?? 1);
+    return [
+      {
+        id: ctx.makeEventId(),
+        type: "spRecover",
+        frame: ctx.startFrame + frame,
+        seq: ctx.nextSeq(),
+        sourceId: ctx.sourceId,
+        targetId: ctx.sourceId,
+        amount,
+      } satisfies SimEvent,
+    ];
+  };
 }
