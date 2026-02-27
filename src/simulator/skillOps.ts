@@ -211,7 +211,7 @@ export function spRecoverByRank(
     return [
       {
         id: ctx.makeEventId(),
-        type: "spRecover",
+        type: "spReturn",
         frame: ctx.startFrame + frame,
         seq: ctx.nextSeq(),
         sourceId: ctx.sourceId,

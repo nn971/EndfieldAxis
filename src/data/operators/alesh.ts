@@ -30,6 +30,15 @@ class AleshDef extends OperatorDef {
       skills: {},
     } satisfies OperatorDefInit);
   }
+
+  override getUltimateEnergyCost(): number {
+    return 100;
+  }
+
+  override getComboUltimateEnergyGainOnHit(): number {
+    return 6.5;
+  }
+
 }
 
 export default new AleshDef();

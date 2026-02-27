@@ -22,7 +22,7 @@ export type SimEventType =
   | "comboTriggerElapse" // combo trigger availability window elapsed
   | "comboCooldownEnd" // combo cooldown has ended
   | "reactionTick" // periodic tick for reaction buffs
-  | "spRecover"; // placeholder: recover SP/energy
+  | "spReturn"; // return team SP from skill effects
 // | string;
 
 export type SimEventBase = {
@@ -125,11 +125,28 @@ export type SimEvent =
       reactionBuffId: BuffId;
     })
   | (SimEventBase & {
-      type: "spRecover";
+      type: "spReturn";
       sourceId: SimEntityId;
       targetId?: SimEntityId;
       amount: number;
     });
+
+export type SimTeamSpState = {
+  current: number;
+  cap: number;
+  regenPerSecond: number;
+  lastRegenFrame: number;
+};
+
+export type SimUltimateState = {
+  current: number;
+  max: number;
+};
+
+export type SimResourceState = {
+  teamSp: SimTeamSpState;
+  ultimateByOperatorId: Record<SimEntityId, SimUltimateState>;
+};
 
 export type SimEventSequence = SimEvent[];
 
@@ -173,6 +190,7 @@ export type SimGlobalBuffs = {
 
 export type SimEnvWithGlobalBuffs = SimEnv & {
   globalBuffs: SimGlobalBuffs;
+  resources: SimResourceState;
 };
 
 // Runtime simulation world is implemented as a class in simulator layer.

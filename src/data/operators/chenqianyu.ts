@@ -132,6 +132,14 @@ class ChenQianyuDef extends OperatorDef {
     return CS_COOLDOWN_SECONDS;
   }
 
+  override getUltimateEnergyCost(): number {
+    return 100;
+  }
+
+  override getComboUltimateEnergyGainOnHit(): number {
+    return 6;
+  }
+
   override registerSimPlugins(registry: SimRegistry): void {
     const BONUS_BUFF = "buff.chenqianyu.talent1.atkInc" as const;
 

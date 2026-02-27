@@ -103,6 +103,14 @@ class EstellaDef extends OperatorDef {
     return CS_COOLDOWN_SECONDS;
   }
 
+  override getUltimateEnergyCost(): number {
+    return 130;
+  }
+
+  override getComboUltimateEnergyGainOnHit(): number {
+    return 9;
+  }
+
   override registerSimPlugins(registry: SimRegistry): void {
     registry.registerOnBuffApplyForBuff({
       buffId: "buff.solidification",

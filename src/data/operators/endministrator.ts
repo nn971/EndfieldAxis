@@ -106,6 +106,14 @@ class EndministratorDef extends OperatorDef {
     return CS_COOLDOWN_SECONDS;
   }
 
+  override getUltimateEnergyCost(): number {
+    return 110;
+  }
+
+  override getComboUltimateEnergyGainOnHit(): number {
+    return 7;
+  }
+
   override registerSimPlugins(registry: SimRegistry): void {
     registry.registerAfterHit({
       id: "operator.endministrator.combo.triggerOnAllyComboHit",

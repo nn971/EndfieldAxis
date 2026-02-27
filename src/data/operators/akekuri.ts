@@ -126,6 +126,14 @@ class AkekuriDef extends OperatorDef {
     return CS_COOLDOWN_SECONDS;
   }
 
+  override getUltimateEnergyCost(): number {
+    return 120;
+  }
+
+  override getComboUltimateEnergyGainOnHit(): number {
+    return 8;
+  }
+
   override registerSimPlugins(registry: SimRegistry): void {
     registry.registerOnCastStart({
       id: "global.link.consumeOnCastStart",

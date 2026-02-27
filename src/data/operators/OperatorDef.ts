@@ -100,6 +100,14 @@ export abstract class OperatorDef {
     return null;
   }
 
+  getUltimateEnergyCost(): number {
+    return 100;
+  }
+
+  getComboUltimateEnergyGainOnHit(): number {
+    return 6.5;
+  }
+
   /**
    * Optional: register simulator listeners for operator talents / potentials / etc.
    * Default is no-op.
