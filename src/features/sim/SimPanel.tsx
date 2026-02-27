@@ -14,17 +14,17 @@ import type {
   SimRenderCache,
   SimRenderMarker,
 } from "../../types/editor";
-import {
-  DAMAGE_TYPE_LIST,
-  DamageType,
-  type OperatorBuild,
-} from "../../types/operator";
+import { type OperatorBuild } from "../../types/operator";
 import OperatorsData from "../../data/operators";
 import { summarizeLog } from "../../simulator/log";
 import { loadSimRegistry } from "../../simulator/listeners/registry";
 import { SimWorld } from "../../simulator/simulator";
 import { simRenderCacheReplaced } from "../solution/solutionSlice";
-import { SimInfliction } from "../../types/simulator/infliction";
+import {
+  INFLICTION_TYPE_LIST,
+  type InflictionType,
+  SimInfliction,
+} from "../../types/simulator/infliction";
 
 function buildSimRenderCache(events: SimEvent[]): SimRenderCache {
   const bars: SimRenderBar[] = [];
@@ -158,9 +158,9 @@ function compileSkillBoxes(params: {
   return out;
 }
 
-function getEmptyInfliction(): Record<DamageType, SimInfliction> {
+function getEmptyInfliction(): Record<InflictionType, SimInfliction> {
   return Object.fromEntries(
-    DAMAGE_TYPE_LIST.map(type => [
+    INFLICTION_TYPE_LIST.map(type => [
       type,
       {
         type: type,
@@ -168,7 +168,7 @@ function getEmptyInfliction(): Record<DamageType, SimInfliction> {
         lastApplyFrame: -1,
       },
     ]),
-  ) as Record<DamageType, SimInfliction>;
+  ) as Record<InflictionType, SimInfliction>;
 }
 
 export default function SimPanel() {
@@ -241,7 +241,7 @@ export default function SimPanel() {
       summarizeLog(
         world.log,
         ["sim", "act", "buff", "stat", "dmg", "dev"],
-        true,
+        false,
       ) +
         "\n\n" +
         `Final world state:\n${finalWorldDescription}`,

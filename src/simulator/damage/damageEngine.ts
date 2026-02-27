@@ -31,6 +31,9 @@ function collectDamageBonuses(params: {
 
   const source = read.getEntity(sourceId);
   const target = read.getEntity(targetId);
+  if (!source || !target) {
+    throw new Error(`Can't find source ${sourceId} or target ${targetId}`);
+  }
 
   // Global listeners (system rules not tied to a particular buff)
   registry.runGlobalDamageBonus({
@@ -78,21 +81,21 @@ function collectDamageBonuses(params: {
 /** Special multiplier should depend and only depend on this.
  *  TODO: Is there a better way?
  */
-export type HitType =
-  | "normalAttack"
-  | "normalSkill"
-  | "comboSkill"
-  | "ultimate"
-  | SimStatusType;
+// export type HitType =
+//   | "normalAttack"
+//   | "normalSkill"
+//   | "comboSkill"
+//   | "ultimate"
+//   | SimStatusType;
 
-export type HitTypes = Partial<Record<HitType, boolean>>;
+// export type HitTypes = Partial<Record<HitType, boolean>>;
 
 export function buildDamageContext(params: {
   registry: SimRegistry;
   read: SimRead;
   frame: number;
   damageType: DamageType;
-  hitTypes: HitTypes;
+  // hitTypes: HitTypes;
   sourceId: SimEntityId;
   targetId: SimEntityId;
   dmgSkillMultiplier: number;

@@ -1,12 +1,11 @@
 import { BuffId } from "../../data/buffs/BuffDef";
 import { DmgType, SkillType } from "../../data/operators/OperatorDef";
-import { HitTypes } from "../../simulator/damage/damageEngine";
-import { DamageType } from "../operator";
+
 import type {
   SimInfliction,
   SimBuff,
   SimStatusType,
-  SimInflictionDef,
+  InflictionType,
 } from "./infliction";
 
 export type SimEventType =
@@ -74,13 +73,13 @@ export type SimEvent =
       type: "inflictionApply";
       sourceId: SimEntityId;
       targetId: SimEntityId;
-      inflictionType: DamageType;
+      inflictionType: InflictionType;
       inflictionStacks: number;
     })
   | (SimEventBase & {
       type: "inflictionExpire";
       sourceId: SimEntityId;
-      inflictionType: DamageType;
+      inflictionType: InflictionType;
       ref: string;
     })
   | (SimEventBase & {
@@ -136,7 +135,7 @@ export type SimEntity = {
   id: SimEntityId;
   name: string;
   hp: number;
-  inflictions: Record<DamageType, SimInfliction>;
+  inflictions: Record<InflictionType, SimInfliction>;
 
   buffs: Record<string, SimBuff>;
 

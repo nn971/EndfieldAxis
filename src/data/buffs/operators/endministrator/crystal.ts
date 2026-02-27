@@ -112,7 +112,7 @@ class CrystalBuffDef extends BuffDef {
 
         const target = read.getEntity(targetId);
         if (!(target as any).buffs?.["buff.crystal"]) return [];
-        if (ev.inflictionType !== "physical") return [];
+        if (ev.inflictionType !== "vulnerable") return [];
 
         // Skip inflictions spawned by statusApply to avoid double consume.
         if (ev.ref) {

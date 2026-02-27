@@ -138,7 +138,7 @@ class ChenQianyuDef extends OperatorDef {
     registry.registerOnInflictionApply({
       id: "operator.chenqianyu.combo.triggerOnVulnerableApply",
       fn: ({ ev, nextSeq, makeEventId }) => {
-        if (ev.inflictionType !== "physical") return [];
+        if (ev.inflictionType !== "vulnerable") return [];
         return [
           {
             id: makeEventId(),

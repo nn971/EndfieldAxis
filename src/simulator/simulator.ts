@@ -1,11 +1,12 @@
-import { DAMAGE_TYPE_LIST, type OperatorBuild } from "../types/operator";
+import type { OperatorBuild } from "../types/operator";
 import operatorsData from "../data/operators";
 import type {
+  InflictionType,
   SimBuff,
   SimInfliction,
   SimStatusType,
 } from "../types/simulator/infliction";
-import type { DamageType } from "../types/operator";
+import { INFLICTION_TYPE_LIST } from "../types/simulator/infliction";
 import type {
   SimEntity,
   SimEntityId,
@@ -24,7 +25,7 @@ import { SimRegistry } from "./listeners/registry";
 
 import { makeId } from "../shared/lib/id";
 
-import { buildDamageContext, HitType, HitTypes } from "./damage/damageEngine";
+import { buildDamageContext } from "./damage/damageEngine";
 // import { dispatchAfterHit } from "./listeners/handlers";
 import { createDefaultDamageModel } from "./damage/damageModel";
 
@@ -36,8 +37,18 @@ import {
   resolveBuffExpiration,
   resolveInflictionExpiration,
   resolveStatusApplication,
+  resolveInflictionApplication,
 } from "./resolvers";
 import { BuffId } from "../data/buffs/BuffDef";
+import {
+  SOLIDIFICATION_BUFF_ID,
+  SOLIDIFICATION_SHATTER_BASE_MUL,
+  SOLIDIFICATION_SHATTER_PER_STACK_MUL,
+  SOLIDIFICATION_INITIAL_HIT_BASE_MUL,
+  SOLIDIFICATION_INITIAL_HIT_PER_STACK_MUL,
+  SOLIDIFICATION_BASE_DURATION_FRAMES,
+  SOLIDIFICATION_EXTRA_DURATION_PER_STACK_FRAMES,
+} from "../data/buffs/reactions/solidification";
 
 /**
  * SimWorld
@@ -56,6 +67,7 @@ import { BuffId } from "../data/buffs/BuffDef";
 
 const EVENT_PREFIX = "SimEvent_";
 export const COMBO_AVAILABLE_WINDOW_FRAMES = 300;
+
 function makeEventId() {
   return makeId(EVENT_PREFIX);
 }
@@ -63,7 +75,7 @@ function makeEventId() {
 export type SimRead = {
   readonly nowInFrames: number;
   readonly env: SimEnv;
-  getEntity(id: SimEntityId): SimEntity;
+  getEntity(id: SimEntityId | null): SimEntity | null;
   /** Returns operator build if this entityId corresponds to an operator, else undefined. */
   getBuild(entityId: SimEntityId): OperatorBuild | undefined;
   /** Lookup an event by id (useful for provenance via SimEventBase.ref). */
@@ -107,30 +119,32 @@ export type SimOps = {
   // }) => void;
   addInfliction: (
     targetId: SimEntityId,
-    inflictionType: DamageType,
+    inflictionType: InflictionType,
     stacks: number,
   ) => void;
-  removeInfliction: (targetId: SimEntityId, inflictionType: DamageType) => void;
+  removeInfliction: (
+    targetId: SimEntityId,
+    inflictionType: InflictionType,
+  ) => void;
 };
 
 type SimResolvers = {
   /** should return whether the status is triggered */
   resolveStatusApplication: (
     triggerPlugins: () => void,
-    sourceId: SimEntityId,
-    targetId: SimEntityId,
-    statusType: SimStatusType,
-    ref?: string,
+    ev: Extract<SimEvent, { type: "statusApply" }>,
   ) => void;
   resolveBuffApplication: (
-    sourceId: SimEntityId,
-    targetId: SimEntityId,
-    buffId: BuffId,
+    ev: Extract<SimEvent, { type: "buffApply" }>,
   ) => void;
-  resolveBuffExpiration: (entityId: SimEntityId, buffId: BuffId) => void;
+  resolveBuffExpiration: (
+    ev: Extract<SimEvent, { type: "buffExpire" }>,
+  ) => void;
+  resolveInflictionApplication: (
+    ev: Extract<SimEvent, { type: "inflictionApply" }>,
+  ) => void;
   resolveInflictionExpiration: (
-    sourceId: SimEntityId,
-    inflictionType: DamageType,
+    ev: Extract<SimEvent, { type: "inflictionExpire" }>,
   ) => void;
 };
 
@@ -153,8 +167,8 @@ function sortEventsInPlace(queue: SimEvent[]): void {
 }
 
 function setEmptyInflictions(e: SimEntity): void {
-  const inflictions = e.inflictions as Record<DamageType, SimInfliction>;
-  for (const type of DAMAGE_TYPE_LIST) {
+  const inflictions = e.inflictions as Record<InflictionType, SimInfliction>;
+  for (const type of INFLICTION_TYPE_LIST) {
     inflictions[type] ??= {
       type: type,
       stacks: 0,
@@ -243,27 +257,13 @@ export class SimWorld {
     };
 
     this.resolvers = {
-      resolveBuffApplication: (sourceId, targetId, buffId) =>
-        resolveBuffApplication(self, sourceId, targetId, buffId),
-      resolveBuffExpiration: (entityId, buffId) =>
-        resolveBuffExpiration(self, entityId, buffId),
-      resolveInflictionExpiration: (sourceId, inflictionType) =>
-        resolveInflictionExpiration(self, sourceId, inflictionType),
-      resolveStatusApplication: (
-        triggerPlugins,
-        sourceId,
-        targetId,
-        statusType,
-        ref,
-      ) =>
-        resolveStatusApplication(
-          self,
-          triggerPlugins,
-          sourceId,
-          targetId,
-          statusType,
-          ref,
-        ),
+      resolveBuffApplication: ev => resolveBuffApplication(self, ev),
+      resolveBuffExpiration: ev => resolveBuffExpiration(self, ev),
+      resolveInflictionApplication: ev =>
+        resolveInflictionApplication(self, ev),
+      resolveInflictionExpiration: ev => resolveInflictionExpiration(self, ev),
+      resolveStatusApplication: (triggerPlugins, ev) =>
+        resolveStatusApplication(self, triggerPlugins, ev),
     };
   }
 
@@ -489,7 +489,7 @@ export class SimWorld {
 
   private addInfliction(
     entityId: SimEntityId,
-    inflictionType: DamageType,
+    inflictionType: InflictionType,
     stacks: number = 1,
   ): void {
     const ent = this.getEntityOrThrow(entityId);
@@ -501,13 +501,14 @@ export class SimWorld {
 
   private removeInfliction(
     entityId: SimEntityId,
-    inflictionType: DamageType,
+    inflictionType: InflictionType,
   ): void {
     const ent = this.getEntityOrThrow(entityId);
     ent.inflictions[inflictionType].stacks = 0;
     ent.inflictions[inflictionType].lastApplyFrame = -1;
   }
 
+  // ----- Run Sim -----
   public runSim(maxSteps: number = 10000) {
     // const session = { world, registry, damageModel };
 
@@ -536,12 +537,11 @@ export class SimWorld {
       // ) {
       //   continue;
       // }
-
-      if (ev.type === "castStart") {
-        const validation = this.validateComboCast(ev);
-        ev.comboValidation = validation;
-        if (!validation.isLegal) this.blockedCastStartIds.add(ev.id);
-      }
+      // if (ev.type === "castStart") {
+      //   const validation = this.validateComboCast(ev);
+      //   ev.comboValidation = validation;
+      //   if (!validation.isLegal) this.blockedCastStartIds.add(ev.id);
+      // }
 
       this.processedEvents.push(ev);
 
@@ -603,8 +603,6 @@ export class SimWorld {
           if (!target) throw new Error(`undefined target`);
           if (!source) throw new Error(`undefined source`);
 
-          const hitTypes = {} as HitTypes;
-
           // // Skill category tag (for listeners / future gating).
           // if (ev.skillType) {
           //   hitTypes[ev.skillType] = true;
@@ -622,14 +620,13 @@ export class SimWorld {
           // let statusHitType: SimStatusType | null = directStatusHitType;
 
           // // Fallback: infer status from parent statusApply event.
-          const ref = (ev as any).ref;
-          if (typeof ref === "string") {
-            const parent = this.read.getEvent(ref);
-            if (parent?.type === "statusApply") {
-              const st = (parent as any).statusType;
-              hitTypes[st as SimStatusType] = true;
-            }
-          }
+          // const ref = (ev as any).ref;
+          // if (typeof ref === "string") {
+          //   const parent = this.read.getEvent(ref);
+          //   if (parent?.type === "statusApply") {
+          //     const st = (parent as any).statusType;
+          //   }
+          // }
 
           const dmgSkillMultiplier = Number(ev.dmgMultiplier ?? 1);
 
@@ -638,7 +635,6 @@ export class SimWorld {
             read: this.read,
             frame: ev.frame,
             damageType: ev.damageType,
-            hitTypes: hitTypes,
             sourceId: source.id,
             targetId: target.id,
             dmgSkillMultiplier,
@@ -678,6 +674,30 @@ export class SimWorld {
           if (!target) throw new Error(`undefined target`);
           if (!source) throw new Error(`undefined source`);
 
+          if ((target as any).buffs?.[SOLIDIFICATION_BUFF_ID]) {
+            const reactionStacks = Number(
+              (target as any).buffs?.[SOLIDIFICATION_BUFF_ID]?.stacks ?? 0,
+            );
+            this.ops.removeBuff(target.id, SOLIDIFICATION_BUFF_ID);
+            this.ops.schedule({
+              id: makeEventId(),
+              type: "hit",
+              frame: ev.frame,
+              seq: this.ops.nextSeq(),
+              sourceId: source.id,
+              targetId: target.id,
+              damageType: "physical",
+              dmgMultiplier:
+                SOLIDIFICATION_SHATTER_BASE_MUL +
+                reactionStacks * SOLIDIFICATION_SHATTER_PER_STACK_MUL,
+              ref: ev.id,
+            } as SimEvent);
+            this.ops.log(
+              "buff",
+              `Shatter triggered by status ${ev.statusType} on ${(target as any).name}: consumed Solidification stacks=${reactionStacks}`,
+            );
+          }
+
           const triggerPlugins = () => {
             const spawned = this.registry.runOnStatusApply({
               read: this.read,
@@ -693,13 +713,7 @@ export class SimWorld {
               this.ops.schedule(sev);
             }
           };
-          this.resolvers.resolveStatusApplication(
-            triggerPlugins,
-            source.id,
-            target.id,
-            ev.statusType!,
-            ev.id,
-          );
+          this.resolvers.resolveStatusApplication(triggerPlugins, ev);
 
           break;
         }
@@ -707,11 +721,7 @@ export class SimWorld {
         case "buffApply": {
           if (!target) throw new Error(`undefined target`);
           if (!source) throw new Error(`undefined source`);
-          this.resolvers.resolveBuffApplication(
-            source.id,
-            target.id,
-            ev.buffId!,
-          );
+          this.resolvers.resolveBuffApplication(ev);
 
           const spawned = this.registry.runOnBuffApply({
             read: this.read,
@@ -750,62 +760,27 @@ export class SimWorld {
           // sourceId holds the entity who owns the buff.
           if (!ev.sourceId)
             throw new Error(`event with type buffExpire but no sourceId`);
-          this.resolvers.resolveBuffExpiration(ev.sourceId, ev.buffId!);
+          this.resolvers.resolveBuffExpiration(ev);
           break;
         }
 
         case "inflictionApply": {
-          if (!target) throw new Error(`undefined target`);
-          if (!source) throw new Error(`undefined source`);
-
-          const current = target.inflictions[ev.inflictionType].stacks;
-          this.ops.addInfliction(
-            target.id,
-            ev.inflictionType,
-            ev.inflictionStacks,
-          );
-          const after = target.inflictions[ev.inflictionType].stacks;
-          this.ops.log(
-            "buff",
-            `${ev.inflictionType} infliction stacks ${current} -> ${after} (target=${(target as any).name})`,
-          );
-
-          const spawned = this.registry.runOnInflictionApply({
-            read: this.read,
-            ev,
-            sourceId: source.id,
-            targetId: target.id,
-            nextSeq: this.ops.nextSeq,
-            makeEventId: () => makeId("SimEvent_"),
-          });
-          for (const sev of spawned) this.ops.schedule(sev);
-
-          this.ops.schedule({
-            id: makeEventId(),
-            type: "inflictionExpire",
-            frame: this.read.nowInFrames + DEFAULT_INFLICTION_DURATION_FRAMES,
-            seq: this.ops.nextSeq(),
-            sourceId: target.id,
-            targetId: undefined,
-            inflictionType: ev.inflictionType,
-            ref: ev.id,
-          } as SimEvent);
+          this.resolvers.resolveInflictionApplication(ev);
           break;
         }
 
         case "inflictionExpire": {
           if (!ev.sourceId)
             throw new Error(`event with type inflictionExpire but no sourceId`);
-          this.resolvers.resolveInflictionExpiration(
-            ev.sourceId,
-            ev.inflictionType!,
-          );
+          this.resolvers.resolveInflictionExpiration(ev);
           break;
         }
 
         case "comboTriggered": {
           const sourceId = ev.sourceId;
           const sourceEnt = this.read.getEntity(sourceId);
+          if (!sourceEnt)
+            throw new Error(`Can not find entity id=(${sourceId})`);
           if (sourceEnt.type !== "operator") break;
 
           const accepted = this.triggerCombo(sourceId, ev.frame);
@@ -819,6 +794,8 @@ export class SimWorld {
         case "comboTriggerElapse": {
           const sourceId = ev.sourceId;
           const sourceEnt = this.read.getEntity(sourceId);
+          if (!sourceEnt)
+            throw new Error(`Can not find entity id=(${sourceId})`);
           if (sourceEnt.type !== "operator") break;
 
           const combo = sourceEnt.combo;
@@ -836,6 +813,8 @@ export class SimWorld {
         case "comboCooldownEnd": {
           const sourceId = ev.sourceId;
           const sourceEnt = this.read.getEntity(sourceId);
+          if (!sourceEnt)
+            throw new Error(`Can not find entity id=(${sourceId})`);
           if (sourceEnt.type !== "operator") break;
 
           const combo = sourceEnt.combo;

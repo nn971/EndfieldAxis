@@ -8,8 +8,19 @@ import {
 import { BuffId } from "../data/buffs/BuffDef";
 import { SimWorld } from "./simulator";
 import buffsData from "../data/buffs";
-import { DamageType } from "../types/operator";
-import { HitTypes } from "./damage/damageEngine";
+import type {
+  ArtsInflictionType,
+  InflictionType,
+} from "../types/simulator/infliction";
+import {
+  SOLIDIFICATION_BUFF_ID,
+  SOLIDIFICATION_SHATTER_BASE_MUL,
+  SOLIDIFICATION_SHATTER_PER_STACK_MUL,
+  SOLIDIFICATION_INITIAL_HIT_BASE_MUL,
+  SOLIDIFICATION_INITIAL_HIT_PER_STACK_MUL,
+  SOLIDIFICATION_BASE_DURATION_FRAMES,
+  SOLIDIFICATION_EXTRA_DURATION_PER_STACK_FRAMES,
+} from "../data/buffs/reactions/solidification";
 
 // TODO: come up with a way to configure this
 export const DEFAULT_INFLICTION_DURATION_FRAMES = 1800;
@@ -17,6 +28,56 @@ export const DEFAULT_INFLICTION_DURATION_FRAMES = 1800;
 const EVENT_PREFIX = "SimEvent_";
 function makeEventId() {
   return makeId(EVENT_PREFIX);
+}
+
+function isArtsInfliction(type: InflictionType): type is ArtsInflictionType {
+  return (
+    type === "heat" ||
+    type === "electric" ||
+    type === "cryo" ||
+    type === "nature"
+  );
+}
+
+function scheduleApplyArtsInfliction(
+  world: SimWorld,
+  sourceId: SimEntityId,
+  targetId: SimEntityId,
+  inflictionType: ArtsInflictionType,
+  ref?: string,
+): void {
+  const id = makeEventId();
+  world.ops.schedule({
+    id: id,
+    type: "inflictionApply",
+    frame: world.read.nowInFrames,
+    seq: world.ops.nextSeq(),
+    sourceId,
+    targetId,
+    inflictionType,
+    inflictionStacks: 1,
+    ref,
+  } as SimEvent);
+}
+
+function scheduleApplyVulnerable(
+  world: SimWorld,
+  sourceId: SimEntityId,
+  targetId: SimEntityId,
+  ref?: string,
+): void {
+  const id = makeEventId();
+  world.ops.schedule({
+    id: id,
+    type: "inflictionApply",
+    frame: world.read.nowInFrames,
+    seq: world.ops.nextSeq(),
+    sourceId,
+    targetId,
+    inflictionType: "vulnerable",
+    inflictionStacks: 1,
+    ref,
+  } as SimEvent);
 }
 
 /** compute the special multiplier for physical status */
@@ -69,7 +130,7 @@ function computePhysicalStatusSpecialMul(
 // function scheduleInflictionExpire(
 //   world: SimWorld,
 //   targetId: SimEntityId,
-//   inflictionType: DamageType,
+//   inflictionType: InflictionType,
 // ): void {
 //   world.ops.schedule({
 //     id: makeEventId(),
@@ -87,21 +148,15 @@ function scheduleApplyInfliction(
   world: SimWorld,
   sourceId: SimEntityId,
   targetId: SimEntityId,
-  inflictionType: DamageType,
+  inflictionType: InflictionType,
   ref?: string,
 ): void {
-  const id = makeEventId();
-  world.ops.schedule({
-    id: id,
-    type: "inflictionApply",
-    frame: world.read.nowInFrames,
-    seq: world.ops.nextSeq(),
-    sourceId,
-    targetId,
-    inflictionType: inflictionType,
-    inflictionStacks: 1,
-    ref,
-  } as SimEvent);
+  if (isArtsInfliction(inflictionType)) {
+    scheduleApplyArtsInfliction(world, sourceId, targetId, inflictionType, ref);
+    return;
+  }
+
+  scheduleApplyVulnerable(world, sourceId, targetId, ref);
   // world.ops.schedule({
   //   id: makeEventId(),
   //   type: "inflictionExpire",
@@ -146,11 +201,13 @@ function scheduleBuffExpire(
 export function resolveStatusApplication(
   self: SimWorld,
   triggerPlugins: () => void,
-  sourceId: SimEntityId,
-  targetId: SimEntityId,
-  statusType: SimStatusType,
-  ref?: string,
+  ev: Extract<SimEvent, { type: "statusApply" }>,
 ) {
+  const sourceId = ev.sourceId;
+  const targetId = ev.targetId;
+  const statusType = ev.statusType;
+  const ref = ev.id;
+
   const source = self.read.getEntity(sourceId);
   if (!source) throw new Error(`Unknown source with sourceId=${sourceId}`);
 
@@ -164,7 +221,7 @@ export function resolveStatusApplication(
     statusType === "knockDown";
   let shouldRemoveVulnerable = false;
 
-  const current = (target as any).inflictions.physical?.stacks ?? 0;
+  const current = (target as any).inflictions.vulnerable?.stacks ?? 0;
   switch (statusType) {
     case "lift": {
       if (current <= 0) break;
@@ -278,7 +335,7 @@ export function resolveStatusApplication(
   }
 
   if (shouldAddVulnerable) {
-    scheduleApplyInfliction(self, sourceId, targetId, "physical", ref);
+    scheduleApplyVulnerable(self, sourceId, targetId, ref);
     const after = Math.min(4, current + 1);
 
     // self.ops.log(
@@ -286,7 +343,7 @@ export function resolveStatusApplication(
     //   `${statusType}: vulnerable stacks ${current} -> ${after} (target=${(target as any).name})`,
     // );
   } else if (shouldRemoveVulnerable) {
-    self.ops.removeInfliction(targetId, "physical");
+    self.ops.removeInfliction(targetId, "vulnerable");
 
     self.ops.log(
       "buff",
@@ -297,10 +354,12 @@ export function resolveStatusApplication(
 
 export function resolveBuffApplication(
   self: SimWorld,
-  sourceId: SimEntityId,
-  targetId: SimEntityId,
-  buffId: BuffId,
+  ev: Extract<SimEvent, { type: "buffApply" }>,
 ) {
+  const sourceId = ev.sourceId ?? null;
+  const targetId = ev.targetId;
+  const buffId = ev.buffId;
+
   const source = self.read.getEntity(sourceId);
   if (!source) throw new Error(`Unknown source with sourceId=${sourceId}`);
 
@@ -367,21 +426,26 @@ export function resolveBuffApplication(
 
 export function resolveBuffExpiration(
   self: SimWorld,
-  entityId: SimEntityId,
-  buffId: BuffId,
+  ev: Extract<SimEvent, { type: "buffExpire" }>,
 ) {
   // return false if expiration event is stale
 
-  const ent = self.read.getEntity(entityId);
-  if (!ent) throw new Error(`Unknown entity with entityId ${entityId}`);
+  const ent = self.read.getEntity(ev.sourceId);
+  if (!ent) throw new Error(`Unknown entity with entityId ${ev.sourceId}`);
 
+  const buffId = ev.buffId;
   const buff = (ent as any).buffs?.[buffId];
   if (!buff) return false; // already removed or consumed
 
-  const duration = buffsData[buffId].durationFrames ?? 0;
+  const duration =
+    buffId === SOLIDIFICATION_BUFF_ID
+      ? SOLIDIFICATION_BASE_DURATION_FRAMES +
+        Number((buff as any).stacks ?? 0) *
+          SOLIDIFICATION_EXTRA_DURATION_PER_STACK_FRAMES
+      : (buffsData[buffId].durationFrames ?? 0);
   if (duration <= 0) return false;
   if (self.read.nowInFrames >= buff.lastApplyFrame + duration) {
-    self.ops.removeBuff(entityId, buffId);
+    self.ops.removeBuff(ent.id, buffId);
     self.ops.log("buff", `BUFF ${buffId} expire (entity=${(ent as any).name})`);
     return true;
   }
@@ -389,16 +453,158 @@ export function resolveBuffExpiration(
   return false;
 }
 
+export function resolveInflictionApplication(
+  self: SimWorld,
+  ev: Extract<SimEvent, { type: "inflictionApply" }>,
+) {
+  const source = self.read.getEntity(ev.sourceId ?? null);
+  if (!source) throw new Error(`Unknown source with sourceId=${ev.sourceId}`);
+
+  const target = self.read.getEntity(ev.targetId ?? null);
+  if (!target) throw new Error(`Unknown target with targetId=${ev.targetId}`);
+
+  const isCryoArtsInfliction = ev.inflictionType === "cryo";
+  const cryoReactionStacks = isCryoArtsInfliction
+    ? (target.inflictions.heat.stacks ?? 0) +
+      (target.inflictions.electric.stacks ?? 0) +
+      (target.inflictions.nature.stacks ?? 0)
+    : 0;
+
+  if (isCryoArtsInfliction && cryoReactionStacks > 0) {
+    self.ops.removeInfliction(target.id, "heat");
+    self.ops.removeInfliction(target.id, "electric");
+    self.ops.removeInfliction(target.id, "nature");
+    self.ops.removeInfliction(target.id, "cryo");
+
+    self.ops.schedule({
+      id: makeEventId(),
+      type: "hit",
+      frame: self.nowInFrames,
+      seq: self.ops.nextSeq(),
+      sourceId: source.id,
+      targetId: target.id,
+      damageType: "cryo",
+      dmgMultiplier:
+        SOLIDIFICATION_INITIAL_HIT_BASE_MUL +
+        cryoReactionStacks * SOLIDIFICATION_INITIAL_HIT_PER_STACK_MUL,
+      ref: ev.id,
+    } as SimEvent);
+
+    self.ops.upsertBuff(target.id, {
+      id: SOLIDIFICATION_BUFF_ID,
+      lastApplyFrame: self.read.nowInFrames,
+      stacks: cryoReactionStacks,
+    } as SimBuff);
+
+    self.ops.schedule({
+      id: makeEventId(),
+      type: "buffExpire",
+      frame:
+        self.read.nowInFrames +
+        SOLIDIFICATION_BASE_DURATION_FRAMES +
+        cryoReactionStacks * SOLIDIFICATION_EXTRA_DURATION_PER_STACK_FRAMES,
+      seq: self.ops.nextSeq(),
+      sourceId: target.id,
+      buffId: SOLIDIFICATION_BUFF_ID,
+      ref: ev.id,
+    } as SimEvent);
+
+    self.ops.log(
+      "buff",
+      `Solidification triggered on ${(target as any).name}: consumed arts stacks=${cryoReactionStacks}`,
+    );
+
+    const buffApplyEvent = {
+      id: makeEventId(),
+      type: "buffApply",
+      frame: ev.frame,
+      seq: self.ops.nextSeq(),
+      sourceId: source.id,
+      targetId: target.id,
+      buffId: SOLIDIFICATION_BUFF_ID,
+      ref: ev.id,
+    } as Extract<SimEvent, { type: "buffApply" }>;
+    const onBuffApplySpawned = self.registry.runOnBuffApply({
+      read: self.read,
+      ev: buffApplyEvent,
+      sourceId: source.id,
+      targetId: target.id,
+      nextSeq: self.ops.nextSeq,
+      makeEventId: () => makeId("SimEvent_"),
+    });
+    for (const sev of onBuffApplySpawned) self.ops.schedule(sev);
+
+    return;
+  }
+
+  if (
+    ev.inflictionType === "vulnerable" &&
+    (target as any).buffs?.[SOLIDIFICATION_BUFF_ID]
+  ) {
+    const reactionStacks = Number(
+      (target as any).buffs?.[SOLIDIFICATION_BUFF_ID]?.stacks ?? 0,
+    );
+
+    self.ops.removeBuff(target.id, SOLIDIFICATION_BUFF_ID);
+    self.ops.schedule({
+      id: makeEventId(),
+      type: "hit",
+      frame: ev.frame,
+      seq: self.ops.nextSeq(),
+      sourceId: source.id,
+      targetId: target.id,
+      damageType: "physical",
+      dmgMultiplier:
+        SOLIDIFICATION_SHATTER_BASE_MUL +
+        reactionStacks * SOLIDIFICATION_SHATTER_PER_STACK_MUL,
+      ref: ev.id,
+    } as SimEvent);
+    self.ops.log(
+      "buff",
+      `Shatter triggered by Vulnerable on ${(target as any).name}: consumed Solidification stacks=${reactionStacks}`,
+    );
+  }
+
+  const current = target.inflictions[ev.inflictionType].stacks;
+  self.ops.addInfliction(target.id, ev.inflictionType, ev.inflictionStacks);
+  const after = target.inflictions[ev.inflictionType].stacks;
+  self.ops.log(
+    "buff",
+    `${ev.inflictionType} infliction stacks ${current} -> ${after} (target=${(target as any).name})`,
+  );
+
+  const spawned = self.registry.runOnInflictionApply({
+    read: self.read,
+    ev,
+    sourceId: source.id,
+    targetId: target.id,
+    nextSeq: self.ops.nextSeq,
+    makeEventId: () => makeId("SimEvent_"),
+  });
+  for (const sev of spawned) self.ops.schedule(sev);
+
+  self.ops.schedule({
+    id: makeEventId(),
+    type: "inflictionExpire",
+    frame: self.read.nowInFrames + DEFAULT_INFLICTION_DURATION_FRAMES,
+    seq: self.ops.nextSeq(),
+    sourceId: target.id,
+    targetId: undefined,
+    inflictionType: ev.inflictionType,
+    ref: ev.id,
+  } as SimEvent);
+}
+
 export function resolveInflictionExpiration(
   self: SimWorld,
-  sourceId: SimEntityId,
-  inflictionType: DamageType,
+  ev: Extract<SimEvent, { type: "inflictionExpire" }>,
 ) {
   // return false if expiration event is stale
 
-  const ent = self.read.getEntity(sourceId);
-  if (!ent) throw new Error(`Unknown entity with entityId ${sourceId}`);
+  const ent = self.read.getEntity(ev.sourceId);
+  if (!ent) throw new Error(`Unknown entity with entityId ${ev.sourceId}`);
 
+  const inflictionType = ev.inflictionType;
   const inf = (ent as any).inflictions?.[inflictionType];
   if (!inf) return false; // already removed or consumed
 
@@ -407,7 +613,7 @@ export function resolveInflictionExpiration(
     self.read.nowInFrames >=
     inf.lastApplyFrame + DEFAULT_INFLICTION_DURATION_FRAMES
   ) {
-    self.ops.removeInfliction(sourceId, inflictionType);
+    self.ops.removeInfliction(ent.id, inflictionType);
     self.ops.log(
       "buff",
       `INFLICTION ${inflictionType} expire (entity=${(ent as any).name})`,

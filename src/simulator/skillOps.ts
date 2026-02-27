@@ -1,4 +1,5 @@
 import { BuffId } from "../data/buffs/BuffDef";
+import type { InflictionType } from "../types/simulator/infliction";
 import type { DmgType, SkillType } from "../data/operators/OperatorDef";
 import type { SimStatusType } from "../types/simulator/infliction";
 import type { SimEvent } from "../types/simulator/simulator";
@@ -72,9 +73,6 @@ export function physicalHit(
       targetId: ctx.targetId,
 
       damageType: (opts.dmgType ?? "physical") as any,
-      hitTypes: {
-        [ctx.skillType as SkillType]: true,
-      },
       dmgMultiplier: opts.dmgMultiplier,
     };
 
@@ -114,6 +112,26 @@ export function applyBuff(frame: number, buffId: BuffId): SkillOpFn {
       sourceId: ctx.sourceId,
       targetId: ctx.targetId,
       buffId,
+    };
+    return [ev];
+  };
+}
+
+export function applyInfliction(
+  frame: number,
+  inflictionType: InflictionType,
+  stacks: number = 1,
+): SkillOpFn {
+  return ctx => {
+    const ev: SimEvent = {
+      id: ctx.makeEventId(),
+      type: "inflictionApply",
+      frame: ctx.startFrame + frame,
+      seq: ctx.nextSeq(),
+      sourceId: ctx.sourceId,
+      targetId: ctx.targetId,
+      inflictionType,
+      inflictionStacks: Math.max(1, Math.floor(Number(stacks) || 1)),
     };
     return [ev];
   };
