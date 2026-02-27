@@ -10,6 +10,44 @@ import operatorsData from "../../data/operators";
 import { moveItem } from "../../shared/lib/utils";
 import placeholderImg from "../../assets/default/placeholder.jpg";
 
+type SeriesPoint = { frame: number; value: number };
+
+function buildLineAndAreaPath(params: {
+  points: SeriesPoint[];
+  maxFrame: number;
+  maxValue: number;
+  width: number;
+  height: number;
+}) {
+  const { points, maxFrame, maxValue, width, height } = params;
+  if (points.length === 0 || width <= 0 || height <= 0 || maxValue <= 0) {
+    return { linePath: "", areaPath: "" };
+  }
+
+  const toX = (frame: number) =>
+    Math.max(0, Math.min(width, (frame / maxFrame) * width));
+  const toY = (value: number) =>
+    Math.max(0, Math.min(height, height - (value / maxValue) * height));
+
+  const lineSegments = points.map((point, idx) => {
+    const x = toX(point.frame);
+    const y = toY(point.value);
+    return `${idx === 0 ? "M" : "L"}${x} ${y}`;
+  });
+
+  const lastPoint = points[points.length - 1];
+  const firstPoint = points[0];
+  const areaPath =
+    `${lineSegments.join(" ")} ` +
+    `L${toX(lastPoint.frame)} ${height} ` +
+    `L${toX(firstPoint.frame)} ${height} Z`;
+
+  return {
+    linePath: lineSegments.join(" "),
+    areaPath,
+  };
+}
+
 const SKILL_TABS: { key: SkillType; label: string }[] = [
   { key: "normalAttack", label: "Normal Attack" },
   { key: "normalSkill", label: "Normal Skill" },
@@ -51,6 +89,8 @@ export default function AxisEditor({
   const LEFT_GUTTER_WIDTH = 150;
   const AXIS_LENTH_IN_FRAMES = 3600;
   const UPPER_GUTTER_HEIGHT = 20;
+  const SP_TRACK_HEIGHT = 36;
+  const LANE_AREA_TOP = UPPER_GUTTER_HEIGHT + SP_TRACK_HEIGHT;
   const LANE_HEIGHT = 100;
   const SKILL_BOX_HEIGHT = 30;
   const BUFF_BAR_HEIGHT = 8;
@@ -99,15 +139,15 @@ export default function AxisEditor({
     const overAxis =
       localX >= 0 &&
       localX <= AXIS_LENTH_IN_FRAMES &&
-      localY >= 0 &&
-      localY <= 4 * LANE_HEIGHT;
+      localY >= LANE_AREA_TOP &&
+      localY <= LANE_AREA_TOP + 4 * LANE_HEIGHT;
 
     if (!overAxis)
       return { overAxis: false, laneIndex: null, startFrame: null };
 
     const laneIndex = Math.max(
       0,
-      Math.min(3, Math.floor(localY / LANE_HEIGHT)),
+      Math.min(3, Math.floor((localY - LANE_AREA_TOP) / LANE_HEIGHT)),
     );
     const startFrame = clampStart(Math.round(localX)); // 1px = 1 frame in your current coordinate model
 
@@ -469,7 +509,7 @@ export default function AxisEditor({
       <div
         className="relative mt-4 mb-4 overflow-hidden border border-zinc-700 rounded bg-zinc-900"
         style={{
-          height: UPPER_GUTTER_HEIGHT + RENDERED_LANE_COUNT * LANE_HEIGHT,
+          height: LANE_AREA_TOP + RENDERED_LANE_COUNT * LANE_HEIGHT,
         }}
       >
         {/* left gutter with lane labels */}
@@ -480,9 +520,9 @@ export default function AxisEditor({
           <div
             className="relative"
             style={{
-              top: UPPER_GUTTER_HEIGHT,
-              height: RENDERED_LANE_COUNT * LANE_HEIGHT,
-            }}
+            top: LANE_AREA_TOP,
+            height: RENDERED_LANE_COUNT * LANE_HEIGHT,
+          }}
           >
             {[0, 1, 2, 3, 4].map(laneIndex => {
               const opId = laneLabels[laneIndex];
@@ -526,7 +566,7 @@ export default function AxisEditor({
         <div
           className="absolute relative overflow-x-auto overflow-y-hidden"
           style={{
-            height: UPPER_GUTTER_HEIGHT + RENDERED_LANE_COUNT * LANE_HEIGHT,
+            height: LANE_AREA_TOP + RENDERED_LANE_COUNT * LANE_HEIGHT,
             left: LEFT_GUTTER_WIDTH,
             right: 0,
           }}
@@ -557,17 +597,100 @@ export default function AxisEditor({
             );
           })}
 
+          <div
+            className="absolute border-y border-zinc-700/70 bg-zinc-800/40"
+            style={{
+              top: UPPER_GUTTER_HEIGHT,
+              left: 0,
+              width: AXIS_LENTH_IN_FRAMES,
+              height: SP_TRACK_HEIGHT,
+            }}
+          >
+            {simRenderCache.teamSpSeries.length > 1 && simRenderCache.teamSpCap > 0 && (() => {
+              const { linePath, areaPath } = buildLineAndAreaPath({
+                points: simRenderCache.teamSpSeries.map(point => ({ frame: point.frame, value: point.value })),
+                maxFrame: AXIS_LENTH_IN_FRAMES,
+                maxValue: simRenderCache.teamSpCap,
+                width: AXIS_LENTH_IN_FRAMES,
+                height: SP_TRACK_HEIGHT,
+              });
+              return (
+                <svg
+                  className="absolute inset-0 pointer-events-none"
+                  width={AXIS_LENTH_IN_FRAMES}
+                  height={SP_TRACK_HEIGHT}
+                  viewBox={`0 0 ${AXIS_LENTH_IN_FRAMES} ${SP_TRACK_HEIGHT}`}
+                >
+                  <path d={areaPath} fill="rgba(250, 204, 21, 0.14)" />
+                  <path
+                    d={linePath}
+                    fill="none"
+                    stroke="rgba(253, 224, 71, 0.85)"
+                    strokeWidth={1.5}
+                  />
+                </svg>
+              );
+            })()}
+          </div>
+
           {/* skill boxes */}
           <div
             ref={axisAreaRef}
             className="absolute"
             style={{
               left: 0,
-              top: UPPER_GUTTER_HEIGHT,
+              top: LANE_AREA_TOP,
               width: AXIS_LENTH_IN_FRAMES,
               height: RENDERED_LANE_COUNT * LANE_HEIGHT,
             }}
           >
+            <svg
+              className="absolute inset-0 pointer-events-none"
+              width={AXIS_LENTH_IN_FRAMES}
+              height={RENDERED_LANE_COUNT * LANE_HEIGHT}
+              viewBox={`0 0 ${AXIS_LENTH_IN_FRAMES} ${RENDERED_LANE_COUNT * LANE_HEIGHT}`}
+            >
+              {effectiveTeamOperatorIds.map((operatorId, laneIndex) => {
+                const points = simRenderCache.ultimateEnergySeriesByOperatorId[
+                  operatorId
+                ];
+                const maxValue =
+                  simRenderCache.ultimateEnergyMaxByOperatorId[operatorId] ?? 0;
+                if (!points || points.length < 2 || maxValue <= 0) return null;
+
+                const laneTop = laneIndex * LANE_HEIGHT;
+                const chartTopPadding = 8;
+                const chartBottomPadding = 8;
+                const chartHeight =
+                  LANE_HEIGHT - chartTopPadding - chartBottomPadding;
+                const { linePath, areaPath } = buildLineAndAreaPath({
+                  points: points.map(point => ({
+                    frame: point.frame,
+                    value: point.value,
+                  })),
+                  maxFrame: AXIS_LENTH_IN_FRAMES,
+                  maxValue,
+                  width: AXIS_LENTH_IN_FRAMES,
+                  height: chartHeight,
+                });
+
+                return (
+                  <g
+                    key={`ue-series-${operatorId}`}
+                    transform={`translate(0 ${laneTop + chartTopPadding})`}
+                  >
+                    <path d={areaPath} fill="rgba(228, 228, 231, 0.12)" />
+                    <path
+                      d={linePath}
+                      fill="none"
+                      stroke="rgba(228, 228, 231, 0.72)"
+                      strokeWidth={1.25}
+                    />
+                  </g>
+                );
+              })}
+            </svg>
+
             {simRenderCache.bars.map(bar => {
               const laneIndex = toLaneIndex(bar.ownerId);
               const width = Math.max(2, bar.endFrame - bar.startFrame);
@@ -579,7 +702,7 @@ export default function AxisEditor({
               return (
                 <div key={bar.id}>
                   <div
-                    className={`absolute border ${bar.type === "buff" ? "bg-sky-500/50 border-sky-300" : "bg-rose-500/45 border-rose-300"}`}
+                    className={`absolute border ${bar.type === "buff" ? "bg-sky-500/35 border-sky-300/80" : "bg-rose-500/30 border-rose-300/80"}`}
                     style={{
                       left: bar.startFrame,
                       top,
@@ -671,7 +794,7 @@ export default function AxisEditor({
               return (
                 <div
                   key={box.id}
-                  className="absolute bg-gray-500 border border-gray-400"
+                  className="absolute bg-gray-500/75 border border-gray-300/80"
                   style={{
                     left: startFrame,
                     width: box.durationFrames,

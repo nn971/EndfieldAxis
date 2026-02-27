@@ -153,6 +153,13 @@ type SimWorldInit = {
   teamOperatorIds?: string[];
 };
 
+export type SimResourceSample = {
+  frame: number;
+  seq: number;
+  teamSp: number;
+  ultimateCurrentByOperatorId: Record<string, number>;
+};
+
 /** Larger seq happens first in the same frame */
 function sortEventsInPlace(queue: SimEvent[]): void {
   queue.sort((a, b) => {
@@ -178,6 +185,7 @@ export class SimWorld {
   public nowInFrames: number;
   public readonly log: SimLog = [];
   public readonly processedEvents: SimEvent[] = [];
+  public readonly resourceSamples: SimResourceSample[] = [];
 
   private queue: SimEvent[] = [];
   private seqCounter = 1;
@@ -227,6 +235,8 @@ export class SimWorld {
         max: cost,
       };
     }
+
+    this.captureResourceSample(this.nowInFrames, -1);
 
     if (init.futureEvents && init.futureEvents.length > 0) {
       // Clone to avoid accidental external mutation.
@@ -288,6 +298,25 @@ export class SimWorld {
     const ent = this.env.entitiesById[id];
     if (!ent) throw new Error(`Unknown entity id=${id}`);
     return ent;
+  }
+
+  private captureResourceSample(frame: number, seq: number): void {
+    const ultimateCurrentByOperatorId: Record<string, number> = {};
+    const sortedOperatorIds = Object.keys(
+      this.env.resources.ultimateByOperatorId,
+    ).sort((a, b) => a.localeCompare(b));
+
+    for (const operatorId of sortedOperatorIds) {
+      const state = this.env.resources.ultimateByOperatorId[operatorId];
+      ultimateCurrentByOperatorId[operatorId] = Number(state?.current ?? 0);
+    }
+
+    this.resourceSamples.push({
+      frame,
+      seq,
+      teamSp: Number(this.env.resources.teamSp.current),
+      ultimateCurrentByOperatorId,
+    });
   }
 
   // ----- Queue helpers -----
@@ -658,6 +687,8 @@ export class SimWorld {
       if (!ev) break;
 
       this.ops.advanceToFrame(ev.frame);
+      this.syncTeamSpRegen(ev.frame);
+      this.captureResourceSample(ev.frame, ev.seq + 0.5);
 
       this.currentEvent = ev;
 
@@ -1044,6 +1075,7 @@ export class SimWorld {
       }
 
       this.currentEvent = null;
+      this.captureResourceSample(ev.frame, ev.seq);
     }
 
     this.ops.log("sim", "SIM end");

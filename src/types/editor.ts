@@ -21,9 +21,19 @@ export interface SimRenderMarker {
   frame: number;
 }
 
+export interface SimRenderSeriesPoint {
+  frame: number;
+  seq: number;
+  value: number;
+}
+
 export interface SimRenderCache {
   bars: SimRenderBar[];
   markers: SimRenderMarker[];
+  teamSpSeries: SimRenderSeriesPoint[];
+  teamSpCap: number;
+  ultimateEnergySeriesByOperatorId: Record<string, SimRenderSeriesPoint[]>;
+  ultimateEnergyMaxByOperatorId: Record<string, number>;
   simEndFrame: number;
 }
 
@@ -31,6 +41,10 @@ export function makeEmptySimRenderCache(): SimRenderCache {
   return {
     bars: [],
     markers: [],
+    teamSpSeries: [],
+    teamSpCap: 0,
+    ultimateEnergySeriesByOperatorId: {},
+    ultimateEnergyMaxByOperatorId: {},
     simEndFrame: 0,
   };
 }

@@ -19,6 +19,7 @@ import OperatorsData from "../../data/operators";
 import { summarizeLog } from "../../simulator/log";
 import { loadSimRegistry } from "../../simulator/listeners/registry";
 import { SimWorld } from "../../simulator/simulator";
+import type { SimResourceSample } from "../../simulator/simulator";
 import { simRenderCacheReplaced } from "../solution/solutionSlice";
 import {
   INFLICTION_TYPE_LIST,
@@ -26,7 +27,12 @@ import {
   SimInfliction,
 } from "../../types/simulator/infliction";
 
-function buildSimRenderCache(events: SimEvent[]): SimRenderCache {
+function buildSimRenderCache(
+  events: SimEvent[],
+  resourceSamples: SimResourceSample[],
+  teamSpCap: number,
+  ultimateEnergyMaxByOperatorId: Record<string, number>,
+): SimRenderCache {
   const bars: SimRenderBar[] = [];
   const markers: SimRenderMarker[] = [];
 
@@ -122,7 +128,36 @@ function buildSimRenderCache(events: SimEvent[]): SimRenderCache {
     bars.push(active);
   }
 
-  return { bars, markers, simEndFrame };
+  const teamSpSeries = resourceSamples.map(sample => ({
+    frame: sample.frame,
+    seq: sample.seq,
+    value: sample.teamSp,
+  }));
+
+  const ultimateEnergySeriesByOperatorId: Record<
+    string,
+    { frame: number; seq: number; value: number }[]
+  > = {};
+
+  for (const operatorId of Object.keys(ultimateEnergyMaxByOperatorId)) {
+    ultimateEnergySeriesByOperatorId[operatorId] = resourceSamples.map(
+      sample => ({
+        frame: sample.frame,
+        seq: sample.seq,
+        value: Number(sample.ultimateCurrentByOperatorId[operatorId] ?? 0),
+      }),
+    );
+  }
+
+  return {
+    bars,
+    markers,
+    teamSpSeries,
+    teamSpCap,
+    ultimateEnergySeriesByOperatorId,
+    ultimateEnergyMaxByOperatorId,
+    simEndFrame,
+  };
 }
 
 function compileSkillBoxes(params: {
@@ -232,8 +267,20 @@ export default function SimPanel() {
     for (const ev of events) world.ops.schedule(ev);
 
     world.runSim();
+    const ultimateEnergyMaxByOperatorId = Object.fromEntries(
+      Object.entries(world.env.resources.ultimateByOperatorId).map(
+        ([operatorId, state]) => [operatorId, Number(state.max ?? 0)],
+      ),
+    );
     dispatch(
-      simRenderCacheReplaced(buildSimRenderCache(world.processedEvents)),
+      simRenderCacheReplaced(
+        buildSimRenderCache(
+          world.processedEvents,
+          world.resourceSamples,
+          Number(world.env.resources.teamSp.cap),
+          ultimateEnergyMaxByOperatorId,
+        ),
+      ),
     );
 
     const finalWorldDescription = JSON.stringify(world.env, null, 2);
@@ -273,6 +320,10 @@ export default function SimPanel() {
                 simRenderCacheReplaced({
                   bars: [],
                   markers: [],
+                  teamSpSeries: [],
+                  teamSpCap: 0,
+                  ultimateEnergySeriesByOperatorId: {},
+                  ultimateEnergyMaxByOperatorId: {},
                   simEndFrame: 0,
                 }),
               );
