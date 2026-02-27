@@ -58,6 +58,7 @@ class GrandVisionDef extends WeaponDef {
               seq: nextSeq(),
               sourceId,
               targetId: sourceId,
+              ownerId: sourceId,
               buffId: LONG_WISH_BUFF as any,
             },
             {
@@ -65,7 +66,7 @@ class GrandVisionDef extends WeaponDef {
               type: "buffRemove",
               frame: ev.frame,
               seq: nextSeq(),
-              sourceId,
+              ownerId: sourceId,
               buffId: LONG_WISH_BUFF as any,
             },
           ];
@@ -79,6 +80,7 @@ class GrandVisionDef extends WeaponDef {
             seq: nextSeq(),
             sourceId,
             targetId: sourceId,
+            ownerId: sourceId,
             buffId: LONG_WISH_BUFF as any,
           },
         ];
@@ -115,6 +117,7 @@ class GrandVisionDef extends WeaponDef {
             seq: nextSeq(),
             sourceId,
             targetId: sourceId,
+            ownerId: sourceId,
             buffId: LONG_WISH_BUFF as any,
           },
         ];
@@ -148,7 +151,7 @@ class GrandVisionDef extends WeaponDef {
             type: "buffRemove",
             frame: ev.frame,
             seq: nextSeq(),
-            sourceId,
+            ownerId: sourceId,
             buffId: LONG_WISH_BUFF as any,
           },
         ];

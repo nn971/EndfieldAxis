@@ -46,6 +46,7 @@ class SunderingSteelDef extends WeaponDef {
             seq: nextSeq(),
             sourceId: sourceId,
             targetId: sourceId,
+            ownerId: sourceId,
             buffId: BONUS_BUFF as any,
           },
         ];

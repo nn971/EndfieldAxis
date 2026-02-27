@@ -117,6 +117,7 @@ export function applyBuff(
       seq: ctx.nextSeq(),
       sourceId: ctx.sourceId,
       targetId: ctx.targetId,
+      ownerId: ctx.targetId,
       buffId,
       isForced: opts?.isForced,
     };
@@ -186,7 +187,7 @@ export function artsHitByRank(
         frame: ctx.startFrame + frame,
         seq: ctx.nextSeq(),
         sourceId: ctx.sourceId,
-        targetId: ctx.targetId,
+        ownerId: ctx.targetId,
         inflictionType: opts.dmgType as InflictionType,
         inflictionStacks: 1,
       } satisfies SimEvent);

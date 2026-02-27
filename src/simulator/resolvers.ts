@@ -1,4 +1,3 @@
-import { makeId } from "../shared/lib/id";
 import type { SimEntityId, SimEvent } from "../types/simulator/simulator";
 import {
   type SimStatusType,
@@ -44,35 +43,14 @@ import {
   CORROSION_MIN_RESISTANCE_BASE,
   CORROSION_MIN_RESISTANCE_PER_STACK,
 } from "../data/buffs/reactions/corrosion";
+import { makeSimEventId } from "../shared/lib/utils";
 
 // TODO: come up with a way to configure this
 export const DEFAULT_INFLICTION_DURATION_FRAMES = 1800;
 
-const EVENT_PREFIX = "SimEvent_";
-function makeEventId() {
-  return makeId(EVENT_PREFIX);
-}
-
-function scheduleApplyArtsInfliction(
-  world: SimWorld,
-  sourceId: SimEntityId,
-  targetId: SimEntityId,
-  inflictionType: ArtsInflictionType,
-  ref?: string,
-): void {
-  const id = makeEventId();
-  world.ops.schedule({
-    id: id,
-    type: "inflictionApply",
-    frame: world.read.nowInFrames,
-    seq: world.ops.nextSeq(),
-    sourceId,
-    targetId,
-    inflictionType,
-    inflictionStacks: 1,
-    ref,
-  } as SimEvent);
-}
+export const ARTS_BURST_DELAY_FRAMES = 12;
+export const ARTS_BURST_BASE_MUL = 0.55;
+export const ARTS_BURST_PER_STACK_MUL = 0.25;
 
 function scheduleApplyVulnerable(
   world: SimWorld,
@@ -80,16 +58,33 @@ function scheduleApplyVulnerable(
   targetId: SimEntityId,
   ref?: string,
 ): void {
-  const id = makeEventId();
+  const id = makeSimEventId();
   world.ops.schedule({
     id: id,
     type: "inflictionApply",
     frame: world.read.nowInFrames,
     seq: world.ops.nextSeq(),
     sourceId,
-    targetId,
+    ownerId: targetId,
     inflictionType: "vulnerable",
     inflictionStacks: 1,
+    ref,
+  } as SimEvent);
+}
+
+function scheduleInflictionRemove(
+  world: SimWorld,
+  ownerId: SimEntityId,
+  inflictionType: InflictionType,
+  ref?: string,
+): void {
+  world.ops.schedule({
+    id: makeSimEventId(),
+    type: "inflictionRemove",
+    frame: world.read.nowInFrames,
+    seq: world.ops.nextSeq(),
+    ownerId,
+    inflictionType,
     ref,
   } as SimEvent);
 }
@@ -140,49 +135,6 @@ function computePhysicalStatusSpecialMul(
   return finalMul;
 }
 
-/** WARNING: should not in use */
-// function scheduleInflictionExpire(
-//   world: SimWorld,
-//   targetId: SimEntityId,
-//   inflictionType: InflictionType,
-// ): void {
-//   world.ops.schedule({
-//     id: makeEventId(),
-//     type: "inflictionExpire",
-//     frame: world.read.nowInFrames + DEFAULT_INFLICTION_DURATION_FRAMES,
-//     seq: world.ops.nextSeq(),
-//     sourceId: targetId,
-//     targetId,
-//     inflictionType,
-//     ref: "auto",
-//   } as SimEvent);
-// }
-
-function scheduleApplyInfliction(
-  world: SimWorld,
-  sourceId: SimEntityId,
-  targetId: SimEntityId,
-  inflictionType: InflictionType,
-  ref?: string,
-): void {
-  if (isArtsInfliction(inflictionType)) {
-    scheduleApplyArtsInfliction(world, sourceId, targetId, inflictionType, ref);
-    return;
-  }
-
-  scheduleApplyVulnerable(world, sourceId, targetId, ref);
-  // world.ops.schedule({
-  //   id: makeEventId(),
-  //   type: "inflictionExpire",
-  //   frame: world.read.nowInFrames + DEFAULT_INFLICTION_DURATION_FRAMES,
-  //   seq: world.ops.nextSeq(),
-  //   sourceId: targetId,
-  //   targetId,
-  //   inflictionType,
-  //   ref: id,
-  // } as SimEvent);
-}
-
 function scheduleBuffExpire(
   world: SimWorld,
   targetId: SimEntityId,
@@ -202,11 +154,11 @@ function scheduleBuffExpire(
     return;
   }
   world.ops.schedule({
-    id: makeEventId(),
+    id: makeSimEventId(),
     type: "buffExpire",
     frame: world.read.nowInFrames + duration,
     seq: world.ops.nextSeq(),
-    sourceId: targetId,
+    ownerId: targetId,
     buffId: buffId,
     ref: "auto",
   } as SimEvent);
@@ -242,7 +194,7 @@ export function resolveStatusApplication(
       // Has vulnerable: add 1 stack (cap 4) and trigger Lift damage.
       // Schedule Lift damage as a hit event so it can interleave with other same-frame effects.
       self.ops.schedule({
-        id: makeEventId(),
+        id: makeSimEventId(),
         type: "hit",
         frame: self.read.nowInFrames,
         seq: self.ops.nextSeq(),
@@ -260,7 +212,7 @@ export function resolveStatusApplication(
       if (current <= 0) break;
 
       self.ops.schedule({
-        id: makeEventId(),
+        id: makeSimEventId(),
         type: "hit",
         frame: self.read.nowInFrames,
         seq: self.ops.nextSeq(),
@@ -290,7 +242,7 @@ export function resolveStatusApplication(
 
       // Schedule crush burst damage as a hit event so it can interleave with other same-frame effects.
       self.ops.schedule({
-        id: makeEventId(),
+        id: makeSimEventId(),
         type: "hit",
         frame: self.read.nowInFrames,
         seq: self.ops.nextSeq(),
@@ -321,7 +273,7 @@ export function resolveStatusApplication(
       triggerPlugins();
 
       self.ops.schedule({
-        id: makeEventId(),
+        id: makeSimEventId(),
         type: "hit",
         frame: self.read.nowInFrames,
         seq: self.ops.nextSeq(),
@@ -356,7 +308,7 @@ export function resolveStatusApplication(
     //   `${statusType}: vulnerable stacks ${current} -> ${after} (target=${(target as any).name})`,
     // );
   } else if (shouldRemoveVulnerable) {
-    self.ops.removeInfliction(targetId, "vulnerable");
+    scheduleInflictionRemove(self, targetId, "vulnerable", ev.id);
 
     self.ops.log(
       "buff",
@@ -370,24 +322,24 @@ export function resolveBuffApplication(
   ev: Extract<SimEvent, { type: "buffApply" }>,
 ) {
   const sourceId = ev.sourceId ?? null;
-  const targetId = ev.targetId;
+  const ownerId = ev.ownerId;
   const buffId = ev.buffId;
 
   const source = sourceId ? self.read.getEntity(sourceId) : null;
 
-  const target = self.read.getEntity(targetId);
-  if (!target) throw new Error(`Unknown target with targetId=${targetId}`);
+  const target = self.read.getEntity(ownerId);
+  if (!target) throw new Error(`Unknown target with targetId=${ownerId}`);
 
   const existing = (target as any).buffs?.[buffId];
 
   if (buffId === "buff.crystal") {
     const had = Boolean(existing);
-    self.ops.upsertBuff(targetId, {
+    self.ops.upsertBuff(ownerId, {
       id: buffId,
       lastApplyFrame: self.read.nowInFrames,
       stacks: 1,
     } as SimBuff);
-    scheduleBuffExpire(self, targetId, buffId);
+    scheduleBuffExpire(self, ownerId, buffId);
     self.ops.log(
       "buff",
       `BUFF ${buffId} ${had ? "refresh" : "apply"} (source=${(source as any)?.name ?? "system"} target=${(target as any).name})`,
@@ -415,7 +367,7 @@ export function resolveBuffApplication(
   const afterStacks = Math.min(maxStacks, beforeStacks + 1);
 
   const had = Boolean(existing);
-  self.ops.upsertBuff(targetId, {
+  self.ops.upsertBuff(ownerId, {
     id: buffId,
     lastApplyFrame: self.read.nowInFrames,
     stacks: afterStacks,
@@ -424,7 +376,7 @@ export function resolveBuffApplication(
         ? (existing as any).meta
         : ((ev as any).meta ?? (existing as any)?.meta),
   } as SimBuff);
-  scheduleBuffExpire(self, targetId, buffId);
+  scheduleBuffExpire(self, ownerId, buffId);
 
   if (maxStacks > 1) {
     self.ops.log(
@@ -446,8 +398,8 @@ export function resolveBuffExpiration(
 ) {
   // return false if expiration event is stale
 
-  const ent = self.read.getEntity(ev.sourceId);
-  if (!ent) throw new Error(`Unknown entity with entityId ${ev.sourceId}`);
+  const ent = self.read.getEntity(ev.ownerId);
+  if (!ent) throw new Error(`Unknown entity with entityId ${ev.ownerId}`);
 
   const buffId = ev.buffId;
   const buff = (ent as any).buffs?.[buffId];
@@ -480,15 +432,15 @@ export function resolveInflictionApplication(
   const source = self.read.getEntity(ev.sourceId ?? null);
   if (!source) throw new Error(`Unknown source with sourceId=${ev.sourceId}`);
 
-  const target = self.read.getEntity(ev.targetId ?? null);
-  if (!target) throw new Error(`Unknown target with targetId=${ev.targetId}`);
+  const owner = self.read.getEntity(ev.ownerId ?? null);
+  if (!owner) throw new Error(`Unknown target with targetId=${ev.ownerId}`);
 
   if (isArtsInflictionType(ev.inflictionType)) {
     const artsType = ev.inflictionType;
     const existingStacksByType = Object.fromEntries(
       ARTS_INFLICTION_TYPE_LIST.map(type => [
         type,
-        Number(target.inflictions[type].stacks ?? 0),
+        Number(owner.inflictions[type].stacks ?? 0),
       ]),
     ) as Record<ArtsInflictionType, number>;
 
@@ -503,7 +455,7 @@ export function resolveInflictionApplication(
 
     if (nonSameTypeStacks > 0) {
       for (const type of ARTS_INFLICTION_TYPE_LIST) {
-        self.ops.removeInfliction(target.id, type);
+        scheduleInflictionRemove(self, owner.id, type, ev.id);
       }
 
       let reactionBuffId: BuffId;
@@ -552,85 +504,73 @@ export function resolveInflictionApplication(
       }
 
       self.ops.schedule({
-        id: makeEventId(),
+        id: makeSimEventId(),
         type: "hit",
         frame: self.nowInFrames,
         seq: self.ops.nextSeq(),
         sourceId: source.id,
-        targetId: target.id,
+        targetId: owner.id,
         damageType: artsType,
         dmgMultiplier:
           initialHitBaseMul + consumedArtsStacks * initialHitPerStackMul,
         ref: ev.id,
       } as SimEvent);
 
-      self.ops.upsertBuff(target.id, {
-        id: reactionBuffId,
-        lastApplyFrame: self.read.nowInFrames,
-        stacks: buffStacks,
-        meta: buffMeta,
-      } as SimBuff);
-
-      scheduleBuffExpire(self, target.id, reactionBuffId);
-
-      const buffApplyEvent = {
-        id: makeEventId(),
+      self.ops.schedule({
+        id: makeSimEventId(),
         type: "buffApply",
         frame: ev.frame,
         seq: self.ops.nextSeq(),
         sourceId: source.id,
-        targetId: target.id,
+        ownerId: owner.id,
         buffId: reactionBuffId,
         isForced: false,
         ref: ev.id,
-      } as Extract<SimEvent, { type: "buffApply" }>;
-      const onBuffApplySpawned = self.registry.runOnBuffApply({
-        read: self.read,
-        ev: buffApplyEvent,
-        sourceId: source.id,
-        targetId: target.id,
-        nextSeq: self.ops.nextSeq,
-        makeEventId: () => makeId("SimEvent_"),
-      });
-      for (const sev of onBuffApplySpawned) self.ops.schedule(sev);
+      } as Extract<SimEvent, { type: "buffApply" }>);
+
+      scheduleBuffExpire(self, owner.id, reactionBuffId);
 
       self.ops.log(
         "buff",
-        `${reactionBuffId} triggered on ${(target as any).name}: consumed arts stacks=${consumedArtsStacks}`,
+        `${reactionBuffId} triggered on ${(owner as any).name}: consumed arts stacks=${consumedArtsStacks}`,
+      );
+      self.ops.log(
+        "buff",
+        `Arts Reaction consumed inflictions on ${(owner as any).name}`,
       );
 
       return;
     }
 
     const current = currentSameTypeStacks;
-    self.ops.addInfliction(target.id, ev.inflictionType, ev.inflictionStacks);
-    const after = target.inflictions[ev.inflictionType].stacks;
+    self.ops.addInfliction(owner.id, ev.inflictionType, ev.inflictionStacks);
+    const after = owner.inflictions[ev.inflictionType].stacks;
     self.ops.log(
       "buff",
-      `${ev.inflictionType} infliction stacks ${current} -> ${after} (target=${(target as any).name})`,
+      `${ev.inflictionType} infliction stacks ${current} -> ${after} (target=${(owner as any).name})`,
     );
 
     const isBurstTrigger = current > 0;
     if (isBurstTrigger) {
       self.ops.schedule({
-        id: makeEventId(),
+        id: makeSimEventId(),
         type: "hit",
         frame: self.read.nowInFrames + ARTS_BURST_DELAY_FRAMES,
         seq: self.ops.nextSeq(),
         sourceId: source.id,
-        targetId: target.id,
+        targetId: owner.id,
         damageType: artsType,
         dmgMultiplier: ARTS_BURST_BASE_MUL + after * ARTS_BURST_PER_STACK_MUL,
         ref: ev.id,
       } as SimEvent);
     }
   } else {
-    const current = target.inflictions[ev.inflictionType].stacks;
-    self.ops.addInfliction(target.id, ev.inflictionType, ev.inflictionStacks);
-    const after = target.inflictions[ev.inflictionType].stacks;
+    const current = owner.inflictions[ev.inflictionType].stacks;
+    self.ops.addInfliction(owner.id, ev.inflictionType, ev.inflictionStacks);
+    const after = owner.inflictions[ev.inflictionType].stacks;
     self.ops.log(
       "buff",
-      `${ev.inflictionType} infliction stacks ${current} -> ${after} (target=${(target as any).name})`,
+      `${ev.inflictionType} infliction stacks ${current} -> ${after} (target=${(owner as any).name})`,
     );
   }
 
@@ -638,18 +578,18 @@ export function resolveInflictionApplication(
     read: self.read,
     ev,
     sourceId: source.id,
-    targetId: target.id,
+    targetId: owner.id,
     nextSeq: self.ops.nextSeq,
-    makeEventId: () => makeId("SimEvent_"),
+    makeEventId: makeSimEventId,
   });
   for (const sev of spawned) self.ops.schedule(sev);
 
   self.ops.schedule({
-    id: makeEventId(),
+    id: makeSimEventId(),
     type: "inflictionExpire",
     frame: self.read.nowInFrames + DEFAULT_INFLICTION_DURATION_FRAMES,
     seq: self.ops.nextSeq(),
-    sourceId: target.id,
+    ownerId: owner.id,
     targetId: undefined,
     inflictionType: ev.inflictionType,
     ref: ev.id,
@@ -662,8 +602,8 @@ export function resolveInflictionExpiration(
 ) {
   // return false if expiration event is stale
 
-  const ent = self.read.getEntity(ev.sourceId);
-  if (!ent) throw new Error(`Unknown entity with entityId ${ev.sourceId}`);
+  const ent = self.read.getEntity(ev.ownerId);
+  if (!ent) throw new Error(`Unknown entity with entityId ${ev.ownerId}`);
 
   const inflictionType = ev.inflictionType;
   const inf = (ent as any).inflictions?.[inflictionType];
@@ -674,7 +614,7 @@ export function resolveInflictionExpiration(
     self.read.nowInFrames >=
     inf.lastApplyFrame + DEFAULT_INFLICTION_DURATION_FRAMES
   ) {
-    self.ops.removeInfliction(ent.id, inflictionType);
+    scheduleInflictionRemove(self, ent.id, inflictionType, ev.id);
     self.ops.log(
       "buff",
       `INFLICTION ${inflictionType} expire (entity=${(ent as any).name})`,
@@ -683,6 +623,10 @@ export function resolveInflictionExpiration(
   }
   return false;
 }
-export const ARTS_BURST_DELAY_FRAMES = 12;
-export const ARTS_BURST_BASE_MUL = 0.55;
-export const ARTS_BURST_PER_STACK_MUL = 0.25;
+
+export function resolveInflictionRemoval(
+  self: SimWorld,
+  ev: Extract<SimEvent, { type: "inflictionRemove" }>,
+) {
+  self.ops.removeInfliction(ev.ownerId, ev.inflictionType);
+}

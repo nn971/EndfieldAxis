@@ -22,8 +22,7 @@ import type {
 } from "./damage/damageModel";
 import { pushLog, type SimLog, type SimLogEntryCat } from "./log";
 import { SimRegistry } from "./listeners/registry";
-
-import { makeId } from "../shared/lib/id";
+import { makeSimEventId } from "../shared/lib/utils";
 
 import { buildDamageContext } from "./damage/damageEngine";
 // import { dispatchAfterHit } from "./listeners/handlers";
@@ -36,6 +35,7 @@ import {
   resolveBuffApplication,
   resolveBuffExpiration,
   resolveInflictionExpiration,
+  resolveInflictionRemoval,
   resolveStatusApplication,
   resolveInflictionApplication,
 } from "./resolvers";
@@ -60,12 +60,7 @@ import {
  * - world.ops: intended mutation access (the only place that should mutate)
  */
 
-const EVENT_PREFIX = "SimEvent_";
 export const COMBO_AVAILABLE_WINDOW_FRAMES = 300;
-
-function makeEventId() {
-  return makeId(EVENT_PREFIX);
-}
 
 export type SimRead = {
   readonly nowInFrames: number;
@@ -140,6 +135,9 @@ type SimResolvers = {
   ) => void;
   resolveInflictionExpiration: (
     ev: Extract<SimEvent, { type: "inflictionExpire" }>,
+  ) => void;
+  resolveInflictionRemoval: (
+    ev: Extract<SimEvent, { type: "inflictionRemove" }>,
   ) => void;
 };
 
@@ -288,6 +286,7 @@ export class SimWorld {
       resolveInflictionApplication: ev =>
         resolveInflictionApplication(self, ev),
       resolveInflictionExpiration: ev => resolveInflictionExpiration(self, ev),
+      resolveInflictionRemoval: ev => resolveInflictionRemoval(self, ev),
       resolveStatusApplication: (triggerPlugins, ev) =>
         resolveStatusApplication(self, triggerPlugins, ev),
     };
@@ -419,7 +418,7 @@ export class SimWorld {
     frame: number,
   ): void {
     this.ops.schedule({
-      id: makeEventId(),
+      id: makeSimEventId(),
       type: "comboTriggerElapse",
       frame: frame + COMBO_AVAILABLE_WINDOW_FRAMES,
       seq: this.ops.nextSeq(),
@@ -597,7 +596,7 @@ export class SimWorld {
 
     if (cooldownFrames > 0) {
       this.ops.schedule({
-        id: makeEventId(),
+        id: makeSimEventId(),
         type: "comboCooldownEnd",
         frame: ev.frame + cooldownFrames,
         seq: this.ops.nextSeq(),
@@ -708,15 +707,14 @@ export class SimWorld {
 
       this.processedEvents.push(ev);
 
-      const source = ev.sourceId
-        ? (this.read.getEntity(ev.sourceId) as SimEntity)
-        : null;
-      const target = ev.targetId
-        ? (this.read.getEntity(ev.targetId) as SimEntity)
-        : null;
-
       switch (ev.type) {
         case "castStart": {
+          const source = ev.sourceId
+            ? (this.read.getEntity(ev.sourceId) as SimEntity)
+            : null;
+          const target = ev.targetId
+            ? (this.read.getEntity(ev.targetId) as SimEntity)
+            : null;
           const comboLegal = ev.comboValidation?.isLegal ?? true;
           const comboReason = ev.comboValidation?.reason;
           if (!comboLegal) {
@@ -762,13 +760,19 @@ export class SimWorld {
             sourceId: ev.sourceId,
             targetId: ev.targetId,
             nextSeq: this.ops.nextSeq,
-            makeEventId: () => makeId("SimEvent_"),
+            makeEventId: makeSimEventId,
           });
           for (const sev of spawned) this.ops.schedule(sev);
           break;
         }
 
         case "castEnd": {
+          const source = ev.sourceId
+            ? (this.read.getEntity(ev.sourceId) as SimEntity)
+            : null;
+          const target = ev.targetId
+            ? (this.read.getEntity(ev.targetId) as SimEntity)
+            : null;
           this.ops.log(
             "act",
             `"${source?.name}" finished casting "${ev.skillType}" on "${target?.name}"`,
@@ -780,13 +784,19 @@ export class SimWorld {
             sourceId: ev.sourceId,
             targetId: ev.targetId,
             nextSeq: this.ops.nextSeq,
-            makeEventId: () => makeId("SimEvent_"),
+            makeEventId: makeSimEventId,
           });
           for (const sev of spawned) this.ops.schedule(sev);
           break;
         }
 
         case "hit": {
+          const source = ev.sourceId
+            ? (this.read.getEntity(ev.sourceId) as SimEntity)
+            : null;
+          const target = ev.targetId
+            ? (this.read.getEntity(ev.targetId) as SimEntity)
+            : null;
           if (!target) throw new Error(`undefined target`);
           if (!source) throw new Error(`undefined source`);
 
@@ -872,13 +882,19 @@ export class SimWorld {
             sourceId: source.id,
             targetId: target.id,
             nextSeq: this.ops.nextSeq,
-            makeEventId: () => makeId("SimEvent_"),
+            makeEventId: makeSimEventId,
           });
           for (const sev of spawned) this.ops.schedule(sev);
           break;
         }
 
         case "statusApply": {
+          const source = ev.sourceId
+            ? (this.read.getEntity(ev.sourceId) as SimEntity)
+            : null;
+          const target = ev.targetId
+            ? (this.read.getEntity(ev.targetId) as SimEntity)
+            : null;
           if (!target) throw new Error(`undefined target`);
           if (!source) throw new Error(`undefined source`);
           const triggerPlugins = () => {
@@ -888,7 +904,7 @@ export class SimWorld {
               sourceId: source.id,
               targetId: target.id,
               nextSeq: this.ops.nextSeq,
-              makeEventId: () => makeId("SimEvent_"),
+              makeEventId: makeSimEventId,
             });
 
             for (const sev of spawned) {
@@ -902,26 +918,30 @@ export class SimWorld {
         }
 
         case "buffApply": {
-          if (!target) throw new Error(`undefined target`);
+          const source = ev.sourceId
+            ? (this.read.getEntity(ev.sourceId) as SimEntity)
+            : null;
+          const owner = ev.ownerId
+            ? (this.read.getEntity(ev.ownerId) as SimEntity)
+            : null;
+          if (!owner) throw new Error(`undefined target`);
           this.resolvers.resolveBuffApplication(ev);
 
           const spawned = this.registry.runOnBuffApply({
             read: this.read,
             ev: ev,
             sourceId: source?.id,
-            targetId: target.id,
+            targetId: owner.id,
             nextSeq: this.ops.nextSeq,
-            makeEventId: () => makeId("SimEvent_"),
+            makeEventId: makeSimEventId,
           });
           for (const sev of spawned) this.ops.schedule(sev);
           break;
         }
 
         case "buffRemove": {
-          if (!ev.sourceId)
-            throw new Error(`event with type buffRemove but no sourceId`);
-          const owner = this.read.getEntity(ev.sourceId);
-          this.ops.removeBuff(ev.sourceId, ev.buffId);
+          const owner = this.read.getEntity(ev.ownerId);
+          this.ops.removeBuff(ev.ownerId, ev.buffId);
           this.ops.log(
             "buff",
             `BUFF ${ev.buffId} removed (entity=${(owner as any).name})`,
@@ -930,18 +950,15 @@ export class SimWorld {
           const spawned = this.registry.runOnBuffConsumed({
             read: this.read,
             ev,
-            sourceId: ev.sourceId,
+            sourceId: ev.ownerId,
             nextSeq: this.ops.nextSeq,
-            makeEventId: () => makeId("SimEvent_"),
+            makeEventId: makeSimEventId,
           });
           for (const sev of spawned) this.ops.schedule(sev);
           break;
         }
 
         case "buffExpire": {
-          // sourceId holds the entity who owns the buff.
-          if (!ev.sourceId)
-            throw new Error(`event with type buffExpire but no sourceId`);
           this.resolvers.resolveBuffExpiration(ev);
           break;
         }
@@ -952,9 +969,14 @@ export class SimWorld {
         }
 
         case "inflictionExpire": {
-          if (!ev.sourceId)
+          if (!ev.ownerId)
             throw new Error(`event with type inflictionExpire but no sourceId`);
           this.resolvers.resolveInflictionExpiration(ev);
+          break;
+        }
+
+        case "inflictionRemove": {
+          this.resolvers.resolveInflictionRemoval(ev);
           break;
         }
 
@@ -978,7 +1000,7 @@ export class SimWorld {
           );
           if (tickMultiplier > 0) {
             this.ops.schedule({
-              id: makeEventId(),
+              id: makeSimEventId(),
               type: "hit",
               frame: ev.frame,
               seq: this.ops.nextSeq(),
@@ -991,7 +1013,7 @@ export class SimWorld {
           }
 
           this.ops.schedule({
-            id: makeEventId(),
+            id: makeSimEventId(),
             type: "reactionTick",
             frame: ev.frame + COMBUSTION_DOT_INTERVAL_FRAMES,
             seq: this.ops.nextSeq(),

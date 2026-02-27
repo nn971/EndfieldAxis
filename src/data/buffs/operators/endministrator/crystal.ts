@@ -33,7 +33,7 @@ function spawnCrystalConsumeEvents(params: {
       type: "buffRemove",
       frame: params.frame,
       seq: params.nextSeq(),
-      sourceId: params.targetId,
+      ownerId: params.targetId,
       buffId: "buff.crystal" as any,
       ref: params.ref,
     },

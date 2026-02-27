@@ -15,6 +15,7 @@ export type SimEventType =
   | "statusApply" // apply a status
   | "inflictionApply" // apply an infliction
   | "inflictionExpire" // expire an infliction, either by duration or by dispel
+  | "inflictionRemove" // remove an infliction immediately (e.g. reaction consume)
   | "buffApply" // apply a timed buff/debuff (e.g. enemy crystal)
   | "buffRemove" // remove a buff immediately (e.g. crystal consumed)
   | "buffExpire" // expire a timed buff/debuff
@@ -35,8 +36,8 @@ export type SimEventBase = {
   ref?: string | null;
   // org?: string | null;
 
-  sourceId?: SimEntityId;
-  targetId?: SimEntityId;
+  // sourceId?: SimEntityId;
+  // targetId?: SimEntityId;
 };
 
 export type SimEvent =
@@ -74,32 +75,37 @@ export type SimEvent =
   | (SimEventBase & {
       type: "inflictionApply";
       sourceId: SimEntityId;
-      targetId: SimEntityId;
+      ownerId: SimEntityId;
       inflictionType: InflictionType;
       inflictionStacks: number;
     })
   | (SimEventBase & {
       type: "inflictionExpire";
-      sourceId: SimEntityId;
+      ownerId: SimEntityId;
       inflictionType: InflictionType;
       ref: string;
     })
   | (SimEventBase & {
+      type: "inflictionRemove";
+      ownerId: SimEntityId;
+      inflictionType: InflictionType;
+    })
+  | (SimEventBase & {
       type: "buffApply";
       sourceId?: SimEntityId;
-      targetId: SimEntityId;
+      ownerId: SimEntityId;
       buffId: BuffId;
       isForced?: boolean;
     })
   | (SimEventBase & {
       type: "buffRemove";
       /** entity who owns the buff */
-      sourceId: SimEntityId;
+      ownerId: SimEntityId;
       buffId: BuffId;
     })
   | (SimEventBase & {
       type: "buffExpire";
-      sourceId: SimEntityId; // entity who owns the buff
+      ownerId: SimEntityId; // entity who owns the buff
       buffId: BuffId;
       ref: string;
     })
@@ -127,7 +133,6 @@ export type SimEvent =
   | (SimEventBase & {
       type: "spReturn";
       sourceId: SimEntityId;
-      targetId?: SimEntityId;
       amount: number;
     });
 

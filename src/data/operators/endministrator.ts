@@ -120,7 +120,7 @@ class EndministratorDef extends OperatorDef {
       fn: ({ read, ev, sourceId, nextSeq, makeEventId }) => {
         if (sourceId === this.id) return [];
         const source = read.getEntity(sourceId);
-        if (source.type !== "operator") return [];
+        if (!source || source.type !== "operator") return [];
 
         const parent = ev.ref ? read.getEvent(ev.ref) : null;
         const isComboHit =
@@ -165,6 +165,7 @@ class EndministratorDef extends OperatorDef {
             seq: nextSeq(),
             sourceId: this.id,
             targetId: this.id,
+            ownerId: this.id,
             buffId: buffId as any,
             ref: ev.id,
           },
@@ -176,7 +177,7 @@ class EndministratorDef extends OperatorDef {
       buffId: "buff.endministrator.talent1.atkInc" as any,
       id: "operator.endministrator.potential2.shareAtkBuff.high",
       fn: ({ read, ev, nextSeq, makeEventId }) => {
-        if (ev.targetId !== this.id) return [];
+        if (ev.ownerId !== this.id) return [];
         const build = read.getBuild(this.id);
         if (Number(build?.potentialRank ?? 0) < 2) return [];
 
@@ -189,6 +190,7 @@ class EndministratorDef extends OperatorDef {
             seq: nextSeq(),
             sourceId: this.id,
             targetId: e.id,
+            ownerId: e.id,
             buffId: "buff.endministrator.potential2.teamAtkShare.high" as any,
             ref: ev.id,
           }));
@@ -199,7 +201,7 @@ class EndministratorDef extends OperatorDef {
       buffId: "buff.endministrator.talent1.atkInc.low" as any,
       id: "operator.endministrator.potential2.shareAtkBuff.low",
       fn: ({ read, ev, nextSeq, makeEventId }) => {
-        if (ev.targetId !== this.id) return [];
+        if (ev.ownerId !== this.id) return [];
         const build = read.getBuild(this.id);
         if (Number(build?.potentialRank ?? 0) < 2) return [];
 
@@ -212,6 +214,7 @@ class EndministratorDef extends OperatorDef {
             seq: nextSeq(),
             sourceId: this.id,
             targetId: e.id,
+            ownerId: e.id,
             buffId: "buff.endministrator.potential2.teamAtkShare.low" as any,
             ref: ev.id,
           }));

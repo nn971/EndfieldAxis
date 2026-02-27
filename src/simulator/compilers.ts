@@ -1,13 +1,8 @@
 import operatorsData from "../data/operators";
-import { makeId } from "../shared/lib/id";
 import { SkillType } from "../data/operators/OperatorDef";
 import type { SimEvent } from "../types/simulator/simulator";
 import type { OperatorBuild } from "../types/operator";
-
-const EVENT_PREFIX = "SimEvent_";
-function makeEventId() {
-  return makeId(EVENT_PREFIX);
-}
+import { makeSimEventId } from "../shared/lib/utils";
 
 export function compileSkillCast(params: {
   sourceId: string;
@@ -43,7 +38,7 @@ export function compileSkillCast(params: {
   const events: SimEvent[] = [];
 
   // event for cast.start
-  const startEventId = makeEventId();
+  const startEventId = makeSimEventId();
   events.push({
     id: startEventId,
     type: "castStart",
@@ -58,7 +53,11 @@ export function compileSkillCast(params: {
 
   // events for skill ops
   // Here we need to reverse the order because larger seq happens earlier.
-  for (const step of skill?.timeline?.reverse() ?? []) {
+  if (!skill?.timeline)
+    throw new Error(
+      `no timeline for skill ${skillType} of operator ${operator.name}`,
+    );
+  for (const step of [...skill?.timeline].reverse() ?? []) {
     if (typeof step !== "function") {
       throw new Error(
         `Skill timeline step must be function. Found: ${JSON.stringify(step)}`,
@@ -71,7 +70,7 @@ export function compileSkillCast(params: {
       skillType,
       sourceBuild: buildByOperatorId?.[sourceId],
       nextSeq,
-      makeEventId,
+      makeEventId: makeSimEventId,
     });
     for (const ev of (eventsToAdd ?? []) as SimEvent[]) {
       // Link timeline events to the castStart event so downstream logic can
@@ -84,7 +83,7 @@ export function compileSkillCast(params: {
 
   // event for cast.end
   events.push({
-    id: makeEventId(),
+    id: makeSimEventId(),
     type: "castEnd",
     frame: startFrame + skill.durationFrames,
     seq: nextSeq(),

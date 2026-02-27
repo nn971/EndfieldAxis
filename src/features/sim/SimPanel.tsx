@@ -63,7 +63,7 @@ function buildSimRenderCache(
     }
 
     if (ev.type === "buffApply") {
-      const ownerId = ev.targetId;
+      const ownerId = ev.ownerId;
       const key = `buff:${ownerId}:${ev.buffId}`;
       const active = activeByKey.get(key);
       if (active) {
@@ -91,13 +91,12 @@ function buildSimRenderCache(
     }
 
     if (ev.type === "buffExpire" || ev.type === "buffRemove") {
-      if (!ev.sourceId) continue;
-      closeBar(`buff:${ev.sourceId}:${ev.buffId}`, ev.frame);
+      closeBar(`buff:${ev.ownerId}:${ev.buffId}`, ev.frame);
       continue;
     }
 
     if (ev.type === "inflictionApply") {
-      const ownerId = ev.targetId;
+      const ownerId = ev.ownerId;
       const key = `infliction:${ownerId}:${ev.inflictionType}`;
       const active = activeByKey.get(key);
       if (active) {
@@ -117,9 +116,9 @@ function buildSimRenderCache(
       continue;
     }
 
-    if (ev.type === "inflictionExpire") {
-      if (!ev.sourceId) continue;
-      closeBar(`infliction:${ev.sourceId}:${ev.inflictionType}`, ev.frame);
+    if (ev.type === "inflictionExpire" || ev.type === "inflictionRemove") {
+      if (!ev.ownerId) continue;
+      closeBar(`infliction:${ev.ownerId}:${ev.inflictionType}`, ev.frame);
     }
   }
 

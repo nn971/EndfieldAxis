@@ -37,7 +37,7 @@ class SolidificationBuffDef extends BuffDef {
           type: "buffRemove" as const,
           frame: params.frame,
           seq: params.nextSeq(),
-          sourceId: params.targetId,
+          ownerId: params.targetId,
           buffId: SOLIDIFICATION_BUFF_ID,
           ref: params.ref,
         },

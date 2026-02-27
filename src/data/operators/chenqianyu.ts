@@ -154,7 +154,7 @@ class ChenQianyuDef extends OperatorDef {
             frame: ev.frame,
             seq: nextSeq(),
             sourceId: this.id,
-            targetId: ev.targetId,
+            targetId: ev.ownerId,
             ref: ev.id,
           },
         ];
@@ -185,6 +185,7 @@ class ChenQianyuDef extends OperatorDef {
             ref: ev.id,
             sourceId: sourceId,
             targetId: sourceId,
+            ownerId: sourceId,
             buffId: BONUS_BUFF,
           },
         ];

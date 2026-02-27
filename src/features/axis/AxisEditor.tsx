@@ -507,22 +507,22 @@ export default function AxisEditor({
 
       {/* axis area */}
       <div
-        className="relative mt-4 mb-4 overflow-hidden border border-zinc-700 rounded bg-zinc-900"
+        className="relative mt-4 mb-4 flex border border-zinc-700 rounded bg-zinc-900"
         style={{
           height: LANE_AREA_TOP + RENDERED_LANE_COUNT * LANE_HEIGHT,
         }}
       >
         {/* left gutter with lane labels */}
         <div
-          className="absolute top-0 left-0"
+          className="relative top-0 left-0"
           style={{ width: LEFT_GUTTER_WIDTH, height: "100%" }}
         >
           <div
             className="relative"
             style={{
-            top: LANE_AREA_TOP,
-            height: RENDERED_LANE_COUNT * LANE_HEIGHT,
-          }}
+              top: LANE_AREA_TOP,
+              height: RENDERED_LANE_COUNT * LANE_HEIGHT,
+            }}
           >
             {[0, 1, 2, 3, 4].map(laneIndex => {
               const opId = laneLabels[laneIndex];
@@ -564,11 +564,9 @@ export default function AxisEditor({
         </div>
 
         <div
-          className="absolute relative overflow-x-auto overflow-y-hidden"
+          className="relative flex-1 overflow-x-auto overflow-y-hidden"
           style={{
             height: LANE_AREA_TOP + RENDERED_LANE_COUNT * LANE_HEIGHT,
-            left: LEFT_GUTTER_WIDTH,
-            right: 0,
           }}
         >
           {/* axis grid */}
@@ -606,31 +604,36 @@ export default function AxisEditor({
               height: SP_TRACK_HEIGHT,
             }}
           >
-            {simRenderCache.teamSpSeries.length > 1 && simRenderCache.teamSpCap > 0 && (() => {
-              const { linePath, areaPath } = buildLineAndAreaPath({
-                points: simRenderCache.teamSpSeries.map(point => ({ frame: point.frame, value: point.value })),
-                maxFrame: AXIS_LENTH_IN_FRAMES,
-                maxValue: simRenderCache.teamSpCap,
-                width: AXIS_LENTH_IN_FRAMES,
-                height: SP_TRACK_HEIGHT,
-              });
-              return (
-                <svg
-                  className="absolute inset-0 pointer-events-none"
-                  width={AXIS_LENTH_IN_FRAMES}
-                  height={SP_TRACK_HEIGHT}
-                  viewBox={`0 0 ${AXIS_LENTH_IN_FRAMES} ${SP_TRACK_HEIGHT}`}
-                >
-                  <path d={areaPath} fill="rgba(250, 204, 21, 0.14)" />
-                  <path
-                    d={linePath}
-                    fill="none"
-                    stroke="rgba(253, 224, 71, 0.85)"
-                    strokeWidth={1.5}
-                  />
-                </svg>
-              );
-            })()}
+            {simRenderCache.teamSpSeries.length > 1 &&
+              simRenderCache.teamSpCap > 0 &&
+              (() => {
+                const { linePath, areaPath } = buildLineAndAreaPath({
+                  points: simRenderCache.teamSpSeries.map(point => ({
+                    frame: point.frame,
+                    value: point.value,
+                  })),
+                  maxFrame: AXIS_LENTH_IN_FRAMES,
+                  maxValue: simRenderCache.teamSpCap,
+                  width: AXIS_LENTH_IN_FRAMES,
+                  height: SP_TRACK_HEIGHT,
+                });
+                return (
+                  <svg
+                    className="absolute inset-0 pointer-events-none"
+                    width={AXIS_LENTH_IN_FRAMES}
+                    height={SP_TRACK_HEIGHT}
+                    viewBox={`0 0 ${AXIS_LENTH_IN_FRAMES} ${SP_TRACK_HEIGHT}`}
+                  >
+                    <path d={areaPath} fill="rgba(250, 204, 21, 0.14)" />
+                    <path
+                      d={linePath}
+                      fill="none"
+                      stroke="rgba(253, 224, 71, 0.85)"
+                      strokeWidth={1.5}
+                    />
+                  </svg>
+                );
+              })()}
           </div>
 
           {/* skill boxes */}
@@ -651,9 +654,8 @@ export default function AxisEditor({
               viewBox={`0 0 ${AXIS_LENTH_IN_FRAMES} ${RENDERED_LANE_COUNT * LANE_HEIGHT}`}
             >
               {effectiveTeamOperatorIds.map((operatorId, laneIndex) => {
-                const points = simRenderCache.ultimateEnergySeriesByOperatorId[
-                  operatorId
-                ];
+                const points =
+                  simRenderCache.ultimateEnergySeriesByOperatorId[operatorId];
                 const maxValue =
                   simRenderCache.ultimateEnergyMaxByOperatorId[operatorId] ?? 0;
                 if (!points || points.length < 2 || maxValue <= 0) return null;

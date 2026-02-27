@@ -1,3 +1,5 @@
+import { makeId } from "./id";
+
 /* lane reordering */
 export function moveItem<T>(arr: T[], from: number, to: number): T[] {
   const next = arr.slice();
@@ -27,4 +29,9 @@ export function assignNoDup(
 export function createSeqGenerator(start = 1): () => number {
   let n = start;
   return () => n++;
+}
+const EVENT_PREFIX = "SimEvent_";
+
+export function makeSimEventId() {
+  return makeId(EVENT_PREFIX);
 }
