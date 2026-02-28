@@ -143,9 +143,9 @@ class EndministratorDef extends OperatorDef {
       },
     });
 
-    registry.registerOnBuffConsumedForBuff({
-      buffId: "buff.crystal",
+    registry.registerOnBuffConsumed({
       id: "operator.endministrator.talent1.onCrystalConsumed",
+      when: { buffId: "buff.crystal" },
       fn: ({ read, ev, nextSeq, makeEventId }) => {
         if (!read.env.entitiesById[this.id]) return [];
         const build = read.getBuild(this.id) as OperatorBuild;
@@ -199,9 +199,9 @@ class EndministratorDef extends OperatorDef {
       },
     });
 
-    registry.registerOnBuffApplyForBuff({
-      buffId: "buff.endministrator.talent1.atkInc" as any,
+    registry.registerOnBuffApply({
       id: "operator.endministrator.potential2.shareAtkBuff.high",
+      when: { buffId: "buff.endministrator.talent1.atkInc" as any },
       fn: ({ read, ev, nextSeq, makeEventId }) => {
         if (ev.ownerId !== this.id) return [];
         const build = read.getBuild(this.id);
@@ -223,9 +223,9 @@ class EndministratorDef extends OperatorDef {
       },
     });
 
-    registry.registerOnBuffApplyForBuff({
-      buffId: "buff.endministrator.talent1.atkInc.low" as any,
+    registry.registerOnBuffApply({
       id: "operator.endministrator.potential2.shareAtkBuff.low",
+      when: { buffId: "buff.endministrator.talent1.atkInc.low" as any },
       fn: ({ read, ev, nextSeq, makeEventId }) => {
         if (ev.ownerId !== this.id) return [];
         const build = read.getBuild(this.id);

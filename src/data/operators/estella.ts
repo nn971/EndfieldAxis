@@ -113,9 +113,9 @@ class EstellaDef extends OperatorDef {
   }
 
   override registerSimPlugins(registry: SimRegistry): void {
-    registry.registerOnBuffApplyForBuff({
-      buffId: "buff.solidification",
+    registry.registerOnBuffApply({
       id: "operator.estella.combo.triggerOnSolidification",
+      when: { buffId: "buff.solidification" },
       fn: ({ read, ev, nextSeq, makeEventId }) => {
         if (!read.env.entitiesById[this.id]) return [];
 

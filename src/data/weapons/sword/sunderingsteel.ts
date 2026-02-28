@@ -33,9 +33,9 @@ class SunderingSteelDef extends WeaponDef {
     const MAX_STACKS = 2;
     const BONUS_BUFF = "weapon.sunderingsteel.atkIncRatio";
 
-    registry.registerOnStatusApplyIfWielded({
-      weaponId: this.id,
+    registry.registerOnStatusApply({
       id: SUNDERING_STEEL_ON_STATUS_APPLY_PLUGIN_ID,
+      when: { sourceWeaponId: this.id },
       fn: ({ ev, sourceId, nextSeq, makeEventId }) => {
         // Each trigger adds 1 stack by applying the buff once.
         return [

@@ -123,6 +123,32 @@ type ListenerEntry<TFn> = {
   id: string;
   priority: number; // currently not in use. all priority are 0
   fn: TFn;
+  when?: TriggerWhen;
+  match?: (ctx: TriggerContext) => boolean;
+};
+
+type TriggerContext =
+  | AfterHitTriggerContext
+  | OnCastTriggerContext
+  | OnStatusApplyTriggerContext
+  | OnBuffApplyTriggerContext
+  | OnBuffConsumedTriggerContext
+  | OnInflictionApplyTriggerContext
+  | OnInflictionConsumedTriggerContext;
+
+type TriggerWhen = {
+  sourceOperatorId?: OperatorId;
+  sourceWeaponId?: WeaponId;
+  buffId?: BuffId;
+  ownerHasBuffId?: BuffId;
+};
+
+type RegisterTriggerParams<TFn, TCtx extends TriggerContext> = {
+  id: string;
+  fn: TFn;
+  priority?: number;
+  when?: TriggerWhen;
+  match?: (ctx: TCtx) => boolean;
 };
 
 function sortEntries<TFn>(
@@ -141,37 +167,14 @@ export class SimRegistry {
     Record<BuffId, ListenerEntry<BuffDamageBonusListener>[]>
   > = {};
 
-  private afterHitGlobal: ListenerEntry<AfterHitTrigger>[] = [];
-  private afterHitByOperatorId: Record<
-    OperatorId,
-    ListenerEntry<AfterHitTrigger>[]
-  > = {};
-
-  private onCastStartGlobal: ListenerEntry<OnCastTrigger>[] = [];
-  private onCastEndGlobal: ListenerEntry<OnCastTrigger>[] = [];
-
-  private onStatusApplyGlobal: ListenerEntry<OnStatusApplyTrigger>[] = [];
-  private onStatusApplyByWielderWeaponId: Partial<
-    Record<WeaponId, ListenerEntry<OnStatusApplyTrigger>[]>
-  > = {};
-
-  private onBuffApplyGlobal: ListenerEntry<OnBuffApplyTrigger>[] = [];
-  private onBuffApplyByBuffId: Partial<
-    Record<BuffId, ListenerEntry<OnBuffApplyTrigger>[]>
-  > = {};
-
-  private onBuffConsumedGlobal: ListenerEntry<OnBuffConsumedTrigger>[] = [];
-  private onBuffConsumedByBuffId: Partial<
-    Record<BuffId, ListenerEntry<OnBuffConsumedTrigger>[]>
-  > = {};
-
-  private onInflictionApplyGlobal: ListenerEntry<OnInflictionApplyTrigger>[] =
-    [];
-  private onInflictionApplyByBuffId: Partial<
-    Record<BuffId, ListenerEntry<OnInflictionApplyTrigger>[]>
-  > = {};
-
-  private onInflictionConsumedGlobal: ListenerEntry<OnInflictionConsumedTrigger>[] =
+  private afterHit: ListenerEntry<AfterHitTrigger>[] = [];
+  private onCastStart: ListenerEntry<OnCastTrigger>[] = [];
+  private onCastEnd: ListenerEntry<OnCastTrigger>[] = [];
+  private onStatusApply: ListenerEntry<OnStatusApplyTrigger>[] = [];
+  private onBuffApply: ListenerEntry<OnBuffApplyTrigger>[] = [];
+  private onBuffConsumed: ListenerEntry<OnBuffConsumedTrigger>[] = [];
+  private onInflictionApply: ListenerEntry<OnInflictionApplyTrigger>[] = [];
+  private onInflictionConsumed: ListenerEntry<OnInflictionConsumedTrigger>[] =
     [];
 
   registerGlobalDamageBonus(params: {
@@ -200,188 +203,115 @@ export class SimRegistry {
     });
   }
 
-  registerAfterHit(params: {
-    id: string;
-    fn: AfterHitTrigger;
-    priority?: number;
-  }): void {
-    this.afterHitGlobal.push({
+  registerAfterHit(
+    params: RegisterTriggerParams<AfterHitTrigger, AfterHitTriggerContext>,
+  ): void {
+    this.afterHit.push({
       id: params.id,
       fn: params.fn,
       priority: params.priority ?? 0,
+      when: params.when,
+      match: params.match as ListenerEntry<AfterHitTrigger>["match"],
     });
   }
 
-  registerAfterHitForOperator(params: {
-    operatorId: OperatorId;
-    id: string;
-    fn: AfterHitTrigger;
-    priority?: number;
-  }): void {
-    const list = (this.afterHitByOperatorId[params.operatorId] ??=
-      []) as ListenerEntry<AfterHitTrigger>[];
-    list.push({
+  registerOnCastStart(
+    params: RegisterTriggerParams<OnCastTrigger, OnCastTriggerContext>,
+  ): void {
+    this.onCastStart.push({
       id: params.id,
       fn: params.fn,
       priority: params.priority ?? 0,
+      when: params.when,
+      match: params.match as ListenerEntry<OnCastTrigger>["match"],
     });
   }
 
-  registerOnCastStart(params: {
-    id: string;
-    fn: OnCastTrigger;
-    priority?: number;
-  }): void {
-    this.onCastStartGlobal.push({
+  registerOnCastEnd(
+    params: RegisterTriggerParams<OnCastTrigger, OnCastTriggerContext>,
+  ): void {
+    this.onCastEnd.push({
       id: params.id,
       fn: params.fn,
       priority: params.priority ?? 0,
+      when: params.when,
+      match: params.match as ListenerEntry<OnCastTrigger>["match"],
     });
   }
 
-  // TODO
-  // registerOnCastStartForBuff(params: {
-  //   buffId: BuffId;
-  //   id: string;
-  //   fn: OnCastTrigger;
-  //   priority?: number;
-  // }): void {
-  //   this.onCastStartGlobal.push({
-  //     id: params.id,
-  //     fn: params.fn,
-  //     priority: params.priority ?? 0,
-  //   });
-  // }
-
-  registerOnCastEnd(params: {
-    id: string;
-    fn: OnCastTrigger;
-    priority?: number;
-  }): void {
-    this.onCastEndGlobal.push({
+  registerOnStatusApply(
+    params: RegisterTriggerParams<
+      OnStatusApplyTrigger,
+      OnStatusApplyTriggerContext
+    >,
+  ): void {
+    this.onStatusApply.push({
       id: params.id,
       fn: params.fn,
       priority: params.priority ?? 0,
+      when: params.when,
+      match: params.match as ListenerEntry<OnStatusApplyTrigger>["match"],
     });
   }
 
-  registerOnStatusApply(params: {
-    id: string;
-    fn: OnStatusApplyTrigger;
-    priority?: number;
-  }): void {
-    this.onStatusApplyGlobal.push({
+  registerOnBuffApply(
+    params: RegisterTriggerParams<
+      OnBuffApplyTrigger,
+      OnBuffApplyTriggerContext
+    >,
+  ): void {
+    this.onBuffApply.push({
       id: params.id,
       fn: params.fn,
       priority: params.priority ?? 0,
+      when: params.when,
+      match: params.match as ListenerEntry<OnBuffApplyTrigger>["match"],
     });
   }
 
-  registerOnStatusApplyIfWielded(params: {
-    weaponId: WeaponId;
-    id: string;
-    fn: OnStatusApplyTrigger;
-    priority?: number;
-  }): void {
-    const list = (this.onStatusApplyByWielderWeaponId[params.weaponId] ??=
-      []) as ListenerEntry<OnStatusApplyTrigger>[];
-    list.push({
+  registerOnBuffConsumed(
+    params: RegisterTriggerParams<
+      OnBuffConsumedTrigger,
+      OnBuffConsumedTriggerContext
+    >,
+  ): void {
+    this.onBuffConsumed.push({
       id: params.id,
       fn: params.fn,
       priority: params.priority ?? 0,
+      when: params.when,
+      match: params.match as ListenerEntry<OnBuffConsumedTrigger>["match"],
     });
   }
 
-  registerOnBuffApply(params: {
-    id: string;
-    fn: OnBuffApplyTrigger;
-    priority?: number;
-  }): void {
-    this.onBuffApplyGlobal.push({
+  registerOnInflictionApply(
+    params: RegisterTriggerParams<
+      OnInflictionApplyTrigger,
+      OnInflictionApplyTriggerContext
+    >,
+  ): void {
+    this.onInflictionApply.push({
       id: params.id,
       fn: params.fn,
       priority: params.priority ?? 0,
+      when: params.when,
+      match: params.match as ListenerEntry<OnInflictionApplyTrigger>["match"],
     });
   }
 
-  registerOnBuffApplyForBuff(params: {
-    buffId: BuffId;
-    id: string;
-    fn: OnBuffApplyTrigger;
-    priority?: number;
-  }): void {
-    const list = (this.onBuffApplyByBuffId[params.buffId] ??=
-      []) as ListenerEntry<OnBuffApplyTrigger>[];
-    list.push({
+  registerOnInflictionConsumed(
+    params: RegisterTriggerParams<
+      OnInflictionConsumedTrigger,
+      OnInflictionConsumedTriggerContext
+    >,
+  ): void {
+    this.onInflictionConsumed.push({
       id: params.id,
       fn: params.fn,
       priority: params.priority ?? 0,
-    });
-  }
-
-  registerOnBuffConsumed(params: {
-    id: string;
-    fn: OnBuffConsumedTrigger;
-    priority?: number;
-  }): void {
-    this.onBuffConsumedGlobal.push({
-      id: params.id,
-      fn: params.fn,
-      priority: params.priority ?? 0,
-    });
-  }
-
-  registerOnBuffConsumedForBuff(params: {
-    buffId: BuffId;
-    id: string;
-    fn: OnBuffConsumedTrigger;
-    priority?: number;
-  }): void {
-    const list = (this.onBuffConsumedByBuffId[params.buffId] ??=
-      []) as ListenerEntry<OnBuffConsumedTrigger>[];
-    list.push({
-      id: params.id,
-      fn: params.fn,
-      priority: params.priority ?? 0,
-    });
-  }
-
-  registerOnInflictionApply(params: {
-    id: string;
-    fn: OnInflictionApplyTrigger;
-    priority?: number;
-  }): void {
-    this.onInflictionApplyGlobal.push({
-      id: params.id,
-      fn: params.fn,
-      priority: params.priority ?? 0,
-    });
-  }
-
-  registerOnInflictionApplyForBuff(params: {
-    buffId: BuffId;
-    id: string;
-    fn: OnInflictionApplyTrigger;
-    priority?: number;
-  }): void {
-    const list = (this.onInflictionApplyByBuffId[params.buffId] ??=
-      []) as ListenerEntry<OnInflictionApplyTrigger>[];
-    list.push({
-      id: params.id,
-      fn: params.fn,
-      priority: params.priority ?? 0,
-    });
-  }
-
-  registerOnInflictionConsumed(params: {
-    id: string;
-    fn: OnInflictionConsumedTrigger;
-    priority?: number;
-  }): void {
-    this.onInflictionConsumedGlobal.push({
-      id: params.id,
-      fn: params.fn,
-      priority: params.priority ?? 0,
+      when: params.when,
+      match:
+        params.match as ListenerEntry<OnInflictionConsumedTrigger>["match"],
     });
   }
 
@@ -391,47 +321,17 @@ export class SimRegistry {
      *  Note: Priorly triggered events happens later, due to the seq.
      */
     sortEntries(this.globalDamageBonus, "globalDamageBonus");
-    sortEntries(this.afterHitGlobal, "afterHitGlobal");
-    for (const key of Object.keys(this.afterHitByOperatorId)) {
-      sortEntries(
-        this.afterHitByOperatorId[key as OperatorId]!,
-        "afterHitByOperatorId",
-      );
-    }
-    sortEntries(this.onCastStartGlobal, "onCastStartGlobal");
-    sortEntries(this.onCastEndGlobal, "onCastEndGlobal");
+    sortEntries(this.afterHit, "afterHitGlobal");
+    sortEntries(this.onCastStart, "onCastStartGlobal");
+    sortEntries(this.onCastEnd, "onCastEndGlobal");
     /** within onStatusApply: Swordmancer prior than Sundering Steel
      *                        Swordmancer prior than Crystal Shattered
      */
-    sortEntries(this.onStatusApplyGlobal, "onStatusApplyGlobal");
-    for (const key of Object.keys(this.onStatusApplyByWielderWeaponId)) {
-      sortEntries(
-        this.onStatusApplyByWielderWeaponId[key as WeaponId]!,
-        "onStatusApplyByWielderWeaponId",
-      );
-    }
-    sortEntries(this.onBuffApplyGlobal, "onBuffApplyGlobal");
-    for (const key of Object.keys(this.onBuffApplyByBuffId)) {
-      sortEntries(
-        this.onBuffApplyByBuffId[key as BuffId]!,
-        "onBuffApplyByBuffId",
-      );
-    }
-    sortEntries(this.onBuffConsumedGlobal, "onBuffConsumedGlobal");
-    for (const key of Object.keys(this.onBuffConsumedByBuffId)) {
-      sortEntries(
-        this.onBuffConsumedByBuffId[key as BuffId]!,
-        "onBuffConsumedByBuffId",
-      );
-    }
-    sortEntries(this.onInflictionApplyGlobal, "onInflictionApplyGlobal");
-    for (const key of Object.keys(this.onInflictionApplyByBuffId)) {
-      sortEntries(
-        this.onInflictionApplyByBuffId[key as BuffId]!,
-        "onInflictionApplyByBuffId",
-      );
-    }
-    sortEntries(this.onInflictionConsumedGlobal, "onInflictionConsumedGlobal");
+    sortEntries(this.onStatusApply, "onStatusApplyGlobal");
+    sortEntries(this.onBuffApply, "onBuffApplyGlobal");
+    sortEntries(this.onBuffConsumed, "onBuffConsumedGlobal");
+    sortEntries(this.onInflictionApply, "onInflictionApplyGlobal");
+    sortEntries(this.onInflictionConsumed, "onInflictionConsumedGlobal");
     for (const key of Object.keys(this.buffDamageBonus)) {
       sortEntries(this.buffDamageBonus[key as BuffId]!, "buffDamageBonus");
     }
@@ -453,90 +353,111 @@ export class SimRegistry {
   }
 
   runAfterHit(ctx: AfterHitTriggerContext): SimEvent[] {
-    const out: SimEvent[] = [];
-    for (const e of this.afterHitGlobal) {
-      out.push(...(e.fn(ctx) ?? []));
-    }
-
-    const list = this.afterHitByOperatorId[ctx.sourceId as OperatorId];
-    if (!list || list.length === 0) return out;
-    for (const e of list) {
-      out.push(...(e.fn(ctx) ?? []));
-    }
-    return out;
+    return this.runTriggers(this.afterHit, ctx);
   }
 
   runOnCastStart(ctx: OnCastTriggerContext): SimEvent[] {
-    const out: SimEvent[] = [];
-    for (const e of this.onCastStartGlobal) out.push(...(e.fn(ctx) ?? []));
-    return out;
+    return this.runTriggers(this.onCastStart, ctx);
   }
 
   runOnCastEnd(ctx: OnCastTriggerContext): SimEvent[] {
-    const out: SimEvent[] = [];
-    for (const e of this.onCastEndGlobal) out.push(...(e.fn(ctx) ?? []));
-    return out;
+    return this.runTriggers(this.onCastEnd, ctx);
   }
 
   runOnStatusApply(ctx: OnStatusApplyTriggerContext): SimEvent[] {
-    const out: SimEvent[] = [];
-    for (const e of this.onStatusApplyGlobal) out.push(...(e.fn(ctx) ?? []));
-
-    const sourceBuild = ctx.read.getBuild(ctx.sourceId);
-    const weaponId = sourceBuild?.weapon.id;
-    if (!weaponId) return out;
-
-    const weaponListeners = this.onStatusApplyByWielderWeaponId[weaponId];
-    if (!weaponListeners || weaponListeners.length === 0) return out;
-    for (const e of weaponListeners) out.push(...(e.fn(ctx) ?? []));
-
-    return out;
+    return this.runTriggers(this.onStatusApply, ctx);
   }
 
   runOnBuffApply(ctx: OnBuffApplyTriggerContext): SimEvent[] {
-    const out: SimEvent[] = [];
-    for (const e of this.onBuffApplyGlobal) out.push(...(e.fn(ctx) ?? []));
-
-    const list = this.onBuffApplyByBuffId[ctx.ev.buffId];
-    if (!list || list.length === 0) return out;
-    for (const e of list) out.push(...(e.fn(ctx) ?? []));
-    return out;
+    return this.runTriggers(this.onBuffApply, ctx);
   }
 
   runOnBuffConsumed(ctx: OnBuffConsumedTriggerContext): SimEvent[] {
-    const out: SimEvent[] = [];
-    for (const e of this.onBuffConsumedGlobal) out.push(...(e.fn(ctx) ?? []));
-
-    const list = this.onBuffConsumedByBuffId[ctx.ev.buffId];
-    if (!list || list.length === 0) return out;
-    for (const e of list) out.push(...(e.fn(ctx) ?? []));
-    return out;
+    return this.runTriggers(this.onBuffConsumed, ctx);
   }
 
   runOnInflictionApply(ctx: OnInflictionApplyTriggerContext): SimEvent[] {
-    const out: SimEvent[] = [];
-    for (const e of this.onInflictionApplyGlobal) {
-      out.push(...(e.fn(ctx) ?? []));
-    }
-
-    const target = ctx.read.getEntity(ctx.targetId);
-    const buffIds = Object.keys((target as any).buffs ?? {}) as BuffId[];
-    if (buffIds.length === 0) return out;
-
-    for (const buffId of buffIds) {
-      const list = this.onInflictionApplyByBuffId[buffId];
-      if (!list || list.length === 0) continue;
-      for (const e of list) out.push(...(e.fn(ctx) ?? []));
-    }
-    return out;
+    return this.runTriggers(this.onInflictionApply, ctx);
   }
 
   runOnInflictionConsumed(ctx: OnInflictionConsumedTriggerContext): SimEvent[] {
     const out: SimEvent[] = [];
-    for (const e of this.onInflictionConsumedGlobal) {
+    for (const e of this.onInflictionConsumed) {
+      if (
+        !this.matchesListener(
+          e as ListenerEntry<(ctx: TriggerContext) => SimEvent[]>,
+          ctx,
+        )
+      )
+        continue;
       out.push(...(e.fn(ctx) ?? []));
     }
     return out;
+  }
+
+  private runTriggers<TCtx extends TriggerContext>(
+    entries: ListenerEntry<(ctx: TCtx) => SimEvent[]>[],
+    ctx: TCtx,
+  ): SimEvent[] {
+    const out: SimEvent[] = [];
+    for (const e of entries) {
+      if (!this.matchesListener(e, ctx)) {
+        continue;
+      }
+      out.push(...(e.fn(ctx) ?? []));
+    }
+    return out;
+  }
+
+  private matchesListener<TCtx extends TriggerContext>(
+    entry: ListenerEntry<(ctx: TCtx) => SimEvent[]>,
+    ctx: TCtx,
+  ): boolean {
+    if (entry.when && !this.matchesWhen(ctx, entry.when)) return false;
+    if (entry.match && !entry.match(ctx)) return false;
+    return true;
+  }
+
+  private matchesWhen(ctx: TriggerContext, when: TriggerWhen): boolean {
+    const sourceId = "sourceId" in ctx ? ctx.sourceId : undefined;
+
+    if (when.sourceOperatorId && sourceId !== when.sourceOperatorId) {
+      return false;
+    }
+
+    if (when.sourceWeaponId) {
+      if (!sourceId) return false;
+      const sourceBuild = ctx.read.getBuild(sourceId);
+      if (sourceBuild?.weapon.id !== when.sourceWeaponId) return false;
+    }
+
+    if (when.buffId) {
+      if (!("ev" in ctx && "buffId" in ctx.ev)) return false;
+      if (ctx.ev.buffId !== when.buffId) return false;
+    }
+
+    if (when.ownerHasBuffId) {
+      const ownerId = this.getOwnerIdForContext(ctx);
+      if (!ownerId) return false;
+      const owner = ctx.read.getEntity(ownerId);
+      if (!(owner as any)?.buffs?.[when.ownerHasBuffId]) return false;
+    }
+
+    return true;
+  }
+
+  private getOwnerIdForContext(ctx: TriggerContext): SimEntityId | undefined {
+    if (ctx.ev.type === "buffApply" || ctx.ev.type === "buffRemove") {
+      return ctx.ev.ownerId;
+    }
+    if (
+      ctx.ev.type === "inflictionApply" ||
+      ctx.ev.type === "inflictionExpire"
+    ) {
+      return ctx.ev.ownerId;
+    }
+    if ("targetId" in ctx && ctx.targetId) return ctx.targetId;
+    return undefined;
   }
 }
 
