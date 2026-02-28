@@ -1,5 +1,6 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
 import { artsHitByRank, physicalHitByRank } from "../../simulator/skillOps";
+import { SimEvent } from "../../types/simulator/simulator";
 import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 
 const NS_DMG_MUL = [
@@ -125,7 +126,7 @@ class EstellaDef extends OperatorDef {
             frame: ev.frame,
             seq: nextSeq(),
             sourceId: this.id,
-            targetId: ev.targetId,
+            targetId: ev.ownerId,
             ref: ev.id,
           },
         ];

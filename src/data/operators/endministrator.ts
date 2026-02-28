@@ -1,6 +1,8 @@
 import { applyBuff, physicalHitByRank } from "../../simulator/skillOps";
 import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 import type { SimRegistry } from "../../simulator/listeners/registry";
+import { SimEvent } from "../../types/simulator/simulator";
+import { OperatorBuild } from "../../types/operator";
 
 const NS_DMG_MUL = [
   1.56, 1.71, 1.87, 2.02, 2.18, 2.34, 2.49, 2.65, 2.8, 3.0, 3.23, 3.5,
@@ -146,7 +148,7 @@ class EndministratorDef extends OperatorDef {
       id: "operator.endministrator.talent1.onCrystalConsumed",
       fn: ({ read, ev, nextSeq, makeEventId }) => {
         if (!read.env.entitiesById[this.id]) return [];
-        const build = read.getBuild(this.id);
+        const build = read.getBuild(this.id) as OperatorBuild;
         const talentRank = Number(build?.talentRanks?.talent1 ?? 0);
         if (talentRank <= 0) return [];
         // Only respond to crystal removals caused by explicit consume flow.
@@ -157,19 +159,43 @@ class EndministratorDef extends OperatorDef {
             ? "buff.endministrator.talent1.atkInc"
             : "buff.endministrator.talent1.atkInc.low";
 
-        return [
+        const spawned = [
           {
             id: makeEventId(),
             type: "buffApply",
             frame: ev.frame,
             seq: nextSeq(),
             sourceId: this.id,
-            targetId: this.id,
             ownerId: this.id,
             buffId: buffId as any,
             ref: ev.id,
           },
-        ];
+        ] as SimEvent[];
+        // Potential 1: Return 50 SP if normal skill consumes Crystal
+        if (build.potentialRank >= 1) {
+          const consumerEvent = read.getEvent(ev.ref);
+          if (consumerEvent && consumerEvent.ref) {
+            const castEvent = read.getEvent(consumerEvent.ref);
+            if (
+              castEvent &&
+              castEvent.type === "castStart" &&
+              castEvent.sourceId === this.id &&
+              castEvent.skillType === "normalSkill"
+            ) {
+              spawned.push({
+                id: makeEventId(),
+                type: "spReturn",
+                frame: ev.frame,
+                seq: nextSeq(),
+                sourceId: this.id,
+                amount: 50,
+                ref: castEvent.id,
+              });
+            }
+          }
+        }
+
+        return spawned;
       },
     });
 

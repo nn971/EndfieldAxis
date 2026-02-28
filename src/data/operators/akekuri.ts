@@ -1,5 +1,5 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
-import type { SimEnvWithGlobalBuffs } from "../../types/simulator/simulator";
+import type { SimEnv } from "../../types/simulator/simulator";
 import {
   artsHitByRank,
   physicalHitByRank,
@@ -138,7 +138,7 @@ class AkekuriDef extends OperatorDef {
     registry.registerOnCastStart({
       id: "global.link.consumeOnCastStart",
       fn: ({ read, ev }) => {
-        const globalBuffs = (read.env as SimEnvWithGlobalBuffs).globalBuffs;
+        const globalBuffs = (read.env as SimEnv).globalBuffs;
         const link = globalBuffs.link;
 
         if (
@@ -173,7 +173,7 @@ class AkekuriDef extends OperatorDef {
     registry.registerOnCastEnd({
       id: "global.link.cleanupCastMap",
       fn: ({ read, ev }) => {
-        const globalBuffs = (read.env as SimEnvWithGlobalBuffs).globalBuffs;
+        const globalBuffs = (read.env as SimEnv).globalBuffs;
         const map = globalBuffs?.link?.castBonusByCastStartId;
         if (map && ev.ref) {
           delete map[ev.ref];
@@ -189,7 +189,7 @@ class AkekuriDef extends OperatorDef {
         const castStartId = ev.ref;
         if (!castStartId) return;
 
-        const map = (read.env as SimEnvWithGlobalBuffs).globalBuffs?.link
+        const map = (read.env as SimEnv).globalBuffs?.link
           ?.castBonusByCastStartId;
         const multiplier = Number(map?.[castStartId] ?? 0);
         if (!Number.isFinite(multiplier) || multiplier <= 1) return;

@@ -30,7 +30,8 @@ export interface SimRenderSeriesPoint {
 export interface SimRenderCache {
   bars: SimRenderBar[];
   markers: SimRenderMarker[];
-  teamSpSeries: SimRenderSeriesPoint[];
+  teamSpRealSeries: SimRenderSeriesPoint[];
+  teamSpTotalSeries: SimRenderSeriesPoint[];
   teamSpCap: number;
   ultimateEnergySeriesByOperatorId: Record<string, SimRenderSeriesPoint[]>;
   ultimateEnergyMaxByOperatorId: Record<string, number>;
@@ -41,7 +42,8 @@ export function makeEmptySimRenderCache(): SimRenderCache {
   return {
     bars: [],
     markers: [],
-    teamSpSeries: [],
+    teamSpRealSeries: [],
+    teamSpTotalSeries: [],
     teamSpCap: 0,
     ultimateEnergySeriesByOperatorId: {},
     ultimateEnergyMaxByOperatorId: {},

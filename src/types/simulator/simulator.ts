@@ -23,7 +23,8 @@ export type SimEventType =
   | "comboTriggerElapse" // combo trigger availability window elapsed
   | "comboCooldownEnd" // combo cooldown has ended
   | "reactionTick" // periodic tick for reaction buffs
-  | "spReturn"; // return team SP from skill effects
+  | "spReturn" // return team SP from certain triggers
+  | "spRecover"; // recover team SP from skill effects
 // | string;
 
 export type SimEventBase = {
@@ -134,18 +135,24 @@ export type SimEvent =
       type: "spReturn";
       sourceId: SimEntityId;
       amount: number;
+    })
+  | (SimEventBase & {
+      type: "spRecover";
+      sourceId: SimEntityId;
+      amount: number;
     });
 
 export type SimTeamSpState = {
-  current: number;
-  cap: number;
-  regenPerSecond: number;
+  real: number;
+  fake: number;
+  readonly cap: number;
+  readonly regenPerSecond: number;
   lastRegenFrame: number;
 };
 
 export type SimUltimateState = {
   current: number;
-  max: number;
+  readonly max: number;
 };
 
 export type SimResourceState = {
@@ -182,8 +189,6 @@ export type SimEntity = {
   type: string; //TODO implement this
 };
 
-export type SimEnv = { entitiesById: Record<SimEntityId, SimEntity> };
-
 export type SimGlobalBuffs = {
   link?: {
     /** Current link stacks available for the team. */
@@ -193,7 +198,8 @@ export type SimGlobalBuffs = {
   };
 };
 
-export type SimEnvWithGlobalBuffs = SimEnv & {
+export type SimEnv = {
+  entitiesById: Record<SimEntityId, SimEntity>;
   globalBuffs: SimGlobalBuffs;
   resources: SimResourceState;
 };

@@ -10,7 +10,7 @@ import { INFLICTION_TYPE_LIST } from "../types/simulator/infliction";
 import type {
   SimEntity,
   SimEntityId,
-  SimEnvWithGlobalBuffs,
+  SimEnv,
   SimEvent,
   SimComboState,
 } from "../types/simulator/simulator";
@@ -64,7 +64,7 @@ export const COMBO_AVAILABLE_WINDOW_FRAMES = 300;
 
 export type SimRead = {
   readonly nowInFrames: number;
-  readonly env: SimEnvWithGlobalBuffs;
+  readonly env: SimEnv;
   getEntity(id: SimEntityId | null): SimEntity | null;
   /** Returns operator build if this entityId corresponds to an operator, else undefined. */
   getBuild(entityId: SimEntityId): OperatorBuild | undefined;
@@ -154,7 +154,11 @@ type SimWorldInit = {
 export type SimResourceSample = {
   frame: number;
   seq: number;
-  teamSp: number;
+  teamSp: {
+    real: number;
+    fake: number;
+    total: number;
+  };
   ultimateCurrentByOperatorId: Record<string, number>;
 };
 
@@ -179,7 +183,7 @@ function setEmptyInflictions(e: SimEntity): void {
 
 export class SimWorld {
   // Publicly readable, but mutations should go through ops.
-  public readonly env: SimEnvWithGlobalBuffs;
+  public readonly env: SimEnv;
   public nowInFrames: number;
   public readonly log: SimLog = [];
   public readonly processedEvents: SimEvent[] = [];
@@ -214,7 +218,8 @@ export class SimWorld {
       globalBuffs: {},
       resources: {
         teamSp: {
-          current: 200,
+          real: 200,
+          fake: 0,
           cap: 300,
           regenPerSecond: 8,
           lastRegenFrame: init.nowInFrames ?? 0,
@@ -313,7 +318,13 @@ export class SimWorld {
     this.resourceSamples.push({
       frame,
       seq,
-      teamSp: Number(this.env.resources.teamSp.current),
+      teamSp: {
+        real: Number(this.env.resources.teamSp.real),
+        fake: Number(this.env.resources.teamSp.fake),
+        total: Number(
+          this.env.resources.teamSp.real + this.env.resources.teamSp.fake,
+        ),
+      },
       ultimateCurrentByOperatorId,
     });
   }
@@ -471,31 +482,92 @@ export class SimWorld {
     if (deltaFrames <= 0) return;
 
     const regen = (deltaFrames / 60) * teamSp.regenPerSecond;
-    teamSp.current = Math.min(teamSp.cap, Math.max(0, teamSp.current + regen));
+    this.gainRealTeamSp(regen);
     teamSp.lastRegenFrame = frame;
+  }
+
+  private getTeamSpTotal(): number {
+    const teamSp = this.env.resources.teamSp;
+    return teamSp.real + teamSp.fake;
+  }
+
+  private gainRealTeamSp(amount: number): number {
+    const teamSp = this.env.resources.teamSp;
+    const gain = Math.max(0, Number(amount) || 0);
+    if (gain <= 0) return 0;
+
+    let remaining = gain;
+    let actual = 0;
+
+    const totalBefore = this.getTeamSpTotal();
+    const room = Math.max(0, teamSp.cap - totalBefore);
+    if (room > 0) {
+      const add = Math.min(room, remaining);
+      teamSp.real += add;
+      actual += add;
+      remaining -= add;
+    }
+
+    if (
+      remaining > 0 &&
+      this.getTeamSpTotal() >= teamSp.cap &&
+      teamSp.fake > 0
+    ) {
+      const convert = Math.min(teamSp.fake, remaining);
+      teamSp.fake -= convert;
+      teamSp.real += convert;
+      actual += convert;
+    }
+
+    return actual;
+  }
+
+  private gainFakeTeamSp(amount: number): number {
+    const teamSp = this.env.resources.teamSp;
+    const gain = Math.max(0, Number(amount) || 0);
+    if (gain <= 0) return 0;
+
+    const totalBefore = this.getTeamSpTotal();
+    const room = Math.max(0, teamSp.cap - totalBefore);
+    const add = Math.min(room, gain);
+    teamSp.fake += add;
+    return add;
   }
 
   private spendTeamSp(
     amount: number,
     frame: number,
-  ): { spent: number; isLegal: boolean } {
+  ): { spent: number; realSpent: number; fakeSpent: number; isLegal: boolean } {
     this.syncTeamSpRegen(frame);
     const teamSp = this.env.resources.teamSp;
     const spend = Math.max(0, Number(amount) || 0);
-    const before = teamSp.current;
+    const before = this.getTeamSpTotal();
     const isLegal = before >= spend;
-    const spent = Math.min(before, spend);
-    teamSp.current = Math.max(0, before - spend);
-    return { spent, isLegal };
+    let remaining = Math.min(before, spend);
+
+    const fakeSpent = Math.min(teamSp.fake, remaining);
+    teamSp.fake -= fakeSpent;
+    remaining -= fakeSpent;
+
+    const realSpent = Math.min(teamSp.real, remaining);
+    teamSp.real -= realSpent;
+
+    return {
+      spent: fakeSpent + realSpent,
+      realSpent,
+      fakeSpent,
+      isLegal,
+    };
   }
 
   private returnTeamSp(amount: number, frame: number): number {
     this.syncTeamSpRegen(frame);
-    const teamSp = this.env.resources.teamSp;
-    const gain = Math.max(0, Number(amount) || 0);
-    const before = teamSp.current;
-    teamSp.current = Math.min(teamSp.cap, before + gain);
-    return teamSp.current - before;
+    return this.gainFakeTeamSp(amount);
+  }
+
+  private recoverTeamSp(amount: number, frame: number): number {
+    this.syncTeamSpRegen(frame);
+    return this.gainRealTeamSp(amount);
   }
 
   private spendUltimateEnergy(operatorId: SimEntityId): {
@@ -560,7 +632,12 @@ export class SimWorld {
 
   private readonly normalSkillCastById = new Map<
     string,
-    { spent: number; returned: number; lastHitEventId: string | null }
+    {
+      spent: number;
+      realSpent: number;
+      fakeSpent: number;
+      lastHitEventId: string | null;
+    }
   >();
 
   private validateComboCast(ev: Extract<SimEvent, { type: "castStart" }>): {
@@ -728,7 +805,8 @@ export class SimWorld {
             const spendRes = this.spendTeamSp(100, ev.frame);
             this.normalSkillCastById.set(ev.id, {
               spent: spendRes.spent,
-              returned: 0,
+              realSpent: spendRes.realSpent,
+              fakeSpent: spendRes.fakeSpent,
               lastHitEventId: this.findLastHitEventIdForCast(ev.id),
             });
             if (!spendRes.isLegal) {
@@ -855,23 +933,22 @@ export class SimWorld {
           if (parentCastStart?.skillType === "normalSkill") {
             const castState = this.normalSkillCastById.get(parentCastStart.id);
             if (castState && castState.lastHitEventId === ev.id) {
-              const effectiveCost = Math.max(
-                0,
-                castState.spent - castState.returned,
-              );
-              const ratio = Math.max(0, Math.min(1, effectiveCost / 100));
+              const ratio = Math.max(0, Math.min(1, castState.realSpent / 100));
               const baseGain = 6.5 * ratio;
-              for (const ent of Object.values(this.env.entitiesById)) {
-                if (ent.type !== "operator") continue;
-                const efficiency = this.getUltimateGainEfficiency(ent.id);
-                const gain = baseGain * (1 + efficiency);
-                const gained = this.gainUltimateEnergy(ent.id, gain);
-                if (gained > 0) {
-                  this.ops.log(
-                    "act",
-                    `"${ent.name}" gained ${gained.toFixed(2)} ultimate energy from normal skill hit`,
-                  );
-                }
+              const efficiency = this.getUltimateGainEfficiency(
+                parentCastStart.sourceId,
+              );
+              const gain = baseGain * (1 + efficiency);
+              const gained = this.gainUltimateEnergy(
+                parentCastStart.sourceId,
+                gain,
+              );
+              if (gained > 0) {
+                const owner = this.read.getEntity(parentCastStart.sourceId);
+                this.ops.log(
+                  "act",
+                  `"${owner?.name}" gained ${gained.toFixed(2)} ultimate energy from normal skill hit`,
+                );
               }
             }
           }
@@ -1074,17 +1151,20 @@ export class SimWorld {
 
         case "spReturn": {
           const gained = this.returnTeamSp(ev.amount, ev.frame);
-          const castStart = this.getCastStartForEvent(ev);
-          if (castStart?.skillType === "normalSkill") {
-            const castState = this.normalSkillCastById.get(castStart.id);
-            if (castState) {
-              castState.returned += gained;
-            }
-          }
 
           this.ops.log(
             "act",
-            `team SP return ${gained.toFixed(2)} from ${ev.sourceId} (team SP=${this.env.resources.teamSp.current.toFixed(2)})`,
+            `team SP return ${gained.toFixed(2)} from ${ev.sourceId} (real=${this.env.resources.teamSp.real.toFixed(2)}, fake=${this.env.resources.teamSp.fake.toFixed(2)})`,
+          );
+          break;
+        }
+
+        case "spRecover": {
+          const gained = this.recoverTeamSp(ev.amount, ev.frame);
+
+          this.ops.log(
+            "act",
+            `team SP recover ${gained.toFixed(2)} from ${ev.sourceId} (real=${this.env.resources.teamSp.real.toFixed(2)}, fake=${this.env.resources.teamSp.fake.toFixed(2)})`,
           );
           break;
         }

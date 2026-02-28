@@ -3,7 +3,14 @@ import { DAMAGE_BUCKETS } from "./damage/damageBonuses";
 import type { DamageBreakdown } from "./damage/damageModel";
 import type { DamageContext } from "./damage/damageModel";
 
-export type SimLogEntryCat = "sim" | "act" | "buff" | "stat" | "dmg" | "dev";
+export type SimLogEntryCat =
+  | "sim"
+  | "act"
+  | "buff"
+  | "stat"
+  | "dmg"
+  | "SP"
+  | "dev";
 type SimLogEntryBase = {
   frame: number;
   env: SimEnv;
@@ -17,7 +24,7 @@ export type SimLogEntry =
       amount: number;
     })
   | (SimLogEntryBase & {
-      cat: "sim" | "act" | "buff" | "stat" | "dev";
+      cat: "sim" | "act" | "buff" | "stat" | "SP" | "dev";
     });
 export type SimLog = SimLogEntry[];
 

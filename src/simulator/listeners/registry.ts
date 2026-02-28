@@ -121,7 +121,7 @@ export type OnInflictionConsumedTrigger = (
 
 type ListenerEntry<TFn> = {
   id: string;
-  priority: number;
+  priority: number; // currently not in use. all priority are 0
   fn: TFn;
 };
 
@@ -238,6 +238,20 @@ export class SimRegistry {
       priority: params.priority ?? 0,
     });
   }
+
+  // TODO
+  // registerOnCastStartForBuff(params: {
+  //   buffId: BuffId;
+  //   id: string;
+  //   fn: OnCastTrigger;
+  //   priority?: number;
+  // }): void {
+  //   this.onCastStartGlobal.push({
+  //     id: params.id,
+  //     fn: params.fn,
+  //     priority: params.priority ?? 0,
+  //   });
+  // }
 
   registerOnCastEnd(params: {
     id: string;

@@ -604,19 +604,32 @@ export default function AxisEditor({
               height: SP_TRACK_HEIGHT,
             }}
           >
-            {simRenderCache.teamSpSeries.length > 1 &&
+            {simRenderCache.teamSpRealSeries.length > 1 &&
+              simRenderCache.teamSpTotalSeries.length > 1 &&
               simRenderCache.teamSpCap > 0 &&
               (() => {
-                const { linePath, areaPath } = buildLineAndAreaPath({
-                  points: simRenderCache.teamSpSeries.map(point => ({
-                    frame: point.frame,
-                    value: point.value,
-                  })),
-                  maxFrame: AXIS_LENTH_IN_FRAMES,
-                  maxValue: simRenderCache.teamSpCap,
-                  width: AXIS_LENTH_IN_FRAMES,
-                  height: SP_TRACK_HEIGHT,
-                });
+                const { linePath: realLinePath, areaPath: realAreaPath } =
+                  buildLineAndAreaPath({
+                    points: simRenderCache.teamSpRealSeries.map(point => ({
+                      frame: point.frame,
+                      value: point.value,
+                    })),
+                    maxFrame: AXIS_LENTH_IN_FRAMES,
+                    maxValue: simRenderCache.teamSpCap,
+                    width: AXIS_LENTH_IN_FRAMES,
+                    height: SP_TRACK_HEIGHT,
+                  });
+                const { linePath: totalLinePath, areaPath: totalAreaPath } =
+                  buildLineAndAreaPath({
+                    points: simRenderCache.teamSpTotalSeries.map(point => ({
+                      frame: point.frame,
+                      value: point.value,
+                    })),
+                    maxFrame: AXIS_LENTH_IN_FRAMES,
+                    maxValue: simRenderCache.teamSpCap,
+                    width: AXIS_LENTH_IN_FRAMES,
+                    height: SP_TRACK_HEIGHT,
+                  });
                 return (
                   <svg
                     className="absolute inset-0 pointer-events-none"
@@ -624,12 +637,19 @@ export default function AxisEditor({
                     height={SP_TRACK_HEIGHT}
                     viewBox={`0 0 ${AXIS_LENTH_IN_FRAMES} ${SP_TRACK_HEIGHT}`}
                   >
-                    <path d={areaPath} fill="rgba(250, 204, 21, 0.14)" />
+                    <path d={totalAreaPath} fill="rgba(251, 113, 133, 0.20)" />
+                    <path d={realAreaPath} fill="rgba(250, 204, 21, 0.14)" />
                     <path
-                      d={linePath}
+                      d={realLinePath}
                       fill="none"
                       stroke="rgba(253, 224, 71, 0.85)"
                       strokeWidth={1.5}
+                    />
+                    <path
+                      d={totalLinePath}
+                      fill="none"
+                      stroke="rgba(252, 165, 165, 0.85)"
+                      strokeWidth={1.4}
                     />
                   </svg>
                 );

@@ -127,10 +127,16 @@ function buildSimRenderCache(
     bars.push(active);
   }
 
-  const teamSpSeries = resourceSamples.map(sample => ({
+  const teamSpRealSeries = resourceSamples.map(sample => ({
     frame: sample.frame,
     seq: sample.seq,
-    value: sample.teamSp,
+    value: sample.teamSp.real,
+  }));
+
+  const teamSpTotalSeries = resourceSamples.map(sample => ({
+    frame: sample.frame,
+    seq: sample.seq,
+    value: sample.teamSp.total,
   }));
 
   const ultimateEnergySeriesByOperatorId: Record<
@@ -151,7 +157,8 @@ function buildSimRenderCache(
   return {
     bars,
     markers,
-    teamSpSeries,
+    teamSpRealSeries,
+    teamSpTotalSeries,
     teamSpCap,
     ultimateEnergySeriesByOperatorId,
     ultimateEnergyMaxByOperatorId,
@@ -286,7 +293,7 @@ export default function SimPanel() {
     setLogText(
       summarizeLog(
         world.log,
-        ["sim", "act", "buff", "stat", "dmg", "dev"],
+        ["sim", "act", "buff", "stat", "dmg", "SP", "dev"],
         false,
       ) +
         "\n\n" +
@@ -319,7 +326,8 @@ export default function SimPanel() {
                 simRenderCacheReplaced({
                   bars: [],
                   markers: [],
-                  teamSpSeries: [],
+                  teamSpRealSeries: [],
+                  teamSpTotalSeries: [],
                   teamSpCap: 0,
                   ultimateEnergySeriesByOperatorId: {},
                   ultimateEnergyMaxByOperatorId: {},

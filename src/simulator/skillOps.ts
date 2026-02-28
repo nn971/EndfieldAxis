@@ -116,7 +116,6 @@ export function applyBuff(
       frame: ctx.startFrame + frame,
       seq: ctx.nextSeq(),
       sourceId: ctx.sourceId,
-      targetId: ctx.targetId,
       ownerId: ctx.targetId,
       buffId,
       isForced: opts?.isForced,
@@ -212,11 +211,10 @@ export function spRecoverByRank(
     return [
       {
         id: ctx.makeEventId(),
-        type: "spReturn",
+        type: "spRecover",
         frame: ctx.startFrame + frame,
         seq: ctx.nextSeq(),
         sourceId: ctx.sourceId,
-        targetId: ctx.sourceId,
         amount,
       } satisfies SimEvent,
     ];

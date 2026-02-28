@@ -10,7 +10,7 @@ export type BuffDefInit = {
   id: BuffId;
   name: string;
   icon: string;
-  durationFrames: number;
+  durationFrames: number; // -1 for non-expire buffs
   maxStacks?: number; // default 1 (non-stacking buff)
 };
 
