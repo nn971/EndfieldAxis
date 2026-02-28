@@ -38,6 +38,14 @@ import {
   resolveInflictionRemoval,
   resolveStatusApplication,
   resolveInflictionApplication,
+  resolveHit,
+  resolveReactionTick,
+  resolveComboTriggered,
+  resolveComboCooldownEnd,
+  resolveSpRecover,
+  resolveSpReturn,
+  resolveCastEnd,
+  resolveCastStart,
 } from "./resolvers";
 import { BuffId } from "../data/buffs/BuffDef";
 import {
@@ -91,22 +99,8 @@ export type SimOps = {
   ) => void;
   /** Apply raw damage (integer) to target hp. */
   applyDamage: (targetId: SimEntityId, amount: number) => void;
-  upsertBuff: (targetId: SimEntityId, buff: SimBuff) => void;
+  addBuff: (targetId: SimEntityId, buff: SimBuff) => void;
   removeBuff: (targetId: SimEntityId, buffId: BuffId) => void;
-  /**
-  //  * Add stacks to a buff (creating it if missing), clamping to [0, maxStacks].
-  //  * Optionally emits a log entry when stacks change.
-  //  */
-  // // addBuffStacks: (params: {
-  //   targetId: SimEntityId;
-  //   buffId: BuffId;
-  //   delta: number;
-  //   maxStacks: number;
-  //   logOnChange?: {
-  //     cat: SimLogEntryCat;
-  //     format: (before: number, after: number) => string;
-  //   };
-  // }) => void;
   addInfliction: (
     targetId: SimEntityId,
     inflictionType: InflictionType,
@@ -116,9 +110,16 @@ export type SimOps = {
     targetId: SimEntityId,
     inflictionType: InflictionType,
   ) => void;
+  gainUltimateEnergy: (operatorId: SimEntityId, amount: number) => number;
+  triggerCombo: (operatorId: SimEntityId, frame: number) => boolean;
+  recoverTeamSp: (amount: number, frame: number) => number;
+  returnTeamSp: (amount: number, frame: number) => number;
 };
 
 type SimResolvers = {
+  resolveCastStart: (ev: Extract<SimEvent, { type: "castStart" }>) => void;
+  resolveCastEnd: (ev: Extract<SimEvent, { type: "castEnd" }>) => void;
+  resolveHit: (ev: Extract<SimEvent, { type: "hit" }>) => void;
   /** should return whether the status is triggered */
   resolveStatusApplication: (
     triggerPlugins: () => void,
@@ -139,6 +140,17 @@ type SimResolvers = {
   resolveInflictionRemoval: (
     ev: Extract<SimEvent, { type: "inflictionRemove" }>,
   ) => void;
+  resolveReactionTick: (
+    ev: Extract<SimEvent, { type: "reactionTick" }>,
+  ) => void;
+  resolveComboTriggered: (
+    ev: Extract<SimEvent, { type: "comboTriggered" }>,
+  ) => void;
+  resolveComboCooldownEnd: (
+    ev: Extract<SimEvent, { type: "comboCooldownEnd" }>,
+  ) => void;
+  resolveSpRecover: (ev: Extract<SimEvent, { type: "spRecover" }>) => void;
+  resolveSpReturn: (ev: Extract<SimEvent, { type: "spReturn" }>) => void;
 };
 
 type SimWorldInit = {
@@ -276,16 +288,24 @@ export class SimWorld {
       log: (cat, message, ctx, breakdown, amount) =>
         this.appendLog(cat, message, ctx, breakdown, amount),
       applyDamage: (targetId, amount) => this.applyDamage(targetId, amount),
-      upsertBuff: (targetId, buff) => this.upsertBuff(targetId, buff),
+      addBuff: (targetId, buff) => this.addBuff(targetId, buff),
       removeBuff: (targetId, buffId) => this.removeBuff(targetId, buffId),
       // addBuffStacks: params => this.addBuffStacks(params),
       addInfliction: (targetId, inflictionType, stacks) =>
         this.addInfliction(targetId, inflictionType, stacks),
       removeInfliction: (targetId, inflictionType) =>
         this.removeInfliction(targetId, inflictionType),
+      gainUltimateEnergy: (operatorId, amount) =>
+        this.gainUltimateEnergy(operatorId, amount),
+      triggerCombo: (operatorId, frame) => this.triggerCombo(operatorId, frame),
+      recoverTeamSp: (amount, frame) => this.recoverTeamSp(amount, frame),
+      returnTeamSp: (amount, frame) => this.returnTeamSp(amount, frame),
     };
 
     this.resolvers = {
+      resolveCastStart: ev => resolveCastStart(self, ev),
+      resolveCastEnd: ev => resolveCastEnd(self, ev),
+      resolveHit: ev => resolveHit(self, ev),
       resolveBuffApplication: ev => resolveBuffApplication(self, ev),
       resolveBuffExpiration: ev => resolveBuffExpiration(self, ev),
       resolveInflictionApplication: ev =>
@@ -294,6 +314,11 @@ export class SimWorld {
       resolveInflictionRemoval: ev => resolveInflictionRemoval(self, ev),
       resolveStatusApplication: (triggerPlugins, ev) =>
         resolveStatusApplication(self, triggerPlugins, ev),
+      resolveReactionTick: ev => resolveReactionTick(self, ev),
+      resolveComboTriggered: ev => resolveComboTriggered(self, ev),
+      resolveComboCooldownEnd: ev => resolveComboCooldownEnd(self, ev),
+      resolveSpRecover: ev => resolveSpRecover(self, ev),
+      resolveSpReturn: ev => resolveSpReturn(self, ev),
     };
   }
 
@@ -376,7 +401,8 @@ export class SimWorld {
     } satisfies SimComboState;
   }
 
-  private removeFromComboQueue(operatorId: SimEntityId): void {
+  /** TODO maybe there is an approach better than make this public */
+  public removeFromComboQueue(operatorId: SimEntityId): void {
     const idx = this.comboQueue.indexOf(operatorId);
     if (idx >= 0) this.comboQueue.splice(idx, 1);
   }
@@ -384,58 +410,6 @@ export class SimWorld {
   private getTeamOrderIndex(operatorId: SimEntityId): number {
     const idx = this.teamOperatorOrder.indexOf(operatorId);
     return idx >= 0 ? idx : Number.MAX_SAFE_INTEGER;
-  }
-
-  private triggerCombo(operatorId: SimEntityId, frame: number): boolean {
-    const ent = this.getEntityOrThrow(operatorId);
-    if (ent.type !== "operator") return false;
-    const combo = ent.combo;
-    if (!combo) return false;
-    if (combo.cooldown > 0) return false;
-
-    combo.lastTriggerFrame = frame;
-    combo.availableUntilFrame = frame + COMBO_AVAILABLE_WINDOW_FRAMES;
-
-    if (combo.pending) {
-      this.removeFromComboQueue(operatorId);
-      this.comboQueue.unshift(operatorId);
-      return true;
-    }
-
-    combo.pending = true;
-
-    const myOrder = this.getTeamOrderIndex(operatorId);
-    let insertAt = this.comboQueue.length;
-    for (let i = 0; i < this.comboQueue.length; i++) {
-      const queuedId = this.comboQueue[i]!;
-      const queuedCombo = this.getEntityOrThrow(queuedId).combo;
-      if (!queuedCombo) continue;
-      if (queuedCombo.lastTriggerFrame !== frame) continue;
-
-      const queuedOrder = this.getTeamOrderIndex(queuedId);
-      if (myOrder < queuedOrder) {
-        insertAt = i;
-        break;
-      }
-    }
-
-    this.comboQueue.splice(insertAt, 0, operatorId);
-    return true;
-  }
-
-  private scheduleComboTriggerElapse(
-    operatorId: SimEntityId,
-    triggerEventId: string,
-    frame: number,
-  ): void {
-    this.ops.schedule({
-      id: makeSimEventId(),
-      type: "comboTriggerElapse",
-      frame: frame + COMBO_AVAILABLE_WINDOW_FRAMES,
-      seq: this.ops.nextSeq(),
-      sourceId: operatorId,
-      ref: triggerEventId,
-    });
   }
 
   private getComboCooldownFrames(operatorId: SimEntityId): number {
@@ -462,18 +436,6 @@ export class SimWorld {
     const opDef = operatorsData[operatorId];
     const raw = Number(opDef?.getUltimateEnergyCost?.() ?? 100);
     return Number.isFinite(raw) ? Math.max(1, raw) : 100;
-  }
-
-  private getComboUltimateGain(operatorId: SimEntityId): number {
-    const opDef = operatorsData[operatorId];
-    const raw = Number(opDef?.getComboUltimateEnergyGainOnHit?.() ?? 6.5);
-    return Number.isFinite(raw) ? Math.max(0, raw) : 6.5;
-  }
-
-  private getUltimateGainEfficiency(operatorId: SimEntityId): number {
-    const build = this.read.getBuild(operatorId);
-    const raw = Number(build?.restStat?.ultimateGainEfficiency ?? 0);
-    return Math.max(0, Number.isFinite(raw) ? raw : 0);
   }
 
   private syncTeamSpRegen(frame: number): void {
@@ -534,7 +496,8 @@ export class SimWorld {
     return add;
   }
 
-  private spendTeamSp(
+  /** TODO maybe there is an approach better than make this public */
+  public spendTeamSp(
     amount: number,
     frame: number,
   ): { spent: number; realSpent: number; fakeSpent: number; isLegal: boolean } {
@@ -560,17 +523,8 @@ export class SimWorld {
     };
   }
 
-  private returnTeamSp(amount: number, frame: number): number {
-    this.syncTeamSpRegen(frame);
-    return this.gainFakeTeamSp(amount);
-  }
-
-  private recoverTeamSp(amount: number, frame: number): number {
-    this.syncTeamSpRegen(frame);
-    return this.gainRealTeamSp(amount);
-  }
-
-  private spendUltimateEnergy(operatorId: SimEntityId): {
+  /** TODO maybe there is an approach better than make this public */
+  public spendUltimateEnergy(operatorId: SimEntityId): {
     spent: number;
     isLegal: boolean;
     cost: number;
@@ -586,31 +540,8 @@ export class SimWorld {
     return { spent, isLegal, cost };
   }
 
-  private gainUltimateEnergy(operatorId: SimEntityId, amount: number): number {
-    const state = this.env.resources.ultimateByOperatorId[operatorId];
-    if (!state) return 0;
-    const gain = Math.max(0, Number(amount) || 0);
-    const before = state.current;
-    state.current = Math.min(state.max, before + gain);
-    return state.current - before;
-  }
-
-  private getCastStartForEvent(
-    ev: SimEvent,
-  ): Extract<SimEvent, { type: "castStart" }> | null {
-    let ref = ev.ref;
-    let hops = 0;
-    while (typeof ref === "string" && hops < 16) {
-      const parent = this.read.getEvent(ref);
-      if (!parent) return null;
-      if (parent.type === "castStart") return parent;
-      ref = parent.ref;
-      hops += 1;
-    }
-    return null;
-  }
-
-  private findLastHitEventIdForCast(castStartId: string): string | null {
+  /** TODO maybe there is an approach better than make this public */
+  public findLastHitEventIdForCast(castStartId: string): string | null {
     let best: Extract<SimEvent, { type: "hit" }> | null = null;
     for (const ev of this.eventById.values()) {
       if (ev.type !== "hit") continue;
@@ -630,7 +561,8 @@ export class SimWorld {
     return best?.id ?? null;
   }
 
-  private readonly normalSkillCastById = new Map<
+  /** TODO maybe there is an approach better than make this public */
+  public readonly normalSkillCastById = new Map<
     string,
     {
       spent: number;
@@ -712,7 +644,7 @@ export class SimWorld {
     (ent as any).hp = Math.max(0, Number((ent as any).hp ?? 0) - dmg);
   }
 
-  private upsertBuff(targetId: SimEntityId, buff: SimBuff): void {
+  private addBuff(targetId: SimEntityId, buff: SimBuff): void {
     const ent = this.getEntityOrThrow(targetId);
     (ent as any).buffs ??= {};
     (ent as any).buffs[buff.id] = buff;
@@ -743,6 +675,63 @@ export class SimWorld {
     const ent = this.getEntityOrThrow(entityId);
     ent.inflictions[inflictionType].stacks = 0;
     ent.inflictions[inflictionType].lastApplyFrame = -1;
+  }
+
+  private triggerCombo(operatorId: SimEntityId, frame: number): boolean {
+    /** returns whether combo is triggered successfully */
+    const ent = this.getEntityOrThrow(operatorId);
+    if (ent.type !== "operator") return false;
+    const combo = ent.combo;
+    if (!combo) return false;
+    if (combo.cooldown > 0) return false;
+
+    combo.lastTriggerFrame = frame;
+    combo.availableUntilFrame = frame + COMBO_AVAILABLE_WINDOW_FRAMES;
+
+    if (combo.pending) {
+      this.removeFromComboQueue(operatorId);
+      this.comboQueue.unshift(operatorId);
+      return true;
+    }
+
+    combo.pending = true;
+
+    const myOrder = this.getTeamOrderIndex(operatorId);
+    let insertAt = this.comboQueue.length;
+    for (let i = 0; i < this.comboQueue.length; i++) {
+      const queuedId = this.comboQueue[i]!;
+      const queuedCombo = this.getEntityOrThrow(queuedId).combo;
+      if (!queuedCombo) continue;
+      if (queuedCombo.lastTriggerFrame !== frame) continue;
+
+      const queuedOrder = this.getTeamOrderIndex(queuedId);
+      if (myOrder < queuedOrder) {
+        insertAt = i;
+        break;
+      }
+    }
+
+    this.comboQueue.splice(insertAt, 0, operatorId);
+    return true;
+  }
+
+  private gainUltimateEnergy(operatorId: SimEntityId, amount: number): number {
+    const state = this.env.resources.ultimateByOperatorId[operatorId];
+    if (!state) return 0;
+    const gain = Math.max(0, Number(amount) || 0);
+    const before = state.current;
+    state.current = Math.min(state.max, before + gain);
+    return state.current - before;
+  }
+
+  private returnTeamSp(amount: number, frame: number): number {
+    this.syncTeamSpRegen(frame);
+    return this.gainFakeTeamSp(amount);
+  }
+
+  private recoverTeamSp(amount: number, frame: number): number {
+    this.syncTeamSpRegen(frame);
+    return this.gainRealTeamSp(amount);
   }
 
   // ----- Run Sim -----
@@ -786,182 +775,17 @@ export class SimWorld {
 
       switch (ev.type) {
         case "castStart": {
-          const source = ev.sourceId
-            ? (this.read.getEntity(ev.sourceId) as SimEntity)
-            : null;
-          const target = ev.targetId
-            ? (this.read.getEntity(ev.targetId) as SimEntity)
-            : null;
-          const comboLegal = ev.comboValidation?.isLegal ?? true;
-          const comboReason = ev.comboValidation?.reason;
-          if (!comboLegal) {
-            this.ops.log(
-              "act",
-              `"${source?.name}" failed to cast "${ev.skillType}" (${comboReason ?? "illegal combo cast"})`,
-            );
-          }
-
-          if (ev.skillType === "normalSkill") {
-            const spendRes = this.spendTeamSp(100, ev.frame);
-            this.normalSkillCastById.set(ev.id, {
-              spent: spendRes.spent,
-              realSpent: spendRes.realSpent,
-              fakeSpent: spendRes.fakeSpent,
-              lastHitEventId: this.findLastHitEventIdForCast(ev.id),
-            });
-            if (!spendRes.isLegal) {
-              this.ops.log(
-                "act",
-                `"${source?.name}" normal skill cast with insufficient SP (spent ${spendRes.spent.toFixed(2)}/100)`,
-              );
-            }
-          }
-
-          if (ev.skillType === "ultimate") {
-            const spendRes = this.spendUltimateEnergy(ev.sourceId);
-            if (!spendRes.isLegal) {
-              this.ops.log(
-                "act",
-                `"${source?.name}" ultimate cast with insufficient ultimate energy (spent ${spendRes.spent.toFixed(2)}/${spendRes.cost.toFixed(2)})`,
-              );
-            }
-          }
-
-          this.ops.log(
-            "act",
-            `"${source?.name}" cast "${ev.skillType}" on "${target?.name}"`,
-          );
-
-          const spawned = this.registry.runOnCastStart({
-            read: this.read,
-            ev: ev,
-            sourceId: ev.sourceId,
-            targetId: ev.targetId,
-            nextSeq: this.ops.nextSeq,
-            makeEventId: makeSimEventId,
-          });
-          for (const sev of spawned) this.ops.schedule(sev);
+          this.resolvers.resolveCastStart(ev);
           break;
         }
 
         case "castEnd": {
-          const source = ev.sourceId
-            ? (this.read.getEntity(ev.sourceId) as SimEntity)
-            : null;
-          const target = ev.targetId
-            ? (this.read.getEntity(ev.targetId) as SimEntity)
-            : null;
-          this.ops.log(
-            "act",
-            `"${source?.name}" finished casting "${ev.skillType}" on "${target?.name}"`,
-          );
-
-          const spawned = this.registry.runOnCastEnd({
-            read: this.read,
-            ev: ev,
-            sourceId: ev.sourceId,
-            targetId: ev.targetId,
-            nextSeq: this.ops.nextSeq,
-            makeEventId: makeSimEventId,
-          });
-          for (const sev of spawned) this.ops.schedule(sev);
+          this.resolvers.resolveCastEnd(ev);
           break;
         }
 
         case "hit": {
-          const source = ev.sourceId
-            ? (this.read.getEntity(ev.sourceId) as SimEntity)
-            : null;
-          const target = ev.targetId
-            ? (this.read.getEntity(ev.targetId) as SimEntity)
-            : null;
-          if (!target) throw new Error(`undefined target`);
-          if (!source) throw new Error(`undefined source`);
-
-          const parentCastStart = this.getCastStartForEvent(ev);
-
-          const dmgSkillMultiplier = Number(ev.dmgMultiplier ?? 1);
-
-          const ctx = buildDamageContext({
-            registry: this.registry,
-            read: this.read,
-            frame: ev.frame,
-            damageType: ev.damageType,
-            sourceId: source.id,
-            targetId: target.id,
-            dmgSkillMultiplier,
-            ev,
-            meta: {
-              note: `source=${source.name} target=${target.name}`,
-              hitEvent: ev,
-            },
-          });
-
-          const res = this.damageModel.compute(ctx);
-          this.ops.applyDamage(target.id, res.amount);
-
-          const targetAfter = this.read.getEntity(target.id);
-
-          this.ops.log(
-            "dmg",
-            `"${source.name}" hit "${target.name}" for ${res.amount} damage (hp left: ${(targetAfter as any).hp})`,
-            ctx,
-            res.breakdown,
-            res.amount,
-          );
-
-          if (parentCastStart?.skillType === "comboSkill") {
-            const gainBase = this.getComboUltimateGain(
-              parentCastStart.sourceId,
-            );
-            const efficiency = this.getUltimateGainEfficiency(
-              parentCastStart.sourceId,
-            );
-            const gain = gainBase * (1 + efficiency);
-            const gained = this.gainUltimateEnergy(
-              parentCastStart.sourceId,
-              gain,
-            );
-            if (gained > 0) {
-              this.ops.log(
-                "act",
-                `"${source.name}" gained ${gained.toFixed(2)} ultimate energy from combo hit`,
-              );
-            }
-          }
-
-          if (parentCastStart?.skillType === "normalSkill") {
-            const castState = this.normalSkillCastById.get(parentCastStart.id);
-            if (castState && castState.lastHitEventId === ev.id) {
-              const ratio = Math.max(0, Math.min(1, castState.realSpent / 100));
-              const baseGain = 6.5 * ratio;
-              const efficiency = this.getUltimateGainEfficiency(
-                parentCastStart.sourceId,
-              );
-              const gain = baseGain * (1 + efficiency);
-              const gained = this.gainUltimateEnergy(
-                parentCastStart.sourceId,
-                gain,
-              );
-              if (gained > 0) {
-                const owner = this.read.getEntity(parentCastStart.sourceId);
-                this.ops.log(
-                  "act",
-                  `"${owner?.name}" gained ${gained.toFixed(2)} ultimate energy from normal skill hit`,
-                );
-              }
-            }
-          }
-
-          const spawned = this.registry.runAfterHit({
-            read: this.read,
-            ev: ev,
-            sourceId: source.id,
-            targetId: target.id,
-            nextSeq: this.ops.nextSeq,
-            makeEventId: makeSimEventId,
-          });
-          for (const sev of spawned) this.ops.schedule(sev);
+          this.resolvers.resolveHit(ev);
           break;
         }
 
@@ -1058,114 +882,31 @@ export class SimWorld {
         }
 
         case "reactionTick": {
-          const tickTarget = this.read.getEntity(ev.targetId ?? null);
-          if (!tickTarget) break;
-          if (ev.reactionBuffId !== COMBUSTION_BUFF_ID) break;
-
-          const combustion = (tickTarget as any).buffs?.[COMBUSTION_BUFF_ID] as
-            | SimBuff
-            | undefined;
-          if (!combustion) break;
-
-          const tickSourceId = String(
-            (combustion as any).meta?.reactionSourceId ?? ev.sourceId,
-          );
-          if (!tickSourceId) break;
-
-          const tickMultiplier = Number(
-            (combustion as any).meta?.combustionTickMultiplier ?? 0,
-          );
-          if (tickMultiplier > 0) {
-            this.ops.schedule({
-              id: makeSimEventId(),
-              type: "hit",
-              frame: ev.frame,
-              seq: this.ops.nextSeq(),
-              sourceId: tickSourceId,
-              targetId: ev.targetId,
-              damageType: "heat",
-              dmgMultiplier: tickMultiplier,
-              ref: ev.id,
-            } as SimEvent);
-          }
-
-          this.ops.schedule({
-            id: makeSimEventId(),
-            type: "reactionTick",
-            frame: ev.frame + COMBUSTION_DOT_INTERVAL_FRAMES,
-            seq: this.ops.nextSeq(),
-            sourceId: tickSourceId,
-            targetId: ev.targetId,
-            reactionBuffId: COMBUSTION_BUFF_ID,
-            ref: ev.id,
-          } as SimEvent);
+          this.resolvers.resolveReactionTick(ev);
           break;
         }
 
         case "comboTriggered": {
-          const sourceId = ev.sourceId;
-          const sourceEnt = this.read.getEntity(sourceId);
-          if (!sourceEnt)
-            throw new Error(`Can not find entity id=(${sourceId})`);
-          if (sourceEnt.type !== "operator") break;
-
-          const accepted = this.triggerCombo(sourceId, ev.frame);
-          if (!accepted) break;
-
-          this.scheduleComboTriggerElapse(sourceId, ev.id, ev.frame);
-          this.ops.log("act", `"${sourceEnt.name}" combo triggered`);
+          this.resolvers.resolveComboTriggered(ev);
           break;
         }
 
         case "comboTriggerElapse": {
-          const sourceId = ev.sourceId;
-          const sourceEnt = this.read.getEntity(sourceId);
-          if (!sourceEnt)
-            throw new Error(`Can not find entity id=(${sourceId})`);
-          if (sourceEnt.type !== "operator") break;
-
-          const combo = sourceEnt.combo;
-          if (!combo) break;
-          if (!combo.pending) break;
-          if (combo.availableUntilFrame > ev.frame) break;
-
-          combo.pending = false;
-          combo.availableUntilFrame = -1;
-          this.removeFromComboQueue(sourceId);
-          this.ops.log("act", `"${sourceEnt.name}" combo trigger elapsed`);
           break;
         }
 
         case "comboCooldownEnd": {
-          const sourceId = ev.sourceId;
-          const sourceEnt = this.read.getEntity(sourceId);
-          if (!sourceEnt)
-            throw new Error(`Can not find entity id=(${sourceId})`);
-          if (sourceEnt.type !== "operator") break;
-
-          const combo = sourceEnt.combo;
-          if (!combo) break;
-          combo.cooldown = 0;
+          this.resolvers.resolveComboCooldownEnd(ev);
           break;
         }
 
         case "spReturn": {
-          const gained = this.returnTeamSp(ev.amount, ev.frame);
-
-          this.ops.log(
-            "act",
-            `team SP return ${gained.toFixed(2)} from ${ev.sourceId} (real=${this.env.resources.teamSp.real.toFixed(2)}, fake=${this.env.resources.teamSp.fake.toFixed(2)})`,
-          );
+          this.resolvers.resolveSpReturn(ev);
           break;
         }
 
         case "spRecover": {
-          const gained = this.recoverTeamSp(ev.amount, ev.frame);
-
-          this.ops.log(
-            "act",
-            `team SP recover ${gained.toFixed(2)} from ${ev.sourceId} (real=${this.env.resources.teamSp.real.toFixed(2)}, fake=${this.env.resources.teamSp.fake.toFixed(2)})`,
-          );
+          this.resolvers.resolveSpRecover(ev);
           break;
         }
 

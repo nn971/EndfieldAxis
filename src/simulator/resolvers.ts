@@ -1,11 +1,15 @@
-import type { SimEntityId, SimEvent } from "../types/simulator/simulator";
+import type {
+  SimEntity,
+  SimEntityId,
+  SimEvent,
+} from "../types/simulator/simulator";
 import {
   type SimStatusType,
   type SimInfliction,
   type SimBuff,
 } from "../types/simulator/infliction";
 import { BuffId } from "../data/buffs/BuffDef";
-import { SimWorld } from "./simulator";
+import { SimRead, SimWorld } from "./simulator";
 import buffsData from "../data/buffs";
 import {
   ARTS_INFLICTION_TYPE_LIST,
@@ -26,6 +30,7 @@ import {
   COMBUSTION_INITIAL_HIT_PER_STACK_MUL,
   COMBUSTION_DOT_BASE_MUL,
   COMBUSTION_DOT_PER_STACK_MUL,
+  COMBUSTION_DOT_INTERVAL_FRAMES,
 } from "../data/buffs/reactions/combustion";
 import {
   ELECTRIFICATION_BUFF_ID,
@@ -44,6 +49,8 @@ import {
   CORROSION_MIN_RESISTANCE_PER_STACK,
 } from "../data/buffs/reactions/corrosion";
 import { makeSimEventId } from "../shared/lib/utils";
+import { buildDamageContext } from "./damage/damageEngine";
+import operatorsData from "../data/operators";
 
 // TODO: come up with a way to configure this
 export const DEFAULT_INFLICTION_DURATION_FRAMES = 1800;
@@ -51,6 +58,8 @@ export const DEFAULT_INFLICTION_DURATION_FRAMES = 1800;
 export const ARTS_BURST_DELAY_FRAMES = 12;
 export const ARTS_BURST_BASE_MUL = 0.55;
 export const ARTS_BURST_PER_STACK_MUL = 0.25;
+
+export const COMBO_AVAILABLE_WINDOW_FRAMES = 300;
 
 function scheduleApplyVulnerable(
   world: SimWorld,
@@ -162,6 +171,236 @@ function scheduleBuffExpire(
     buffId: buffId,
     ref: "auto",
   } as SimEvent);
+}
+
+function getCastStartForEvent(
+  read: SimRead,
+  ev: SimEvent,
+): Extract<SimEvent, { type: "castStart" }> | null {
+  let ref = ev.ref;
+  let hops = 0;
+  while (typeof ref === "string" && hops < 16) {
+    const parent = read.getEvent(ref);
+    if (!parent) return null;
+    if (parent.type === "castStart") return parent;
+    ref = parent.ref;
+    hops += 1;
+  }
+  return null;
+}
+
+function getComboUltimateGain(operatorId: SimEntityId): number {
+  const opDef = operatorsData[operatorId];
+  const raw = Number(opDef?.getComboUltimateEnergyGainOnHit?.() ?? 6.5);
+  return Number.isFinite(raw) ? Math.max(0, raw) : 6.5;
+}
+
+function getUltimateGainEfficiency(
+  read: SimRead,
+  operatorId: SimEntityId,
+): number {
+  const build = read.getBuild(operatorId);
+  const raw = Number(build?.restStat?.ultimateGainEfficiency ?? 0);
+  return Math.max(0, Number.isFinite(raw) ? raw : 0);
+}
+
+function scheduleComboTriggerElapse(
+  world: SimWorld,
+  operatorId: SimEntityId,
+  triggerEventId: string,
+  frame: number,
+): void {
+  world.ops.schedule({
+    id: makeSimEventId(),
+    type: "comboTriggerElapse",
+    frame: frame + COMBO_AVAILABLE_WINDOW_FRAMES,
+    seq: world.ops.nextSeq(),
+    sourceId: operatorId,
+    ref: triggerEventId,
+  });
+}
+
+export function resolveCastStart(
+  self: SimWorld,
+  ev: Extract<SimEvent, { type: "castStart" }>,
+) {
+  const source = ev.sourceId
+    ? (self.read.getEntity(ev.sourceId) as SimEntity)
+    : null;
+  const target = ev.targetId
+    ? (self.read.getEntity(ev.targetId) as SimEntity)
+    : null;
+  const comboLegal = ev.comboValidation?.isLegal ?? true;
+  const comboReason = ev.comboValidation?.reason;
+  if (!comboLegal) {
+    self.ops.log(
+      "act",
+      `"${source?.name}" failed to cast "${ev.skillType}" (${comboReason ?? "illegal combo cast"})`,
+    );
+  }
+
+  if (ev.skillType === "normalSkill") {
+    const spendRes = self.spendTeamSp(100, ev.frame);
+    self.normalSkillCastById.set(ev.id, {
+      spent: spendRes.spent,
+      realSpent: spendRes.realSpent,
+      fakeSpent: spendRes.fakeSpent,
+      lastHitEventId: self.findLastHitEventIdForCast(ev.id),
+    });
+    if (!spendRes.isLegal) {
+      self.ops.log(
+        "act",
+        `"${source?.name}" normal skill cast with insufficient SP (spent ${spendRes.spent.toFixed(2)}/100)`,
+      );
+    }
+  }
+
+  if (ev.skillType === "ultimate") {
+    const spendRes = self.spendUltimateEnergy(ev.sourceId);
+    if (!spendRes.isLegal) {
+      self.ops.log(
+        "act",
+        `"${source?.name}" ultimate cast with insufficient ultimate energy (spent ${spendRes.spent.toFixed(2)}/${spendRes.cost.toFixed(2)})`,
+      );
+    }
+  }
+
+  self.ops.log(
+    "act",
+    `"${source?.name}" cast "${ev.skillType}" on "${target?.name}"`,
+  );
+
+  const spawned = self.registry.runOnCastStart({
+    read: self.read,
+    ev: ev,
+    sourceId: ev.sourceId,
+    targetId: ev.targetId,
+    nextSeq: self.ops.nextSeq,
+    makeEventId: makeSimEventId,
+  });
+  for (const sev of spawned) self.ops.schedule(sev);
+}
+
+export function resolveCastEnd(
+  self: SimWorld,
+  ev: Extract<SimEvent, { type: "castEnd" }>,
+) {
+  const source = ev.sourceId
+    ? (self.read.getEntity(ev.sourceId) as SimEntity)
+    : null;
+  const target = ev.targetId
+    ? (self.read.getEntity(ev.targetId) as SimEntity)
+    : null;
+  self.ops.log(
+    "act",
+    `"${source?.name}" finished casting "${ev.skillType}" on "${target?.name}"`,
+  );
+
+  const spawned = self.registry.runOnCastEnd({
+    read: self.read,
+    ev: ev,
+    sourceId: ev.sourceId,
+    targetId: ev.targetId,
+    nextSeq: self.ops.nextSeq,
+    makeEventId: makeSimEventId,
+  });
+  for (const sev of spawned) self.ops.schedule(sev);
+}
+
+export function resolveHit(
+  self: SimWorld,
+  ev: Extract<SimEvent, { type: "hit" }>,
+) {
+  const source = ev.sourceId
+    ? (self.read.getEntity(ev.sourceId) as SimEntity)
+    : null;
+  const target = ev.targetId
+    ? (self.read.getEntity(ev.targetId) as SimEntity)
+    : null;
+  if (!target) throw new Error(`undefined target`);
+  if (!source) throw new Error(`undefined source`);
+
+  const parentCastStart = getCastStartForEvent(self.read, ev);
+
+  const dmgSkillMultiplier = Number(ev.dmgMultiplier ?? 1);
+
+  const ctx = buildDamageContext({
+    registry: self.registry,
+    read: self.read,
+    frame: ev.frame,
+    damageType: ev.damageType,
+    sourceId: source.id,
+    targetId: target.id,
+    dmgSkillMultiplier,
+    ev,
+    meta: {
+      note: `source=${source.name} target=${target.name}`,
+      hitEvent: ev,
+    },
+  });
+
+  const res = self.damageModel.compute(ctx);
+  self.ops.applyDamage(target.id, res.amount);
+
+  const targetAfter = self.read.getEntity(target.id);
+
+  self.ops.log(
+    "dmg",
+    `"${source.name}" hit "${target.name}" for ${res.amount} damage (hp left: ${(targetAfter as any).hp})`,
+    ctx,
+    res.breakdown,
+    res.amount,
+  );
+
+  if (parentCastStart?.skillType === "comboSkill") {
+    const gainBase = getComboUltimateGain(parentCastStart.sourceId);
+    const efficiency = getUltimateGainEfficiency(
+      self.read,
+      parentCastStart.sourceId,
+    );
+    const gain = gainBase * (1 + efficiency);
+    const gained = self.ops.gainUltimateEnergy(parentCastStart.sourceId, gain);
+    if (gained > 0) {
+      self.ops.log(
+        "act",
+        `"${source.name}" gained ${gained.toFixed(2)} ultimate energy from combo hit`,
+      );
+    }
+  }
+
+  if (parentCastStart?.skillType === "normalSkill") {
+    const castState = self.normalSkillCastById.get(parentCastStart.id);
+    if (castState && castState.lastHitEventId === ev.id) {
+      const ratio = Math.max(0, Math.min(1, castState.realSpent / 100));
+      const baseGain = 6.5 * ratio;
+      const efficiency = getUltimateGainEfficiency(
+        self.read,
+        parentCastStart.sourceId,
+      );
+      const gain = baseGain * (1 + efficiency);
+      const gained = self.ops.gainUltimateEnergy(
+        parentCastStart.sourceId,
+        gain,
+      );
+      if (gained > 0) {
+        const owner = self.read.getEntity(parentCastStart.sourceId);
+        self.ops.log(
+          "act",
+          `"${owner?.name}" gained ${gained.toFixed(2)} ultimate energy from normal skill hit`,
+        );
+      }
+    }
+  }
+
+  const spawned = self.registry.runAfterHit({
+    read: self.read,
+    ev: ev,
+    sourceId: source.id,
+    targetId: target.id,
+    nextSeq: self.ops.nextSeq,
+    makeEventId: makeSimEventId,
+  });
+  for (const sev of spawned) self.ops.schedule(sev);
 }
 
 export function resolveStatusApplication(
@@ -334,7 +573,7 @@ export function resolveBuffApplication(
 
   if (buffId === "buff.crystal") {
     const had = Boolean(existing);
-    self.ops.upsertBuff(ownerId, {
+    self.ops.addBuff(ownerId, {
       id: buffId,
       lastApplyFrame: self.read.nowInFrames,
       stacks: 1,
@@ -367,7 +606,7 @@ export function resolveBuffApplication(
   const afterStacks = Math.min(maxStacks, beforeStacks + 1);
 
   const had = Boolean(existing);
-  self.ops.upsertBuff(ownerId, {
+  self.ops.addBuff(ownerId, {
     id: buffId,
     lastApplyFrame: self.read.nowInFrames,
     stacks: afterStacks,
@@ -629,4 +868,125 @@ export function resolveInflictionRemoval(
   ev: Extract<SimEvent, { type: "inflictionRemove" }>,
 ) {
   self.ops.removeInfliction(ev.ownerId, ev.inflictionType);
+}
+
+export function resolveReactionTick(
+  self: SimWorld,
+  ev: Extract<SimEvent, { type: "reactionTick" }>,
+) {
+  const tickTarget = self.read.getEntity(ev.targetId ?? null);
+  if (!tickTarget) return;
+  if (ev.reactionBuffId !== COMBUSTION_BUFF_ID) return;
+
+  const combustion = (tickTarget as any).buffs?.[COMBUSTION_BUFF_ID] as
+    | SimBuff
+    | undefined;
+  if (!combustion) return;
+
+  const tickSourceId = String(
+    (combustion as any).meta?.reactionSourceId ?? ev.sourceId,
+  );
+  if (!tickSourceId) return;
+
+  const tickMultiplier = Number(
+    (combustion as any).meta?.combustionTickMultiplier ?? 0,
+  );
+  if (tickMultiplier > 0) {
+    self.ops.schedule({
+      id: makeSimEventId(),
+      type: "hit",
+      frame: ev.frame,
+      seq: self.ops.nextSeq(),
+      sourceId: tickSourceId,
+      targetId: ev.targetId,
+      damageType: "heat",
+      dmgMultiplier: tickMultiplier,
+      ref: ev.id,
+    } as SimEvent);
+  }
+
+  self.ops.schedule({
+    id: makeSimEventId(),
+    type: "reactionTick",
+    frame: ev.frame + COMBUSTION_DOT_INTERVAL_FRAMES,
+    seq: self.ops.nextSeq(),
+    sourceId: tickSourceId,
+    targetId: ev.targetId,
+    reactionBuffId: COMBUSTION_BUFF_ID,
+    ref: ev.id,
+  } as SimEvent);
+}
+
+export function resolveComboTriggered(
+  self: SimWorld,
+  ev: Extract<SimEvent, { type: "comboTriggered" }>,
+) {
+  const sourceId = ev.sourceId;
+  const sourceEnt = self.read.getEntity(sourceId);
+  if (!sourceEnt) throw new Error(`Can not find entity id=(${sourceId})`);
+  if (sourceEnt.type !== "operator") return;
+
+  const accepted = self.ops.triggerCombo(sourceId, ev.frame);
+  if (!accepted) return;
+
+  scheduleComboTriggerElapse(self, sourceId, ev.id, ev.frame);
+  self.ops.log("act", `"${sourceEnt.name}" combo triggered`);
+}
+
+export function resolveComboTriggerElapse(
+  self: SimWorld,
+  ev: Extract<SimEvent, { type: "comboTriggerElapse" }>,
+) {
+  const sourceId = ev.sourceId;
+  const sourceEnt = self.read.getEntity(sourceId);
+  if (!sourceEnt) throw new Error(`Can not find entity id=(${sourceId})`);
+  if (sourceEnt.type !== "operator") return;
+
+  const combo = sourceEnt.combo;
+  if (!combo) return;
+  if (!combo.pending) return;
+  if (combo.availableUntilFrame > ev.frame) return;
+
+  combo.pending = false;
+  combo.availableUntilFrame = -1;
+  self.removeFromComboQueue(sourceId);
+  self.ops.log("act", `"${sourceEnt.name}" combo trigger elapsed`);
+}
+
+export function resolveComboCooldownEnd(
+  self: SimWorld,
+  ev: Extract<SimEvent, { type: "comboCooldownEnd" }>,
+) {
+  const sourceId = ev.sourceId;
+  const sourceEnt = self.read.getEntity(sourceId);
+  if (!sourceEnt) throw new Error(`Can not find entity id=(${sourceId})`);
+  if (sourceEnt.type !== "operator") return;
+
+  const combo = sourceEnt.combo;
+  if (!combo) return;
+  combo.cooldown = 0;
+}
+
+export function resolveSpRecover(
+  self: SimWorld,
+  ev: Extract<SimEvent, { type: "spRecover" }>,
+) {
+  const gained = self.ops.recoverTeamSp(ev.amount, ev.frame);
+
+  self.ops.log(
+    "act",
+    `team SP recover ${gained.toFixed(2)} from ${ev.sourceId} (real=${self.env.resources.teamSp.real.toFixed(2)}, fake=${self.env.resources.teamSp.fake.toFixed(2)})`,
+  );
+}
+
+export function resolveSpReturn(
+  self: SimWorld,
+  ev: Extract<SimEvent, { type: "spReturn" }>,
+) {
+  const gained = self.ops.returnTeamSp(ev.amount, ev.frame);
+
+  self.ops.log(
+    "act",
+    `team SP return ${gained.toFixed(2)} from ${ev.sourceId} (real=${self.env.resources.teamSp.real.toFixed(2)}, fake=${self.env.resources.teamSp.fake.toFixed(2)})`,
+  );
 }
