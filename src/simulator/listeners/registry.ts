@@ -316,22 +316,15 @@ export class SimRegistry {
   }
 
   finalize(): void {
-    /** TODO Fix the order of these so that it triggers as real game does,
-     *  and of course in the same order during each simulation.
-     *  Note: Priorly triggered events happens later, due to the seq.
-     */
     sortEntries(this.globalDamageBonus, "globalDamageBonus");
-    sortEntries(this.afterHit, "afterHitGlobal");
-    sortEntries(this.onCastStart, "onCastStartGlobal");
-    sortEntries(this.onCastEnd, "onCastEndGlobal");
-    /** within onStatusApply: Swordmancer prior than Sundering Steel
-     *                        Swordmancer prior than Crystal Shattered
-     */
-    sortEntries(this.onStatusApply, "onStatusApplyGlobal");
-    sortEntries(this.onBuffApply, "onBuffApplyGlobal");
-    sortEntries(this.onBuffConsumed, "onBuffConsumedGlobal");
-    sortEntries(this.onInflictionApply, "onInflictionApplyGlobal");
-    sortEntries(this.onInflictionConsumed, "onInflictionConsumedGlobal");
+    sortEntries(this.afterHit, "afterHit");
+    sortEntries(this.onCastStart, "onCastStart");
+    sortEntries(this.onCastEnd, "onCastEnd");
+    sortEntries(this.onStatusApply, "onStatusApply");
+    sortEntries(this.onBuffApply, "onBuffApply");
+    sortEntries(this.onBuffConsumed, "onBuffConsumed");
+    sortEntries(this.onInflictionApply, "onInflictionApply");
+    sortEntries(this.onInflictionConsumed, "onInflictionConsumed");
     for (const key of Object.keys(this.buffDamageBonus)) {
       sortEntries(this.buffDamageBonus[key as BuffId]!, "buffDamageBonus");
     }

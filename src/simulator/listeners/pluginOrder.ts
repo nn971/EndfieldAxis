@@ -14,26 +14,25 @@ export type PluginOrderingConstraint = {
 export type PluginOrderingBucket =
   | "globalDamageBonus"
   | "buffDamageBonus"
-  | "afterHitGlobal"
-  | "afterHitByOperatorId"
-  | "onCastStartGlobal"
-  | "onCastEndGlobal"
-  | "onStatusApplyGlobal"
-  | "onStatusApplyByWielderWeaponId"
-  | "onBuffApplyGlobal"
-  | "onBuffApplyByBuffId"
-  | "onBuffConsumedGlobal"
-  | "onBuffConsumedByBuffId"
-  | "onInflictionApplyGlobal"
-  | "onInflictionApplyByBuffId"
-  | "onInflictionConsumedGlobal";
+  | "afterHit"
+  | "onCastStart"
+  | "onCastEnd"
+  | "onStatusApply"
+  | "onBuffApply"
+  | "onBuffConsumed"
+  | "onInflictionApply"
+  | "onInflictionConsumed";
 
 export type PluginOrderingConfig = Partial<
   Record<PluginOrderingBucket, PluginOrderingConstraint[]>
 >;
 
 const config: PluginOrderingConfig = {
-  onStatusApplyGlobal: [
+  onStatusApply: [
+    {
+      before: SWORDMANCER_ON_STATUS_APPLY_PLUGIN_ID,
+      after: SUNDERING_STEEL_ON_STATUS_APPLY_PLUGIN_ID,
+    },
     {
       before: SWORDMANCER_ON_STATUS_APPLY_PLUGIN_ID,
       after: CRYSTAL_ON_STATUS_APPLY_PLUGIN_ID,
@@ -47,7 +46,11 @@ export function sortPluginsByGameOrder<
   const { entries, bucket } = params;
   entries.sort((a, b) => a.id.localeCompare(b.id));
 
-  const constraints = config[bucket] ?? [];
+  const constraints = assertKnownConstraintIds({
+    bucket,
+    constraints: config[bucket] ?? [],
+    entries,
+  });
   if (constraints.length === 0 || entries.length <= 1) return;
 
   const ids = new Set(entries.map(entry => entry.id));
@@ -60,17 +63,6 @@ export function sortPluginsByGameOrder<
   }
 
   for (const constraint of constraints) {
-    const hasBefore = ids.has(constraint.before);
-    const hasAfter = ids.has(constraint.after);
-
-    if (!hasBefore || !hasAfter) {
-      console.warn(
-        `[plugin-order] Unknown plugin id in ${bucket} constraint: ` +
-          `${constraint.before} -> ${constraint.after}`,
-      );
-      continue;
-    }
-
     const neighbors = adjacency.get(constraint.before)!;
     if (neighbors.has(constraint.after)) continue;
 
@@ -110,6 +102,42 @@ export function sortPluginsByGameOrder<
   const rank = new Map<string, number>();
   orderedIds.forEach((id, index) => rank.set(id, index));
   entries.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
+}
+
+function assertKnownConstraintIds<TEntry extends OrderedPluginEntry>(params: {
+  bucket: PluginOrderingBucket;
+  constraints: PluginOrderingConstraint[];
+  entries: TEntry[];
+}): PluginOrderingConstraint[] {
+  const { bucket, constraints, entries } = params;
+  const ids = new Set(entries.map(entry => entry.id));
+  const unknownIds = new Set<string>();
+  const validConstraints: PluginOrderingConstraint[] = [];
+
+  for (const constraint of constraints) {
+    const hasBefore = ids.has(constraint.before);
+    const hasAfter = ids.has(constraint.after);
+    if (!hasBefore || !hasAfter) {
+      if (!hasBefore) unknownIds.add(constraint.before);
+      if (!hasAfter) unknownIds.add(constraint.after);
+      console.warn(
+        `[plugin-order] Unknown plugin id in ${bucket} constraint: ` +
+          `${constraint.before} -> ${constraint.after}`,
+      );
+      continue;
+    }
+    validConstraints.push(constraint);
+  }
+
+  if (unknownIds.size > 0) {
+    console.warn(
+      `[plugin-order] Unknown plugin ids in ${bucket}: ${[...unknownIds]
+        .sort((a, b) => a.localeCompare(b))
+        .join(", ")}`,
+    );
+  }
+
+  return validConstraints;
 }
 
 function formatCyclePath(
