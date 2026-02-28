@@ -21,9 +21,9 @@ class CombustionBuffDef extends BuffDef {
   }
 
   override registerSimPlugins(registry: SimRegistry): void {
-    registry.registerOnBuffApplyForBuff({
-      buffId: this.id,
+    registry.registerOnBuffApply({
       id: "buff.combustion.scheduleDot",
+      when: { buffId: this.id },
       fn: ({ ev, read, nextSeq, makeEventId }) => {
         const target = read.getEntity(ev.targetId);
         const buff = (target as any).buffs?.[this.id];

@@ -30,9 +30,9 @@ class GrandVisionDef extends WeaponDef {
 
   override registerSimPlugins(registry: SimRegistry): void {
     // When the wielder applies Crystal, prime Long Wish for 20s.
-    registry.registerOnBuffApplyForBuff({
-      buffId: "buff.crystal",
+    registry.registerOnBuffApply({
       id: "weapon.grandvision.longWish.prime",
+      when: { buffId: "buff.crystal" },
       fn: ({ read, ev, sourceId, nextSeq, makeEventId }) => {
         if (!sourceId) return [];
 

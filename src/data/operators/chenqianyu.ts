@@ -161,9 +161,9 @@ class ChenQianyuDef extends OperatorDef {
       },
     });
 
-    registry.registerAfterHitForOperator({
-      operatorId: this.id,
+    registry.registerAfterHit({
       id: "operator.chenqianyu.talent.atkStack",
+      when: { sourceOperatorId: this.id },
       fn: ({ read, ev, sourceId, nextSeq, makeEventId }) => {
         const parent = ev.ref ? read.getEvent(ev.ref) : null;
         const isSkillHit = parent
