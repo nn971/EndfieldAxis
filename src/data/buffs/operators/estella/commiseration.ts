@@ -12,32 +12,7 @@ class CommiserationDef extends BuffDef {
     });
   }
 
-  override registerSimPlugins(registry: SimRegistry): void {
-    // registry.registerOnCastStartForBuff({
-    //   id: "operator.estella.talent1.commiseration.onCastStart",
-    //   fn: ({ read, ev, sourceId, nextSeq, makeEventId }) => {
-    //     if (ev.sourceId != "estella" || ev.skillType != "normalSkill")
-    //       return [];
-    //     return [
-    //       {
-    //         id: makeEventId(),
-    //         type: "buffRemove",
-    //         frame: read.nowInFrames,
-    //         seq: nextSeq(),
-    //         ownerId: "estella",
-    //         buffId: this.id,
-    //       },
-    //       {
-    //         id: makeEventId(),
-    //         type: "spReturn",
-    //         frame: read.nowInFrames,
-    //         seq: nextSeq(),
-    //         sourceId: "estella",
-    //         amount: 15, // TODO
-    //       },
-    //     ];
-    //   },
-    // });
+  override registerSimPlugins(_registry: SimRegistry): void {
   }
 }
 

@@ -1,7 +1,7 @@
 import { applyBuff, physicalHitByRank } from "../../simulator/skillOps";
 import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 import type { SimRegistry } from "../../simulator/listeners/registry";
-import { SimEvent } from "../../types/simulator/simulator";
+import { SimEventDraft } from "../../simulator/listeners/drafts";
 import { OperatorBuild } from "../../types/operator";
 
 const NS_DMG_MUL = [
@@ -64,7 +64,6 @@ class EndministratorDef extends OperatorDef {
           timeline: [
             physicalHitByRank(24, {
               rankTable: NS_DMG_MUL,
-              rankSkillType: "normalSkill",
               withStatus: true,
               statusType: "crush",
             }),
@@ -78,7 +77,6 @@ class EndministratorDef extends OperatorDef {
             applyBuff(45, "buff.crystal"),
             physicalHitByRank(45, {
               rankTable: CS_DMG_MUL,
-              rankSkillType: "comboSkill",
               withStatus: false,
             }),
           ],
@@ -90,12 +88,10 @@ class EndministratorDef extends OperatorDef {
           timeline: [
             physicalHitByRank(55, {
               rankTable: ULT_DMG_MUL,
-              rankSkillType: "ultimate",
               withStatus: false,
             }),
             physicalHitByRank(56, {
               rankTable: ULT_BONUS_DMG_MUL,
-              rankSkillType: "ultimate",
               withStatus: false,
             }),
           ],
@@ -119,7 +115,7 @@ class EndministratorDef extends OperatorDef {
   override registerSimPlugins(registry: SimRegistry): void {
     registry.registerAfterHit({
       id: "operator.endministrator.combo.triggerOnAllyComboHit",
-      fn: ({ read, ev, sourceId, nextSeq, makeEventId }) => {
+      fn: ({ read, ev, sourceId, emit }) => {
         if (sourceId === this.id) return [];
         const source = read.getEntity(sourceId);
         if (!source || source.type !== "operator") return [];
@@ -130,15 +126,12 @@ class EndministratorDef extends OperatorDef {
         if (!isComboHit) return [];
 
         return [
-          {
-            id: makeEventId(),
+          emit.now({
             type: "comboTriggered",
-            frame: ev.frame,
-            seq: nextSeq(),
             sourceId: this.id,
             targetId: ev.targetId,
             ref: ev.id,
-          },
+          }),
         ];
       },
     });
@@ -146,7 +139,7 @@ class EndministratorDef extends OperatorDef {
     registry.registerOnBuffConsumed({
       id: "operator.endministrator.talent1.onCrystalConsumed",
       when: { buffId: "buff.crystal" },
-      fn: ({ read, ev, nextSeq, makeEventId }) => {
+      fn: ({ read, ev, emit }) => {
         if (!read.env.entitiesById[this.id]) return [];
         const build = read.getBuild(this.id) as OperatorBuild;
         const talentRank = Number(build?.talentRanks?.talent1 ?? 0);
@@ -160,17 +153,14 @@ class EndministratorDef extends OperatorDef {
             : "buff.endministrator.talent1.atkInc.low";
 
         const spawned = [
-          {
-            id: makeEventId(),
+          emit.now({
             type: "buffApply",
-            frame: ev.frame,
-            seq: nextSeq(),
             sourceId: this.id,
             ownerId: this.id,
-            buffId: buffId as any,
+            buffId: buffId,
             ref: ev.id,
-          },
-        ] as SimEvent[];
+          }),
+        ] as SimEventDraft[];
         // Potential 1: Return 50 SP if normal skill consumes Crystal
         if (build.potentialRank >= 1) {
           const consumerEvent = read.getEvent(ev.ref);
@@ -182,15 +172,14 @@ class EndministratorDef extends OperatorDef {
               castEvent.sourceId === this.id &&
               castEvent.skillType === "normalSkill"
             ) {
-              spawned.push({
-                id: makeEventId(),
-                type: "spReturn",
-                frame: ev.frame,
-                seq: nextSeq(),
-                sourceId: this.id,
-                amount: 50,
-                ref: castEvent.id,
-              });
+              spawned.push(
+                emit.now({
+                  type: "spReturn",
+                  sourceId: this.id,
+                  amount: 50,
+                  ref: castEvent.id,
+                }),
+              );
             }
           }
         }
@@ -202,48 +191,44 @@ class EndministratorDef extends OperatorDef {
     registry.registerOnBuffApply({
       id: "operator.endministrator.potential2.shareAtkBuff.high",
       when: { buffId: "buff.endministrator.talent1.atkInc" as any },
-      fn: ({ read, ev, nextSeq, makeEventId }) => {
+      fn: ({ read, ev, emit }) => {
         if (ev.ownerId !== this.id) return [];
         const build = read.getBuild(this.id);
         if (Number(build?.potentialRank ?? 0) < 2) return [];
 
         return Object.values(read.env.entitiesById)
           .filter(e => e.type === "operator" && e.id !== this.id)
-          .map(e => ({
-            id: makeEventId(),
-            type: "buffApply" as const,
-            frame: ev.frame,
-            seq: nextSeq(),
-            sourceId: this.id,
-            targetId: e.id,
-            ownerId: e.id,
-            buffId: "buff.endministrator.potential2.teamAtkShare.high" as any,
-            ref: ev.id,
-          }));
+          .map(e =>
+            emit.now({
+              type: "buffApply" as const,
+              sourceId: this.id,
+              ownerId: e.id,
+              buffId: "buff.endministrator.potential2.teamAtkShare.high" as any,
+              ref: ev.id,
+            }),
+          );
       },
     });
 
     registry.registerOnBuffApply({
       id: "operator.endministrator.potential2.shareAtkBuff.low",
       when: { buffId: "buff.endministrator.talent1.atkInc.low" as any },
-      fn: ({ read, ev, nextSeq, makeEventId }) => {
+      fn: ({ read, ev, emit }) => {
         if (ev.ownerId !== this.id) return [];
         const build = read.getBuild(this.id);
         if (Number(build?.potentialRank ?? 0) < 2) return [];
 
         return Object.values(read.env.entitiesById)
           .filter(e => e.type === "operator" && e.id !== this.id)
-          .map(e => ({
-            id: makeEventId(),
-            type: "buffApply" as const,
-            frame: ev.frame,
-            seq: nextSeq(),
-            sourceId: this.id,
-            targetId: e.id,
-            ownerId: e.id,
-            buffId: "buff.endministrator.potential2.teamAtkShare.low" as any,
-            ref: ev.id,
-          }));
+          .map(e =>
+            emit.now({
+              type: "buffApply" as const,
+              sourceId: this.id,
+              ownerId: e.id,
+              buffId: "buff.endministrator.potential2.teamAtkShare.low" as any,
+              ref: ev.id,
+            }),
+          );
       },
     });
   }

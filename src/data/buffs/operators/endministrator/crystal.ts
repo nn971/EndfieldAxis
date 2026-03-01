@@ -1,17 +1,20 @@
 import { BuffDef } from "../../BuffDef";
 import type { SimRegistry } from "../../../../simulator/listeners/registry";
-import type { SimEvent } from "../../../../types/simulator/simulator";
+import type { SimEventDraft } from "../../../../simulator/listeners/drafts";
 import type { SimRead } from "../../../../simulator/simulator";
 
 const ENDMINISTRATOR_ID = "endministrator";
-export const CRYSTAL_ON_STATUS_APPLY_PLUGIN_ID = "buff.crystal.consume.onStatusApply";
+export const CRYSTAL_ON_STATUS_APPLY_PLUGIN_ID =
+  "buff.crystal.consume.onStatusApply";
 
 const CRYSTAL_SHATTER_MUL_BY_CS_RANK = [
   1.78, 1.96, 2.13, 2.31, 2.49, 2.67, 2.84, 3.02, 3.2, 3.42, 3.69, 4.0,
 ] as const;
 
 function getEndministratorComboRank(read: SimRead): number {
-  const rank = Number(read.getBuild(ENDMINISTRATOR_ID)?.skillRanks?.comboSkill ?? 9);
+  const rank = Number(
+    read.getBuild(ENDMINISTRATOR_ID)?.skillRanks?.comboSkill ?? 9,
+  );
   if (!Number.isFinite(rank)) return 9;
   return Math.max(1, Math.min(12, Math.round(rank)));
 }
@@ -20,35 +23,29 @@ function spawnCrystalConsumeEvents(params: {
   read: SimRead;
   frame: number;
   targetId: string;
-  nextSeq: () => number;
-  makeEventId: () => string;
   ref?: string | null;
-}): SimEvent[] {
+}): SimEventDraft[] {
   const csRank = getEndministratorComboRank(params.read);
   const crystalShatterMul = CRYSTAL_SHATTER_MUL_BY_CS_RANK[csRank - 1] ?? 3.2;
 
   return [
     {
-      id: params.makeEventId(),
       type: "buffRemove",
       frame: params.frame,
-      seq: params.nextSeq(),
       ownerId: params.targetId,
       buffId: "buff.crystal" as any,
       ref: params.ref,
     },
     {
-      id: params.makeEventId(),
       type: "hit",
       frame: params.frame,
-      seq: params.nextSeq(),
       sourceId: ENDMINISTRATOR_ID,
       targetId: params.targetId,
       damageType: "physical",
       hitTypes: { comboSkill: true },
       dmgMultiplier: crystalShatterMul,
       ref: params.ref,
-    } as SimEvent,
+    } as SimEventDraft,
   ];
 }
 
@@ -80,7 +77,7 @@ class CrystalBuffDef extends BuffDef {
 
     registry.registerOnStatusApply({
       id: CRYSTAL_ON_STATUS_APPLY_PLUGIN_ID,
-      fn: ({ read, ev, targetId, nextSeq, makeEventId }) => {
+      fn: ({ read, ev, targetId }) => {
         if (!read.env.entitiesById[ENDMINISTRATOR_ID]) return [];
 
         const target = read.getEntity(targetId);
@@ -98,8 +95,6 @@ class CrystalBuffDef extends BuffDef {
           read,
           frame: ev.frame,
           targetId,
-          nextSeq,
-          makeEventId,
           ref: ev.id,
         });
       },
@@ -107,7 +102,7 @@ class CrystalBuffDef extends BuffDef {
 
     registry.registerOnInflictionApply({
       id: "buff.crystal.consume.onInflictionApply",
-      fn: ({ read, ev, targetId, nextSeq, makeEventId }) => {
+      fn: ({ read, ev, targetId }) => {
         if (!read.env.entitiesById[ENDMINISTRATOR_ID]) return [];
 
         const target = read.getEntity(targetId);
@@ -124,8 +119,6 @@ class CrystalBuffDef extends BuffDef {
           read,
           frame: ev.frame,
           targetId,
-          nextSeq,
-          makeEventId,
           ref: ev.id,
         });
       },

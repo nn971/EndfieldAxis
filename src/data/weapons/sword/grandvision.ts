@@ -33,7 +33,7 @@ class GrandVisionDef extends WeaponDef {
     registry.registerOnBuffApply({
       id: "weapon.grandvision.longWish.prime",
       when: { buffId: "buff.crystal" },
-      fn: ({ read, ev, sourceId, nextSeq, makeEventId }) => {
+      fn: ({ read, sourceId, emit }) => {
         if (!sourceId) return [];
 
         const build = read.getBuild(sourceId);
@@ -47,42 +47,31 @@ class GrandVisionDef extends WeaponDef {
         if (stacks >= 2) return [];
 
         // If already primed (stacks=1), refresh by removing then applying.
-        // NOTE: Same-frame events execute by descending seq (larger seq first).
-        // We schedule buffApply first, then buffRemove, so removal executes first.
         if (stacks === 1) {
           return [
-            {
-              id: makeEventId(),
+            emit.now({
+              type: "buffRemove",
+              ownerId: sourceId,
+              buffId: LONG_WISH_BUFF as any,
+            }),
+            emit.now({
               type: "buffApply",
-              frame: ev.frame,
-              seq: nextSeq(),
               sourceId,
               targetId: sourceId,
               ownerId: sourceId,
               buffId: LONG_WISH_BUFF as any,
-            },
-            {
-              id: makeEventId(),
-              type: "buffRemove",
-              frame: ev.frame,
-              seq: nextSeq(),
-              ownerId: sourceId,
-              buffId: LONG_WISH_BUFF as any,
-            },
+            }),
           ];
         }
 
         return [
-          {
-            id: makeEventId(),
+          emit.now({
             type: "buffApply",
-            frame: ev.frame,
-            seq: nextSeq(),
             sourceId,
             targetId: sourceId,
             ownerId: sourceId,
             buffId: LONG_WISH_BUFF as any,
-          },
+          }),
         ];
       },
     });
@@ -90,7 +79,7 @@ class GrandVisionDef extends WeaponDef {
     // Activate Long Wish during the next battle-skill or ultimate cast.
     registry.registerOnCastStart({
       id: "weapon.grandvision.longWish.activate",
-      fn: ({ read, ev, sourceId, nextSeq, makeEventId }) => {
+      fn: ({ read, ev, sourceId, emit }) => {
         if (!sourceId) return [];
 
         const build = read.getBuild(sourceId);
@@ -110,16 +99,13 @@ class GrandVisionDef extends WeaponDef {
 
         // Apply again to stack to 2 (active) for the duration of this cast.
         return [
-          {
-            id: makeEventId(),
+          emit.now({
             type: "buffApply",
-            frame: ev.frame,
-            seq: nextSeq(),
             sourceId,
             targetId: sourceId,
             ownerId: sourceId,
             buffId: LONG_WISH_BUFF as any,
-          },
+          }),
         ];
       },
     });
@@ -127,7 +113,7 @@ class GrandVisionDef extends WeaponDef {
     // Consume Long Wish at cast end.
     registry.registerOnCastEnd({
       id: "weapon.grandvision.longWish.consume",
-      fn: ({ read, ev, sourceId, nextSeq, makeEventId }) => {
+      fn: ({ read, ev, sourceId, emit }) => {
         if (!sourceId) return [];
 
         const build = read.getBuild(sourceId);
@@ -146,14 +132,11 @@ class GrandVisionDef extends WeaponDef {
         if (stacks < 2) return [];
 
         return [
-          {
-            id: makeEventId(),
+          emit.now({
             type: "buffRemove",
-            frame: ev.frame,
-            seq: nextSeq(),
             ownerId: sourceId,
             buffId: LONG_WISH_BUFF as any,
-          },
+          }),
         ];
       },
     });

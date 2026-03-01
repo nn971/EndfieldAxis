@@ -1,8 +1,10 @@
 import operatorsData from "../data/operators";
 import { SkillType } from "../data/operators/OperatorDef";
 import type { SimEvent } from "../types/simulator/simulator";
+import type { SimEventDraft } from "./listeners/drafts";
 import type { OperatorBuild } from "../types/operator";
 import { makeSimEventId } from "../shared/lib/utils";
+import { materializeDrafts } from "./listeners/drafts";
 
 export function compileSkillCast(params: {
   sourceId: string;
@@ -51,35 +53,38 @@ export function compileSkillCast(params: {
     skillType: skillType,
   });
 
+  const timelineDrafts: SimEventDraft[] = [];
+
   // events for skill ops
-  // Here we need to reverse the order because larger seq happens earlier.
   if (!skill?.timeline)
     throw new Error(
       `no timeline for skill ${skillType} of operator ${operator.name}`,
     );
-  for (const step of [...skill?.timeline].reverse() ?? []) {
+  for (const step of skill.timeline ?? []) {
     if (typeof step !== "function") {
       throw new Error(
         `Skill timeline step must be function. Found: ${JSON.stringify(step)}`,
       );
     }
-    const eventsToAdd = (step as any)({
+    const draftsToAdd = (step as any)({
       sourceId,
       targetId,
       startFrame,
       skillType,
       sourceBuild: buildByOperatorId?.[sourceId],
-      nextSeq,
-      makeEventId: makeSimEventId,
     });
-    for (const ev of (eventsToAdd ?? []) as SimEvent[]) {
-      // Link timeline events to the castStart event so downstream logic can
-      // reconstruct provenance via SimEventBase.ref.
-      (ev as any).ref ??= startEventId;
-
-      events.push(ev);
-    }
+    timelineDrafts.push(...((draftsToAdd ?? []) as SimEventDraft[]));
   }
+
+  events.push(
+    ...materializeDrafts(
+      timelineDrafts,
+      { nextSeq, makeId: makeSimEventId },
+      {
+        defaultRef: startEventId,
+      },
+    ),
+  );
 
   // event for cast.end
   events.push({

@@ -275,10 +275,9 @@ export function resolveCastStart(
     ev: ev,
     sourceId: ev.sourceId,
     targetId: ev.targetId,
-    nextSeq: self.ops.nextSeq,
-    makeEventId: makeSimEventId,
+    emit: self.createEmit(ev.frame),
   });
-  for (const sev of spawned) self.ops.schedule(sev);
+  self.ops.scheduleDrafts(spawned);
 }
 
 export function resolveCastEnd(
@@ -301,10 +300,9 @@ export function resolveCastEnd(
     ev: ev,
     sourceId: ev.sourceId,
     targetId: ev.targetId,
-    nextSeq: self.ops.nextSeq,
-    makeEventId: makeSimEventId,
+    emit: self.createEmit(ev.frame),
   });
-  for (const sev of spawned) self.ops.schedule(sev);
+  self.ops.scheduleDrafts(spawned);
 }
 
 export function resolveHit(
@@ -397,10 +395,9 @@ export function resolveHit(
     ev: ev,
     sourceId: source.id,
     targetId: target.id,
-    nextSeq: self.ops.nextSeq,
-    makeEventId: makeSimEventId,
+    emit: self.createEmit(ev.frame),
   });
-  for (const sev of spawned) self.ops.schedule(sev);
+  self.ops.scheduleDrafts(spawned);
 }
 
 export function resolveStatusApplication(
@@ -818,10 +815,9 @@ export function resolveInflictionApplication(
     ev,
     sourceId: source.id,
     targetId: owner.id,
-    nextSeq: self.ops.nextSeq,
-    makeEventId: makeSimEventId,
+    emit: self.createEmit(ev.frame),
   });
-  for (const sev of spawned) self.ops.schedule(sev);
+  self.ops.scheduleDrafts(spawned);
 
   self.ops.schedule({
     id: makeSimEventId(),

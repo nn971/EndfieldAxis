@@ -8,28 +8,28 @@ import type {
   InflictionType,
 } from "./infliction";
 
-export type SimEventType =
-  | "castStart" // start frame of casting a skill
-  | "castEnd" // end frame of casting a skill
-  | "hit" // attack or skill or status hit, physical or arts
-  | "statusApply" // apply a status
-  | "inflictionApply" // apply an infliction
-  | "inflictionExpire" // expire an infliction, either by duration or by dispel
-  | "inflictionRemove" // remove an infliction immediately (e.g. reaction consume)
-  | "buffApply" // apply a timed buff/debuff (e.g. enemy crystal)
-  | "buffRemove" // remove a buff immediately (e.g. crystal consumed)
-  | "buffExpire" // expire a timed buff/debuff
-  | "comboTriggered" // combo trigger activated for an operator
-  | "comboTriggerElapse" // combo trigger availability window elapsed
-  | "comboCooldownEnd" // combo cooldown has ended
-  | "reactionTick" // periodic tick for reaction buffs
-  | "spReturn" // return team SP from certain triggers
-  | "spRecover"; // recover team SP from skill effects
-// | string;
+// export type SimEventType =
+//   | "castStart" // start frame of casting a skill
+//   | "castEnd" // end frame of casting a skill
+//   | "hit" // attack or skill or status hit, physical or arts
+//   | "statusApply" // apply a status
+//   | "inflictionApply" // apply an infliction
+//   | "inflictionExpire" // expire an infliction, either by duration or by dispel
+//   | "inflictionRemove" // remove an infliction immediately (e.g. reaction consume)
+//   | "buffApply" // apply a timed buff/debuff (e.g. enemy crystal)
+//   | "buffRemove" // remove a buff immediately (e.g. crystal consumed)
+//   | "buffExpire" // expire a timed buff/debuff
+//   | "comboTriggered" // combo trigger activated for an operator
+//   | "comboTriggerElapse" // combo trigger availability window elapsed
+//   | "comboCooldownEnd" // combo cooldown has ended
+//   | "reactionTick" // periodic tick for reaction buffs
+//   | "spReturn" // return team SP from certain triggers
+//   | "spRecover"; // recover team SP from skill effects
+// // | string;
 
 export type SimEventBase = {
   id: string; // unique id within a simulation, for endding events to refer to
-  type: SimEventType;
+  type: string;
   frame: number;
   seq: number; // larger seq earlier when frame equal
 
@@ -141,6 +141,8 @@ export type SimEvent =
       sourceId: SimEntityId;
       amount: number;
     });
+
+export type SimEventType = SimEvent["type"];
 
 export type SimTeamSpState = {
   real: number;

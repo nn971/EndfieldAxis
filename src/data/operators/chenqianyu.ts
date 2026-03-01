@@ -66,7 +66,6 @@ class ChenQianyuDef extends OperatorDef {
           timeline: [
             physicalHitByRank(26, {
               rankTable: NS_DMG_MUL,
-              rankSkillType: "normalSkill",
               withStatus: true,
               statusType: "lift",
             }),
@@ -79,7 +78,6 @@ class ChenQianyuDef extends OperatorDef {
           timeline: [
             physicalHitByRank(34, {
               rankTable: CS_DMG_MUL,
-              rankSkillType: "comboSkill",
               withStatus: true,
               statusType: "lift",
             }),
@@ -92,35 +90,27 @@ class ChenQianyuDef extends OperatorDef {
           timeline: [
             physicalHitByRank(32, {
               rankTable: ULT_SLASH_DMG_MUL,
-              rankSkillType: "ultimate",
             }),
             physicalHitByRank(56, {
               rankTable: ULT_SLASH_DMG_MUL,
-              rankSkillType: "ultimate",
             }),
             physicalHitByRank(80, {
               rankTable: ULT_SLASH_DMG_MUL,
-              rankSkillType: "ultimate",
             }),
             physicalHitByRank(104, {
               rankTable: ULT_SLASH_DMG_MUL,
-              rankSkillType: "ultimate",
             }),
             physicalHitByRank(128, {
               rankTable: ULT_SLASH_DMG_MUL,
-              rankSkillType: "ultimate",
             }),
             physicalHitByRank(152, {
               rankTable: ULT_SLASH_DMG_MUL,
-              rankSkillType: "ultimate",
             }),
             physicalHitByRank(176, {
               rankTable: ULT_SLASH_DMG_MUL,
-              rankSkillType: "ultimate",
             }),
             physicalHitByRank(205, {
               rankTable: ULT_FINAL_DMG_MUL,
-              rankSkillType: "ultimate",
             }),
           ],
         },
@@ -145,18 +135,15 @@ class ChenQianyuDef extends OperatorDef {
 
     registry.registerOnInflictionApply({
       id: "operator.chenqianyu.combo.triggerOnVulnerableApply",
-      fn: ({ ev, nextSeq, makeEventId }) => {
+      fn: ({ ev, emit }) => {
         if (ev.inflictionType !== "vulnerable") return [];
         return [
-          {
-            id: makeEventId(),
+          emit.now({
             type: "comboTriggered",
-            frame: ev.frame,
-            seq: nextSeq(),
             sourceId: this.id,
             targetId: ev.ownerId,
             ref: ev.id,
-          },
+          }),
         ];
       },
     });
@@ -164,7 +151,7 @@ class ChenQianyuDef extends OperatorDef {
     registry.registerAfterHit({
       id: "operator.chenqianyu.talent.atkStack",
       when: { sourceOperatorId: this.id },
-      fn: ({ read, ev, sourceId, nextSeq, makeEventId }) => {
+      fn: ({ read, ev, sourceId, emit }) => {
         const parent = ev.ref ? read.getEvent(ev.ref) : null;
         const isSkillHit = parent
           ? parent.type === "castStart" && parent.skillType != "normalAttack"
@@ -177,17 +164,13 @@ class ChenQianyuDef extends OperatorDef {
         if (talentRank <= 0) return [];
 
         return [
-          {
-            id: makeEventId(),
+          emit.now({
             type: "buffApply",
-            frame: ev.frame,
-            seq: nextSeq(),
             ref: ev.id,
             sourceId: sourceId,
-            targetId: sourceId,
             ownerId: sourceId,
             buffId: BONUS_BUFF,
-          },
+          }),
         ];
       },
     });

@@ -24,8 +24,8 @@ class CombustionBuffDef extends BuffDef {
     registry.registerOnBuffApply({
       id: "buff.combustion.scheduleDot",
       when: { buffId: this.id },
-      fn: ({ ev, read, nextSeq, makeEventId }) => {
-        const target = read.getEntity(ev.targetId);
+      fn: ({ ev, read, emit }) => {
+        const target = read.getEntity(ev.ownerId);
         const buff = (target as any).buffs?.[this.id];
         if (!buff) return [];
 
@@ -33,16 +33,13 @@ class CombustionBuffDef extends BuffDef {
         if (!sourceId) return [];
 
         return [
-          {
-            id: makeEventId(),
+          emit.after(COMBUSTION_DOT_INTERVAL_FRAMES, {
             type: "reactionTick",
-            frame: ev.frame + COMBUSTION_DOT_INTERVAL_FRAMES,
-            seq: nextSeq(),
             sourceId,
-            targetId: ev.targetId,
+            targetId: ev.ownerId,
             reactionBuffId: this.id,
             ref: ev.id,
-          },
+          }),
         ];
       },
     });

@@ -1,5 +1,5 @@
 import type { SimRegistry } from "../../../simulator/listeners/registry";
-import { SimEvent } from "../../../types/simulator/simulator";
+import { SimEventDraft } from "../../../simulator/listeners/drafts";
 import { BuffDef } from "../BuffDef";
 
 export const SOLIDIFICATION_BUFF_ID = "buff.solidification" as const;
@@ -27,25 +27,19 @@ class SolidificationBuffDef extends BuffDef {
       sourceId: string;
       targetId: string;
       stacks: number;
-      nextSeq: () => number;
-      makeEventId: () => string;
       ref?: string | null;
-    }) => {
+    }): SimEventDraft[] => {
       return [
         {
-          id: params.makeEventId(),
           type: "buffRemove" as const,
           frame: params.frame,
-          seq: params.nextSeq(),
           ownerId: params.targetId,
           buffId: SOLIDIFICATION_BUFF_ID,
           ref: params.ref,
         },
         {
-          id: params.makeEventId(),
           type: "hit" as const,
           frame: params.frame,
-          seq: params.nextSeq(),
           sourceId: params.sourceId,
           targetId: params.targetId,
           damageType: "physical",
@@ -53,13 +47,13 @@ class SolidificationBuffDef extends BuffDef {
             SOLIDIFICATION_SHATTER_BASE_MUL +
             params.stacks * SOLIDIFICATION_SHATTER_PER_STACK_MUL,
           ref: params.ref,
-        } as SimEvent,
+        } as SimEventDraft,
       ];
     };
 
     registry.registerOnStatusApply({
       id: "buff.solidification.shatter.onPhysicalStatus",
-      fn: ({ read, ev, sourceId, targetId, nextSeq, makeEventId }) => {
+      fn: ({ read, ev, sourceId, targetId }) => {
         if (
           ev.statusType !== "lift" &&
           ev.statusType !== "knockDown" &&
@@ -80,8 +74,6 @@ class SolidificationBuffDef extends BuffDef {
           sourceId,
           targetId,
           stacks,
-          nextSeq,
-          makeEventId,
           ref: ev.id,
         });
       },
@@ -89,7 +81,7 @@ class SolidificationBuffDef extends BuffDef {
 
     registry.registerOnInflictionApply({
       id: "buff.solidification.shatter.onVulnerable",
-      fn: ({ read, ev, sourceId, targetId, nextSeq, makeEventId }) => {
+      fn: ({ read, ev, sourceId, targetId }) => {
         if (ev.inflictionType !== "vulnerable") return [];
 
         const target = read.getEntity(targetId);
@@ -103,8 +95,6 @@ class SolidificationBuffDef extends BuffDef {
           sourceId,
           targetId,
           stacks,
-          nextSeq,
-          makeEventId,
           ref: ev.id,
         });
       },

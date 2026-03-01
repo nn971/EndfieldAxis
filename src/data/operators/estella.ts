@@ -1,6 +1,5 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
 import { artsHitByRank, physicalHitByRank } from "../../simulator/skillOps";
-import { SimEvent } from "../../types/simulator/simulator";
 import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 
 const NS_DMG_MUL = [
@@ -63,7 +62,6 @@ class EstellaDef extends OperatorDef {
           timeline: [
             artsHitByRank(26, {
               rankTable: NS_DMG_MUL,
-              rankSkillType: "normalSkill",
               dmgType: "cryo",
               withInfliction: true,
             }),
@@ -78,7 +76,6 @@ class EstellaDef extends OperatorDef {
           timeline: [
             physicalHitByRank(34, {
               rankTable: CS_DMG_MUL_NON_SOLIDIFIED,
-              rankSkillType: "comboSkill",
               withStatus: true,
               statusType: "lift",
             }),
@@ -92,7 +89,6 @@ class EstellaDef extends OperatorDef {
           timeline: [
             physicalHitByRank(55, {
               rankTable: ULT_DMG_MUL,
-              rankSkillType: "ultimate",
             }),
           ],
         },
@@ -116,19 +112,16 @@ class EstellaDef extends OperatorDef {
     registry.registerOnBuffApply({
       id: "operator.estella.combo.triggerOnSolidification",
       when: { buffId: "buff.solidification" },
-      fn: ({ read, ev, nextSeq, makeEventId }) => {
+      fn: ({ read, ev, emit }) => {
         if (!read.env.entitiesById[this.id]) return [];
 
         return [
-          {
-            id: makeEventId(),
+          emit.now({
             type: "comboTriggered",
-            frame: ev.frame,
-            seq: nextSeq(),
             sourceId: this.id,
             targetId: ev.ownerId,
             ref: ev.id,
-          },
+          }),
         ];
       },
     });

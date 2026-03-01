@@ -4,7 +4,7 @@ import type {
   SimStatusType,
 } from "../types/simulator/infliction";
 import type { DmgType, SkillType } from "../data/operators/OperatorDef";
-import type { SimEvent } from "../types/simulator/simulator";
+import type { SimEventDraft } from "./listeners/drafts";
 
 export type SkillCompileContext = {
   sourceId: string;
@@ -15,11 +15,9 @@ export type SkillCompileContext = {
   sourceBuild?: {
     skillRanks?: Record<string, number>;
   };
-  nextSeq: () => number;
-  makeEventId: () => string;
 };
 
-export type SkillOpFn = (ctx: SkillCompileContext) => SimEvent[];
+export type SkillOpFn = (ctx: SkillCompileContext) => SimEventDraft[];
 
 function clampSkillRank(rank: number): number {
   if (!Number.isFinite(rank)) return 9;
@@ -59,17 +57,11 @@ export function physicalHit(
   },
 ): SkillOpFn {
   return ctx => {
-    const events: SimEvent[] = [];
+    const events: SimEventDraft[] = [];
 
-    // NOTE: In SimWorld, same-frame events are executed by descending seq (larger seq first).
-    // We allocate hitSeq first, then statusSeq, so statusApply executes before the hit.
-    const hitSeq = ctx.nextSeq();
-
-    const hitEv: SimEvent = {
-      id: ctx.makeEventId(),
+    const hitEv: SimEventDraft = {
       type: "hit",
       frame: ctx.startFrame + frame,
-      seq: hitSeq,
 
       sourceId: ctx.sourceId,
       targetId: ctx.targetId,
@@ -84,19 +76,15 @@ export function physicalHit(
         throw new Error(
           `physicalHit(frame=${frame}): withStatus=true but statusType missing`,
         );
-
-      const statusSeq = ctx.nextSeq();
       events.push({
-        id: ctx.makeEventId(),
         type: "statusApply",
         frame: ctx.startFrame + frame,
-        seq: statusSeq,
 
         sourceId: ctx.sourceId,
         targetId: ctx.targetId,
 
         statusType: opts.statusType,
-      } satisfies SimEvent);
+      } satisfies SimEventDraft);
     }
 
     events.push(hitEv);
@@ -110,11 +98,9 @@ export function applyBuff(
   opts?: { isForced?: boolean },
 ): SkillOpFn {
   return ctx => {
-    const ev: SimEvent = {
-      id: ctx.makeEventId(),
+    const ev: SimEventDraft = {
       type: "buffApply",
       frame: ctx.startFrame + frame,
-      seq: ctx.nextSeq(),
       sourceId: ctx.sourceId,
       ownerId: ctx.targetId,
       buffId,
@@ -128,7 +114,6 @@ export function physicalHitByRank(
   frame: number,
   opts: {
     rankTable: readonly number[];
-    rankSkillType?: SkillType;
     dmgType?: DmgType;
     withStatus?: boolean;
     statusType?: SimStatusType;
@@ -137,11 +122,7 @@ export function physicalHitByRank(
   return ctx =>
     physicalHit(frame, {
       dmgType: opts.dmgType,
-      dmgMultiplier: pickSkillValueByRank(
-        ctx,
-        opts.rankTable,
-        opts.rankSkillType ?? ctx.skillType,
-      ),
+      dmgMultiplier: pickSkillValueByRank(ctx, opts.rankTable, ctx.skillType),
       withStatus: opts.withStatus,
       statusType: opts.statusType,
     })(ctx);
@@ -164,7 +145,6 @@ export function artsHitByRank(
   frame: number,
   opts: {
     rankTable: readonly number[];
-    rankSkillType?: SkillType;
     dmgType: Exclude<DmgType, "physical">;
     withInfliction?: boolean;
   },
@@ -172,24 +152,18 @@ export function artsHitByRank(
   return ctx => {
     const events = artsHit(frame, {
       dmgType: opts.dmgType,
-      dmgMultiplier: pickSkillValueByRank(
-        ctx,
-        opts.rankTable,
-        opts.rankSkillType ?? ctx.skillType,
-      ),
+      dmgMultiplier: pickSkillValueByRank(ctx, opts.rankTable, ctx.skillType),
     })(ctx);
 
     if (opts.withInfliction) {
       events.push({
-        id: ctx.makeEventId(),
         type: "inflictionApply",
         frame: ctx.startFrame + frame,
-        seq: ctx.nextSeq(),
         sourceId: ctx.sourceId,
         ownerId: ctx.targetId,
         inflictionType: opts.dmgType as InflictionType,
         inflictionStacks: 1,
-      } satisfies SimEvent);
+      } satisfies SimEventDraft);
     }
 
     return events;
@@ -200,23 +174,20 @@ export function spRecoverByRank(
   frame: number,
   opts: {
     rankTable: readonly number[];
-    rankSkillType?: SkillType;
     ratio?: number;
   },
 ): SkillOpFn {
   return ctx => {
     const amount =
-      pickSkillValueByRank(ctx, opts.rankTable, opts.rankSkillType) *
+      pickSkillValueByRank(ctx, opts.rankTable, ctx.skillType) *
       Number(opts.ratio ?? 1);
     return [
       {
-        id: ctx.makeEventId(),
         type: "spRecover",
         frame: ctx.startFrame + frame,
-        seq: ctx.nextSeq(),
         sourceId: ctx.sourceId,
         amount,
-      } satisfies SimEvent,
+      } satisfies SimEventDraft,
     ];
   };
 }

@@ -14,6 +14,7 @@ import type {
   SimEvent,
   SimComboState,
 } from "../types/simulator/simulator";
+import type { SimEventDraft } from "./listeners/drafts";
 import type { DamageBonusLogEntry } from "./damage/damageBonuses";
 import type {
   DamageBreakdown,
@@ -52,6 +53,7 @@ import {
   COMBUSTION_BUFF_ID,
   COMBUSTION_DOT_INTERVAL_FRAMES,
 } from "../data/buffs/reactions/combustion";
+import { createDraftEmitter, materializeDrafts } from "./listeners/drafts";
 
 /**
  * SimWorld
@@ -85,6 +87,10 @@ export type SimOps = {
   nextSeq: () => number;
   /** Insert an event into the future event queue. */
   schedule: (ev: SimEvent) => void;
+  scheduleDrafts: (
+    drafts: readonly SimEventDraft[],
+    opts?: { defaultRef?: string },
+  ) => void;
   /** Pop the next event in chronological order. */
   popNextEvent: () => SimEvent | null;
   /** Advance simulation time to the given frame. */
@@ -283,6 +289,7 @@ export class SimWorld {
     this.ops = {
       nextSeq: () => this.nextSeq(),
       schedule: (ev: SimEvent) => this.schedule(ev),
+      scheduleDrafts: (drafts, opts) => this.scheduleDrafts(drafts, opts),
       popNextEvent: () => this.popNextEvent(),
       advanceToFrame: (frame: number) => this.advanceToFrame(frame),
       log: (cat, message, ctx, breakdown, amount) =>
@@ -367,6 +374,24 @@ export class SimWorld {
     this.queue.push(ev);
     this.eventById.set(ev.id, ev);
     sortEventsInPlace(this.queue);
+  }
+
+  private scheduleDrafts(
+    drafts: readonly SimEventDraft[],
+    opts?: { defaultRef?: string },
+  ): void {
+    const events = materializeDrafts(
+      drafts,
+      { nextSeq: () => this.nextSeq(), makeId: makeSimEventId },
+      opts,
+    );
+    for (const ev of events) {
+      this.schedule(ev);
+    }
+  }
+
+  public createEmit(baseFrame: number) {
+    return createDraftEmitter(baseFrame);
   }
 
   private popNextEvent(): SimEvent | null {
@@ -804,14 +829,9 @@ export class SimWorld {
               ev,
               sourceId: source.id,
               targetId: target.id,
-              nextSeq: this.ops.nextSeq,
-              makeEventId: makeSimEventId,
+              emit: this.createEmit(ev.frame),
             });
-
-            for (const sev of spawned) {
-              // console.log(sev);
-              this.ops.schedule(sev);
-            }
+            this.ops.scheduleDrafts(spawned);
           };
           this.resolvers.resolveStatusApplication(triggerPlugins, ev);
 
@@ -833,10 +853,9 @@ export class SimWorld {
             ev: ev,
             sourceId: source?.id,
             targetId: owner.id,
-            nextSeq: this.ops.nextSeq,
-            makeEventId: makeSimEventId,
+            emit: this.createEmit(ev.frame),
           });
-          for (const sev of spawned) this.ops.schedule(sev);
+          this.ops.scheduleDrafts(spawned);
           break;
         }
 
@@ -852,10 +871,9 @@ export class SimWorld {
             read: this.read,
             ev,
             sourceId: ev.ownerId,
-            nextSeq: this.ops.nextSeq,
-            makeEventId: makeSimEventId,
+            emit: this.createEmit(ev.frame),
           });
-          for (const sev of spawned) this.ops.schedule(sev);
+          this.ops.scheduleDrafts(spawned);
           break;
         }
 

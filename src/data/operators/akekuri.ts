@@ -67,7 +67,6 @@ class AkekuriDef extends OperatorDef {
           timeline: [
             artsHitByRank(28, {
               rankTable: NS_DMG_MUL,
-              rankSkillType: "normalSkill",
               dmgType: "heat",
               withInfliction: true,
             }),
@@ -80,19 +79,15 @@ class AkekuriDef extends OperatorDef {
           timeline: [
             physicalHitByRank(24, {
               rankTable: CS_DMG_MUL_PER_SEQ,
-              rankSkillType: "comboSkill",
             }),
             spRecoverByRank(24, {
               rankTable: CS_SP_RECOVERY_PER_SEQ,
-              rankSkillType: "comboSkill",
             }),
             physicalHitByRank(44, {
               rankTable: CS_DMG_MUL_PER_SEQ,
-              rankSkillType: "comboSkill",
             }),
             spRecoverByRank(44, {
               rankTable: CS_SP_RECOVERY_PER_SEQ,
-              rankSkillType: "comboSkill",
             }),
           ],
         },
@@ -103,17 +98,14 @@ class AkekuriDef extends OperatorDef {
           timeline: [
             spRecoverByRank(40, {
               rankTable: ULT_SP_RECOVERY,
-              rankSkillType: "ultimate",
               ratio: 1 / 3,
             }),
             spRecoverByRank(85, {
               rankTable: ULT_SP_RECOVERY,
-              rankSkillType: "ultimate",
               ratio: 1 / 3,
             }),
             spRecoverByRank(130, {
               rankTable: ULT_SP_RECOVERY,
-              rankSkillType: "ultimate",
               ratio: 1 / 3,
             }),
           ],

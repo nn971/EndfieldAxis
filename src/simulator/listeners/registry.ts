@@ -1,5 +1,6 @@
 import type { SimBuff } from "../../types/simulator/infliction";
 import type { SimEntityId, SimEvent } from "../../types/simulator/simulator";
+import type { SimEventDraft } from "./drafts";
 import type { DamageBonusCollector } from "../damage/damageBonuses";
 import type { SimRead } from "../simulator";
 import operatorsData from "../../data/operators";
@@ -14,6 +15,7 @@ import {
   sortPluginsByGameOrder,
   type PluginOrderingBucket,
 } from "./pluginOrder";
+import type { DraftEmitter } from "./drafts";
 
 /**
  * Listener/registry layer:
@@ -48,76 +50,71 @@ export type AfterHitTriggerContext = {
   ev: Extract<SimEvent, { type: "hit" }>;
   sourceId: SimEntityId;
   targetId: SimEntityId;
-  nextSeq: () => number;
-  makeEventId: () => string;
+  emit: DraftEmitter;
 };
-export type AfterHitTrigger = (ctx: AfterHitTriggerContext) => SimEvent[];
+export type AfterHitTrigger = (ctx: AfterHitTriggerContext) => SimEventDraft[];
 
 export type OnCastTriggerContext = {
   read: SimRead;
   ev: Extract<SimEvent, { type: "castStart" | "castEnd" }>;
   sourceId: SimEntityId;
   targetId?: SimEntityId;
-  nextSeq: () => number;
-  makeEventId: () => string;
+  emit: DraftEmitter;
 };
-export type OnCastTrigger = (ctx: OnCastTriggerContext) => SimEvent[];
+export type OnCastTrigger = (ctx: OnCastTriggerContext) => SimEventDraft[];
 
 export type OnStatusApplyTriggerContext = {
   read: SimRead;
   ev: Extract<SimEvent, { type: "statusApply" }>;
   sourceId: SimEntityId;
   targetId: SimEntityId;
-  nextSeq: () => number;
-  makeEventId: () => string;
+  emit: DraftEmitter;
 };
 export type OnStatusApplyTrigger = (
   ctx: OnStatusApplyTriggerContext,
-) => SimEvent[];
+) => SimEventDraft[];
 
 export type OnBuffApplyTriggerContext = {
   read: SimRead;
   ev: Extract<SimEvent, { type: "buffApply" }>;
   sourceId?: SimEntityId;
   targetId: SimEntityId;
-  nextSeq: () => number;
-  makeEventId: () => string;
+  emit: DraftEmitter;
 };
-export type OnBuffApplyTrigger = (ctx: OnBuffApplyTriggerContext) => SimEvent[];
+export type OnBuffApplyTrigger = (
+  ctx: OnBuffApplyTriggerContext,
+) => SimEventDraft[];
 
 export type OnBuffConsumedTriggerContext = {
   read: SimRead;
   ev: Extract<SimEvent, { type: "buffRemove" }>;
   sourceId: SimEntityId;
-  nextSeq: () => number;
-  makeEventId: () => string;
+  emit: DraftEmitter;
 };
 export type OnBuffConsumedTrigger = (
   ctx: OnBuffConsumedTriggerContext,
-) => SimEvent[];
+) => SimEventDraft[];
 
 export type OnInflictionApplyTriggerContext = {
   read: SimRead;
   ev: Extract<SimEvent, { type: "inflictionApply" }>;
   sourceId: SimEntityId;
   targetId: SimEntityId;
-  nextSeq: () => number;
-  makeEventId: () => string;
+  emit: DraftEmitter;
 };
 export type OnInflictionApplyTrigger = (
   ctx: OnInflictionApplyTriggerContext,
-) => SimEvent[];
+) => SimEventDraft[];
 
 export type OnInflictionConsumedTriggerContext = {
   read: SimRead;
   ev: Extract<SimEvent, { type: "inflictionExpire" }>;
   sourceId: SimEntityId;
-  nextSeq: () => number;
-  makeEventId: () => string;
+  emit: DraftEmitter;
 };
 export type OnInflictionConsumedTrigger = (
   ctx: OnInflictionConsumedTriggerContext,
-) => SimEvent[];
+) => SimEventDraft[];
 
 type ListenerEntry<TFn> = {
   id: string;
@@ -345,40 +342,42 @@ export class SimRegistry {
     for (const e of list) e.fn(ctx);
   }
 
-  runAfterHit(ctx: AfterHitTriggerContext): SimEvent[] {
+  runAfterHit(ctx: AfterHitTriggerContext): SimEventDraft[] {
     return this.runTriggers(this.afterHit, ctx);
   }
 
-  runOnCastStart(ctx: OnCastTriggerContext): SimEvent[] {
+  runOnCastStart(ctx: OnCastTriggerContext): SimEventDraft[] {
     return this.runTriggers(this.onCastStart, ctx);
   }
 
-  runOnCastEnd(ctx: OnCastTriggerContext): SimEvent[] {
+  runOnCastEnd(ctx: OnCastTriggerContext): SimEventDraft[] {
     return this.runTriggers(this.onCastEnd, ctx);
   }
 
-  runOnStatusApply(ctx: OnStatusApplyTriggerContext): SimEvent[] {
+  runOnStatusApply(ctx: OnStatusApplyTriggerContext): SimEventDraft[] {
     return this.runTriggers(this.onStatusApply, ctx);
   }
 
-  runOnBuffApply(ctx: OnBuffApplyTriggerContext): SimEvent[] {
+  runOnBuffApply(ctx: OnBuffApplyTriggerContext): SimEventDraft[] {
     return this.runTriggers(this.onBuffApply, ctx);
   }
 
-  runOnBuffConsumed(ctx: OnBuffConsumedTriggerContext): SimEvent[] {
+  runOnBuffConsumed(ctx: OnBuffConsumedTriggerContext): SimEventDraft[] {
     return this.runTriggers(this.onBuffConsumed, ctx);
   }
 
-  runOnInflictionApply(ctx: OnInflictionApplyTriggerContext): SimEvent[] {
+  runOnInflictionApply(ctx: OnInflictionApplyTriggerContext): SimEventDraft[] {
     return this.runTriggers(this.onInflictionApply, ctx);
   }
 
-  runOnInflictionConsumed(ctx: OnInflictionConsumedTriggerContext): SimEvent[] {
-    const out: SimEvent[] = [];
+  runOnInflictionConsumed(
+    ctx: OnInflictionConsumedTriggerContext,
+  ): SimEventDraft[] {
+    const out: SimEventDraft[] = [];
     for (const e of this.onInflictionConsumed) {
       if (
         !this.matchesListener(
-          e as ListenerEntry<(ctx: TriggerContext) => SimEvent[]>,
+          e as ListenerEntry<(ctx: TriggerContext) => SimEventDraft[]>,
           ctx,
         )
       )
@@ -389,10 +388,10 @@ export class SimRegistry {
   }
 
   private runTriggers<TCtx extends TriggerContext>(
-    entries: ListenerEntry<(ctx: TCtx) => SimEvent[]>[],
+    entries: ListenerEntry<(ctx: TCtx) => SimEventDraft[]>[],
     ctx: TCtx,
-  ): SimEvent[] {
-    const out: SimEvent[] = [];
+  ): SimEventDraft[] {
+    const out: SimEventDraft[] = [];
     for (const e of entries) {
       if (!this.matchesListener(e, ctx)) {
         continue;
@@ -403,7 +402,7 @@ export class SimRegistry {
   }
 
   private matchesListener<TCtx extends TriggerContext>(
-    entry: ListenerEntry<(ctx: TCtx) => SimEvent[]>,
+    entry: ListenerEntry<(ctx: TCtx) => SimEventDraft[]>,
     ctx: TCtx,
   ): boolean {
     if (entry.when && !this.matchesWhen(ctx, entry.when)) return false;

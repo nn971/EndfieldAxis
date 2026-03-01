@@ -1,6 +1,5 @@
 import { GearsDef, type GearsDefInit } from "../GearsDef";
 import type { RestBonusEntry, OperatorBuild } from "../../../types/operator";
-import type { SimEvent } from "../../../types/simulator/simulator";
 import type { SimStatusType } from "../../../types/simulator/infliction";
 import type { SimRegistry } from "../../../simulator/listeners/registry";
 import { GearSetBonusData } from "..";
@@ -91,17 +90,14 @@ export abstract class SwordmancerDef extends GearsDef {
 
         // console.log(`triggered`);
         return [
-          {
-            id: ctx.makeEventId(),
+          ctx.emit.now({
             type: "hit",
-            frame: ctx.ev.frame,
-            seq: ctx.nextSeq(),
             sourceId: ctx.sourceId,
             targetId: ctx.targetId,
             damageType: set.statusProc.damageType,
             dmgMultiplier: set.statusProc.dmgMultiplier,
             ref: ctx.ev.id,
-          } satisfies SimEvent,
+          }),
         ];
       },
     });
