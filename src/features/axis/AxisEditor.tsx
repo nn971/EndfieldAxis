@@ -604,6 +604,7 @@ export default function AxisEditor({
               height: SP_TRACK_HEIGHT,
             }}
           >
+            {/* SP rendering */}
             {simRenderCache.teamSpRealSeries.length > 1 &&
               simRenderCache.teamSpTotalSeries.length > 1 &&
               simRenderCache.teamSpCap > 0 &&
@@ -630,6 +631,18 @@ export default function AxisEditor({
                     width: AXIS_LENTH_IN_FRAMES,
                     height: SP_TRACK_HEIGHT,
                   });
+                const spMarkerY = (spValue: number) =>
+                  Math.max(
+                    0,
+                    Math.min(
+                      SP_TRACK_HEIGHT,
+                      SP_TRACK_HEIGHT -
+                        (spValue / simRenderCache.teamSpCap) * SP_TRACK_HEIGHT,
+                    ),
+                  );
+                const markerLevels = [100, 200].filter(
+                  level => level <= simRenderCache.teamSpCap,
+                );
                 return (
                   <svg
                     className="absolute inset-0 pointer-events-none"
@@ -637,7 +650,22 @@ export default function AxisEditor({
                     height={SP_TRACK_HEIGHT}
                     viewBox={`0 0 ${AXIS_LENTH_IN_FRAMES} ${SP_TRACK_HEIGHT}`}
                   >
-                    <path d={totalAreaPath} fill="rgba(251, 113, 133, 0.20)" />
+                    {markerLevels.map(level => (
+                      <line
+                        key={`sp-marker-${level}`}
+                        x1={0}
+                        x2={AXIS_LENTH_IN_FRAMES}
+                        y1={spMarkerY(level)}
+                        y2={spMarkerY(level)}
+                        stroke="rgba(255, 255, 255, 0.35)"
+                        strokeWidth={1}
+                      />
+                    ))}
+                    <path
+                      d={`${totalAreaPath} ${realAreaPath}`}
+                      fill="rgba(251, 113, 133, 0.20)"
+                      fillRule="evenodd"
+                    />
                     <path d={realAreaPath} fill="rgba(250, 204, 21, 0.14)" />
                     <path
                       d={realLinePath}
@@ -713,6 +741,7 @@ export default function AxisEditor({
               })}
             </svg>
 
+            {/* buff bars */}
             {simRenderCache.bars.map(bar => {
               const laneIndex = toLaneIndex(bar.ownerId);
               const width = Math.max(2, bar.endFrame - bar.startFrame);
