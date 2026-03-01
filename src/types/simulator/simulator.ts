@@ -7,6 +7,7 @@ import type {
   SimStatusType,
   InflictionType,
 } from "./infliction";
+import type { SimEventWhen } from "./when";
 
 // export type SimEventType =
 //   | "castStart" // start frame of casting a skill
@@ -32,6 +33,7 @@ export type SimEventBase = {
   type: string;
   frame: number;
   seq: number; // larger seq earlier when frame equal
+  when?: SimEventWhen;
 
   /** Optional reference to a related event (parent / originating action). */
   ref?: string | null;

@@ -5,6 +5,7 @@ import type {
 } from "../types/simulator/infliction";
 import type { DmgType, SkillType } from "../data/operators/OperatorDef";
 import type { SimEventDraft } from "./listeners/drafts";
+import type { SimEventWhen } from "../types/simulator/when";
 
 export type SkillCompileContext = {
   sourceId: string;
@@ -54,6 +55,7 @@ export function physicalHit(
     dmgMultiplier?: number;
     withStatus?: boolean;
     statusType?: SimStatusType;
+    when?: SimEventWhen;
   },
 ): SkillOpFn {
   return ctx => {
@@ -68,6 +70,7 @@ export function physicalHit(
 
       damageType: (opts.dmgType ?? "physical") as any,
       dmgMultiplier: opts.dmgMultiplier,
+      when: opts.when,
     };
 
     const withStatus = Boolean(opts.withStatus);
@@ -84,6 +87,7 @@ export function physicalHit(
         targetId: ctx.targetId,
 
         statusType: opts.statusType,
+        when: opts.when,
       } satisfies SimEventDraft);
     }
 
@@ -95,7 +99,7 @@ export function physicalHit(
 export function applyBuff(
   frame: number,
   buffId: BuffId,
-  opts?: { isForced?: boolean },
+  opts?: { isForced?: boolean; when?: SimEventWhen },
 ): SkillOpFn {
   return ctx => {
     const ev: SimEventDraft = {
@@ -105,6 +109,7 @@ export function applyBuff(
       ownerId: ctx.targetId,
       buffId,
       isForced: opts?.isForced,
+      when: opts?.when,
     };
     return [ev];
   };
@@ -117,6 +122,7 @@ export function physicalHitByRank(
     dmgType?: DmgType;
     withStatus?: boolean;
     statusType?: SimStatusType;
+    when?: SimEventWhen;
   },
 ): SkillOpFn {
   return ctx =>
@@ -125,6 +131,7 @@ export function physicalHitByRank(
       dmgMultiplier: pickSkillValueByRank(ctx, opts.rankTable, ctx.skillType),
       withStatus: opts.withStatus,
       statusType: opts.statusType,
+      when: opts.when,
     })(ctx);
 }
 
@@ -133,11 +140,13 @@ export function artsHit(
   opts: {
     dmgType: Exclude<DmgType, "physical">;
     dmgMultiplier?: number;
+    when?: SimEventWhen;
   },
 ): SkillOpFn {
   return physicalHit(frame, {
     dmgType: opts.dmgType,
     dmgMultiplier: opts.dmgMultiplier,
+    when: opts.when,
   });
 }
 
@@ -147,12 +156,14 @@ export function artsHitByRank(
     rankTable: readonly number[];
     dmgType: Exclude<DmgType, "physical">;
     withInfliction?: boolean;
+    when?: SimEventWhen;
   },
 ): SkillOpFn {
   return ctx => {
     const events = artsHit(frame, {
       dmgType: opts.dmgType,
       dmgMultiplier: pickSkillValueByRank(ctx, opts.rankTable, ctx.skillType),
+      when: opts.when,
     })(ctx);
 
     if (opts.withInfliction) {
@@ -163,6 +174,7 @@ export function artsHitByRank(
         ownerId: ctx.targetId,
         inflictionType: opts.dmgType as InflictionType,
         inflictionStacks: 1,
+        when: opts.when,
       } satisfies SimEventDraft);
     }
 

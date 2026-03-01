@@ -51,6 +51,7 @@ import {
 import { makeSimEventId } from "../shared/lib/utils";
 import { buildDamageContext } from "./damage/damageEngine";
 import operatorsData from "../data/operators";
+import { SimEventWhen } from "../types/simulator/when";
 
 // TODO: come up with a way to configure this
 export const DEFAULT_INFLICTION_DURATION_FRAMES = 1800;
@@ -60,6 +61,103 @@ export const ARTS_BURST_BASE_MUL = 0.55;
 export const ARTS_BURST_PER_STACK_MUL = 0.25;
 
 export const COMBO_AVAILABLE_WINDOW_FRAMES = 300;
+
+export function validateEventWhen(
+  read: SimRead,
+  ev: SimEvent,
+): { isValid: boolean; reason?: string } {
+  const when = ev.when;
+  if (!when) return { isValid: true };
+
+  const sourceId = "sourceId" in ev ? ev.sourceId : undefined;
+  const targetId = "targetId" in ev ? ev.targetId : undefined;
+
+  return validateWhenAgainstEvent(read, ev, when, { sourceId, targetId });
+}
+
+function validateWhenAgainstEvent(
+  read: SimRead,
+  ev: SimEvent,
+  when: SimEventWhen,
+  context: {
+    sourceId?: SimEntityId;
+    targetId?: SimEntityId;
+  },
+): { isValid: boolean; reason?: string } {
+  if (when.sourceOperatorId && context.sourceId !== when.sourceOperatorId) {
+    return {
+      isValid: false,
+      reason: `sourceOperatorId mismatch (expected=${when.sourceOperatorId}, actual=${context.sourceId ?? "undefined"})`,
+    };
+  }
+
+  if (when.sourceWeaponId) {
+    if (!context.sourceId) {
+      return {
+        isValid: false,
+        reason: `sourceWeaponId requires sourceId`,
+      };
+    }
+    const sourceBuild = read.getBuild(context.sourceId);
+    const weaponId = sourceBuild?.weapon.id;
+    if (weaponId !== when.sourceWeaponId) {
+      return {
+        isValid: false,
+        reason: `sourceWeaponId mismatch (expected=${when.sourceWeaponId}, actual=${weaponId ?? "undefined"})`,
+      };
+    }
+  }
+
+  if (when.buffId) {
+    if (!("buffId" in ev)) {
+      return {
+        isValid: false,
+        reason: `buffId requires a buff event`,
+      };
+    }
+    if (ev.buffId !== when.buffId) {
+      return {
+        isValid: false,
+        reason: `buffId mismatch (expected=${when.buffId}, actual=${ev.buffId})`,
+      };
+    }
+  }
+
+  if (when.ownerHasBuffId) {
+    const ownerId = "ownerId" in ev ? ev.ownerId : undefined;
+    if (!ownerId) {
+      return {
+        isValid: false,
+        reason: `ownerHasBuffId requires ownerId`,
+      };
+    }
+    const owner = read.getEntity(ownerId);
+    if (!(owner as any)?.buffs?.[when.ownerHasBuffId]) {
+      return {
+        isValid: false,
+        reason: `owner missing buff ${when.ownerHasBuffId}`,
+      };
+    }
+  }
+
+  if (when.targetHasBuffId) {
+    if (!context.targetId) {
+      return {
+        isValid: false,
+        reason: `targetHasBuffId requires targetId`,
+      };
+    }
+    const target = read.getEntity(context.targetId);
+    if (!(target as any)?.buffs?.[when.targetHasBuffId]) {
+      return {
+        isValid: false,
+        reason: `target missing buff ${when.targetHasBuffId}`,
+      };
+    }
+  }
+
+  return { isValid: true };
+}
 
 function scheduleApplyVulnerable(
   world: SimWorld,

@@ -16,6 +16,7 @@ import {
   type PluginOrderingBucket,
 } from "./pluginOrder";
 import type { DraftEmitter } from "./drafts";
+import type { SimEventWhen } from "../../types/simulator/when";
 
 /**
  * Listener/registry layer:
@@ -133,12 +134,7 @@ type TriggerContext =
   | OnInflictionApplyTriggerContext
   | OnInflictionConsumedTriggerContext;
 
-type TriggerWhen = {
-  sourceOperatorId?: OperatorId;
-  sourceWeaponId?: WeaponId;
-  buffId?: BuffId;
-  ownerHasBuffId?: BuffId;
-};
+type TriggerWhen = SimEventWhen;
 
 type RegisterTriggerParams<TFn, TCtx extends TriggerContext> = {
   id: string;
@@ -433,6 +429,13 @@ export class SimRegistry {
       if (!ownerId) return false;
       const owner = ctx.read.getEntity(ownerId);
       if (!(owner as any)?.buffs?.[when.ownerHasBuffId]) return false;
+    }
+
+    if (when.targetHasBuffId) {
+      const targetId = "targetId" in ctx ? ctx.targetId : undefined;
+      if (!targetId) return false;
+      const target = ctx.read.getEntity(targetId);
+      if (!(target as any)?.buffs?.[when.targetHasBuffId]) return false;
     }
 
     return true;

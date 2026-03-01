@@ -1,5 +1,9 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
-import { artsHitByRank, physicalHitByRank } from "../../simulator/skillOps";
+import {
+  applyBuff,
+  artsHitByRank,
+  physicalHitByRank,
+} from "../../simulator/skillOps";
 import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 
 const NS_DMG_MUL = [
@@ -13,6 +17,10 @@ const CS_DMG_MUL_NON_SOLIDIFIED = [
 const CS_DMG_MUL_SOLIDIFIED = [
   2.8, 3.08, 3.36, 3.64, 3.92, 4.2, 4.48, 4.76, 5.04, 5.39, 5.81, 6.3,
 ] as const;
+
+const CS_DMG_MUL_SOLIDIFIED_DELTA = CS_DMG_MUL_SOLIDIFIED.map(
+  (v, i) => v - CS_DMG_MUL_NON_SOLIDIFIED[i],
+) as readonly number[];
 
 const ULT_DMG_MUL = [
   4.89, 5.38, 5.86, 6.35, 6.84, 7.33, 7.82, 8.31, 8.8, 9.41, 10.14, 11.0,
@@ -79,6 +87,13 @@ class EstellaDef extends OperatorDef {
               withStatus: true,
               statusType: "lift",
             }),
+            physicalHitByRank(34, {
+              rankTable: CS_DMG_MUL_SOLIDIFIED_DELTA,
+              when: { targetHasBuffId: "buff.solidification" },
+            }),
+            applyBuff(34, "buff.estella.combo.physicalSusceptibility", {
+              when: { targetHasBuffId: "buff.solidification" },
+            }),
           ],
         },
         ultimate: {
@@ -125,10 +140,6 @@ class EstellaDef extends OperatorDef {
         ];
       },
     });
-
-    // Keep both tables close to the definition until conditional combo damage
-    // by target state is implemented in the simulator.
-    void CS_DMG_MUL_SOLIDIFIED;
   }
 }
 

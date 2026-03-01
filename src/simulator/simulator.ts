@@ -47,6 +47,7 @@ import {
   resolveSpReturn,
   resolveCastEnd,
   resolveCastStart,
+  validateEventWhen,
 } from "./resolvers";
 import { BuffId } from "../data/buffs/BuffDef";
 import {
@@ -797,6 +798,15 @@ export class SimWorld {
       // }
 
       this.processedEvents.push(ev);
+
+      const whenValidation = validateEventWhen(this.read, ev);
+      if (!whenValidation.isValid) {
+        this.ops.log(
+          "dev",
+          `dismiss event ${ev.type} id=${ev.id}: when mismatch (${whenValidation.reason ?? "unknown reason"})`,
+        );
+        continue;
+      }
 
       switch (ev.type) {
         case "castStart": {
