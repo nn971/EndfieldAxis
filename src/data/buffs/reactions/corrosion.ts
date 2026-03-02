@@ -1,14 +1,23 @@
 import type { SimRegistry } from "../../../simulator/listeners/registry";
 import { BuffDef } from "../BuffDef";
 
+/** Triggers Nature damage 0.8 * (1+stacksConsumed).
+ *  Decreases 3.6/4.8/6/7.2 all resistances.
+ *  Increase this amount 0.84/1.12/1.4/1.68 per second.
+ *  Cap 12/16/20/24.
+ *  Last for 15s.
+ */
+
 export const CORROSION_BUFF_ID = "buff.corrosion" as const;
-export const CORROSION_DURATION_FRAMES = 600;
-export const CORROSION_INITIAL_HIT_BASE_MUL = 0.5;
-export const CORROSION_INITIAL_HIT_PER_STACK_MUL = 0.35;
+export const CORROSION_DURATION_FRAMES = 900;
+
 export const CORROSION_REDUCTION_PER_SECOND_BASE = 0.04;
 export const CORROSION_REDUCTION_PER_SECOND_PER_STACK = 0.02;
 export const CORROSION_MIN_RESISTANCE_BASE = -0.2;
 export const CORROSION_MIN_RESISTANCE_PER_STACK = -0.08;
+
+export const CORROSION_INITIAL_HIT_BASE_MUL = 0.5;
+export const CORROSION_INITIAL_HIT_PER_STACK_MUL = 0.35;
 
 class CorrosionBuffDef extends BuffDef {
   constructor() {
@@ -27,7 +36,10 @@ class CorrosionBuffDef extends BuffDef {
       fn: ({ role, collector, read, buff }) => {
         if (role !== "target") return;
 
-        const elapsedFrames = Math.max(0, read.nowInFrames - buff.lastApplyFrame);
+        const elapsedFrames = Math.max(
+          0,
+          read.nowInFrames - buff.lastApplyFrame,
+        );
         const elapsedSeconds = elapsedFrames / 60;
 
         const reductionPerSecond = Number(

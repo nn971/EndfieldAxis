@@ -1,13 +1,21 @@
 import type { SimRegistry } from "../../../simulator/listeners/registry";
 import { BuffDef } from "../BuffDef";
 
+/** Triggers Cryo damage 1.2 * (1+stacksConsumed).
+ *  Last for 6s/7s/8s/9s.
+ *  When become vulnerable or suffers physical status,
+ *  triggers Shatter damage 1.2 * (1+stacks)
+ */
+
 export const SOLIDIFICATION_BUFF_ID = "buff.solidification" as const;
 export const SOLIDIFICATION_BASE_DURATION_FRAMES = 360;
-export const SOLIDIFICATION_EXTRA_DURATION_PER_STACK_FRAMES = 90;
-export const SOLIDIFICATION_INITIAL_HIT_BASE_MUL = 0.6;
-export const SOLIDIFICATION_INITIAL_HIT_PER_STACK_MUL = 0.4;
+export const SOLIDIFICATION_EXTRA_DURATION_PER_STACK_FRAMES = 60;
+
 export const SOLIDIFICATION_SHATTER_BASE_MUL = 2.5;
 export const SOLIDIFICATION_SHATTER_PER_STACK_MUL = 1.5;
+
+export const SOLIDIFICATION_INITIAL_HIT_BASE_MUL = 0.6;
+export const SOLIDIFICATION_INITIAL_HIT_PER_STACK_MUL = 0.4;
 
 class SolidificationBuffDef extends BuffDef {
   constructor() {
@@ -21,25 +29,28 @@ class SolidificationBuffDef extends BuffDef {
   }
 
   override registerSimPlugins(registry: SimRegistry): void {
-    const spawnShatter = function* (params: {
-      sourceId: string;
-      targetId: string;
-      stacks: number;
-      ref?: string | null;
-    }, emit: { buffRemove: (draft: any) => any; hit: (draft: any) => any }) {
+    const spawnShatter = function* (
+      params: {
+        sourceId: string;
+        targetId: string;
+        stacks: number;
+        ref?: string | null;
+      },
+      emit: { buffRemove: (draft: any) => any; hit: (draft: any) => any },
+    ) {
       yield emit.buffRemove({
-          targetId: params.targetId,
-          buffId: SOLIDIFICATION_BUFF_ID,
-          ref: params.ref,
+        targetId: params.targetId,
+        buffId: SOLIDIFICATION_BUFF_ID,
+        ref: params.ref,
       });
       yield emit.hit({
-          sourceId: params.sourceId,
-          targetId: params.targetId,
-          damageType: "physical",
-          dmgMultiplier:
-            SOLIDIFICATION_SHATTER_BASE_MUL +
-            params.stacks * SOLIDIFICATION_SHATTER_PER_STACK_MUL,
-          ref: params.ref,
+        sourceId: params.sourceId,
+        targetId: params.targetId,
+        damageType: "physical",
+        dmgMultiplier:
+          SOLIDIFICATION_SHATTER_BASE_MUL +
+          params.stacks * SOLIDIFICATION_SHATTER_PER_STACK_MUL,
+        ref: params.ref,
       });
     };
 
@@ -62,12 +73,15 @@ class SolidificationBuffDef extends BuffDef {
         );
         if (stacks <= 0) return;
 
-        yield* spawnShatter({
-          sourceId,
-          targetId,
-          stacks,
-          ref: ev.id,
-        }, emit);
+        yield* spawnShatter(
+          {
+            sourceId,
+            targetId,
+            stacks,
+            ref: ev.id,
+          },
+          emit,
+        );
       },
     });
 
@@ -83,12 +97,15 @@ class SolidificationBuffDef extends BuffDef {
         );
         if (stacks <= 0) return;
 
-        yield* spawnShatter({
-          sourceId,
-          targetId,
-          stacks,
-          ref: ev.id,
-        }, emit);
+        yield* spawnShatter(
+          {
+            sourceId,
+            targetId,
+            stacks,
+            ref: ev.id,
+          },
+          emit,
+        );
       },
     });
   }

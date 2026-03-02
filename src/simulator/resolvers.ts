@@ -56,9 +56,10 @@ import { SimEventWhen } from "../types/simulator/when";
 // TODO: come up with a way to configure this
 export const DEFAULT_INFLICTION_DURATION_FRAMES = 1800;
 
+/** Any Arts Burst have damage multiplier 1.6 */
 export const ARTS_BURST_DELAY_FRAMES = 12;
-export const ARTS_BURST_BASE_MUL = 0.55;
-export const ARTS_BURST_PER_STACK_MUL = 0.25;
+export const ARTS_BURST_BASE_MUL = 1.6;
+export const ARTS_BURST_PER_STACK_MUL = 0;
 
 export const COMBO_AVAILABLE_WINDOW_FRAMES = 300;
 

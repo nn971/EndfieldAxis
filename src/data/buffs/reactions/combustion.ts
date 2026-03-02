@@ -2,6 +2,11 @@ import type { SimRegistry } from "../../../simulator/listeners/registry";
 import { delay } from "../../../simulator/scripts";
 import { BuffDef } from "../BuffDef";
 
+/** Triggers Heat damage 0.8 * (1+stacksConsumed).
+ *  Receive one hit 0.12 * (1+stacks) of Heat damage per second.
+ *  Last for 10s.
+ */
+
 export const COMBUSTION_BUFF_ID = "buff.combustion" as const;
 export const COMBUSTION_DURATION_FRAMES = 600;
 export const COMBUSTION_INITIAL_HIT_BASE_MUL = 0.5;
@@ -41,7 +46,6 @@ class CombustionBuffDef extends BuffDef {
           sourceId,
           targetId: ev.targetId,
           reactionBuffId: buffId,
-          ref: ev.id,
         });
       },
     });
