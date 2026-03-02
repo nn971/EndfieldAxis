@@ -6,7 +6,6 @@ import {
   selectTeamOperatorIds,
 } from "../solution/selectors";
 import { createDefaultDamageModel } from "../../simulator/damage/damageModel";
-import { compileSkillCast } from "../../simulator/compilers";
 import type { SimEvent, SimEntity } from "../../types/simulator/simulator";
 import type { SkillBox } from "../../types/editor";
 import type {
@@ -26,6 +25,9 @@ import {
   type InflictionType,
   SimInfliction,
 } from "../../types/simulator/infliction";
+import { makeSimEventId } from "../../shared/lib/utils";
+import operatorsData from "../../data/operators";
+import { SkillType } from "../../data/operators/OperatorDef";
 
 function buildSimRenderCache(
   events: SimEvent[],
@@ -166,6 +168,66 @@ function buildSimRenderCache(
   };
 }
 
+function compileSkillCast(params: {
+  sourceId: string;
+  skillType: SkillType;
+  targetId: string;
+  startFrame: number;
+  nextSeq: () => number;
+}): SimEvent[] {
+  const { sourceId, skillType, targetId, startFrame, nextSeq } = params;
+  const operator = operatorsData[sourceId];
+  if (!operator) {
+    console.warn(
+      `Unknown operator with id ${sourceId} while compiling skill cast`,
+    );
+    return [];
+  }
+  const skill = operator.skills[skillType];
+  if (!skill) {
+    console.warn(
+      `Unknown skill type ${skillType} for operator ${sourceId} while compiling skill cast`,
+    );
+    return [];
+  }
+
+  const events: SimEvent[] = [];
+
+  // event for castStart
+  const startEventId = makeSimEventId();
+  events.push({
+    id: startEventId,
+    type: "castStart",
+    frame: startFrame,
+    seq: nextSeq(),
+    ref: null,
+
+    sourceId: sourceId,
+    targetId: targetId,
+
+    skillType: skillType,
+  });
+
+  // Skill scripts should be auto triggered at castStart event.
+
+  // event for castEnd
+  events.push({
+    id: makeSimEventId(),
+    type: "castEnd",
+    frame: startFrame + skill.durationFrames,
+    seq: nextSeq(),
+
+    sourceId: sourceId,
+    targetId: targetId,
+
+    ref: startEventId, // reference to the castStart event
+
+    skillType: skillType,
+  });
+
+  return events;
+}
+
 function compileSkillBoxes(params: {
   skillBoxes: SkillBox[];
   targetId: string;
@@ -192,7 +254,6 @@ function compileSkillBoxes(params: {
       targetId,
       startFrame: box.startFrame,
       nextSeq,
-      buildByOperatorId,
     });
     out.push(...evs);
   }

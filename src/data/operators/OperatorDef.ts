@@ -1,9 +1,7 @@
-import type { SkillCompileContext } from "../../simulator/skillOps";
 import type { SimScript } from "../../simulator/scripts";
 import type { SimRegistry } from "../../simulator/listeners/registry";
 import type { SimRead } from "../../simulator/simulator";
 import type { SimEvent } from "../../types/simulator/simulator";
-import type { SimEventDraft } from "../../simulator/scripts";
 import { WeaponType } from "../weapons/WeaponDef";
 
 /**
@@ -40,16 +38,12 @@ export type SkillType =
   | "ultimate";
 // | string;
 
-export type SkillTimelineStep = (ctx: SkillCompileContext) => SimEventDraft[];
-
 export type SkillDef = {
   name: string;
   durationFrames: number;
   icon: string;
   /** Unified event script runtime entrypoint (preferred). */
   script?: SimScript;
-  /** @deprecated Legacy timeline compiler hooks. Kept during migration only. */
-  timeline?: SkillTimelineStep[];
 };
 
 export type OperatorDefInit = {

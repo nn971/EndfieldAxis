@@ -1,77 +1,153 @@
 # AGENTS.md
 
-## Project purpose
+## Purpose
+EndfieldAxis is an in-browser team rotation planner and deterministic combat simulator.
+Users pick a 4-operator team, place skill casts on a frame timeline, edit builds,
+run simulation, then inspect logs plus render overlays (buff/infliction/energy tracks).
 
-EndfieldAxis is an in-browser **team rotation planner + combat simulator** for Arknights: Endfield-style operator kits.
+## Stack
+- Vite + React 19 + TypeScript (`strict: true`)
+- Redux Toolkit + React-Redux
+- Tailwind CSS v4
+- No backend; all simulation/runtime logic is local TS code
 
-Users build a 4-operator team, lay out skill usage on a frame-based timeline ("Axis"), tweak each operator build, then run a deterministic event simulation to inspect damage/buff/infliction behavior and produce render overlays for the timeline.
+## Agent priorities
+1. Keep changes minimal and targeted.
+2. Preserve deterministic simulation ordering.
+3. Keep preview/drag UI state local; commit once interaction completes.
+4. Keep IDs stable and explicit in data content.
+5. Recompute build-derived stats after build mutation (`statUpdater`).
 
-## Tech stack
+## Build, lint, test, and dev commands
 
-- Vite + React + TypeScript
-- Redux Toolkit for committed editor state
-- Tailwind utility classes for UI styling
-
-## Fast start
-
+### Setup and dev
 ```bash
 npm install
 npm run dev
 ```
 
-## High-level architecture
+### Production build
+```bash
+npm run build
+```
 
-- `src/features/solution/`
-  - Canonical app state (`SolutionState`) and reducers.
-  - Save/load serialization and browser storage helpers.
-- `src/features/axis/`
-  - Timeline editor UI for lane order + skill boxes.
-  - Uses temporary drag/preview state locally, commits final mutations through Redux actions.
-- `src/features/operator/`
-  - Operator build editor (level, ranks, gear, weapon).
-- `src/features/sim/`
-  - "Run" action entrypoint that compiles timeline boxes into sim events.
-  - Builds post-sim render cache (buff bars / markers) and text log output.
-- `src/simulator/`
-  - Event queue, world state, resolvers, plugin listeners, and damage engine.
-- `src/data/`
-  - Game content definitions: operators, buffs, weapons, gear, and reaction logic.
+### Lint
+```bash
+npm run lint
+```
+Lint a single file (recommended while iterating):
+```bash
+npx eslint src/features/sim/SimPanel.tsx
+```
 
-## Core domain model to understand before editing
+### Type check (manual)
+```bash
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.node.json --noEmit
+```
 
-1. **Committed vs preview state**
-   - Redux keeps committed state only.
-   - Pointer/drag interactions in editors keep local preview state and commit once at interaction end.
-2. **Timeline = source of casts**
-   - Each skill box represents a cast window (`operatorId`, `skillType`, `startFrame`, `durationFrames`).
-   - Simulation compiles sorted skill boxes into scheduled events.
-3. **Simulation is deterministic**
-   - Events are processed by frame and sequence.
-   - `SimWorld` owns mutable sim state (`entities`, buffs, inflictions, logs, queue).
-4. **Content-driven formulas**
-   - Stat and effect behavior is largely data-defined under `src/data/**` and resolver/plugin code in `src/simulator/**`.
+### Tests
+- There is currently no test runner configured (`npm test` script is absent).
+- There are no `*.test.*` / `*.spec.*` files in the repository right now.
+- If Vitest is added, run a single test file with:
+```bash
+npx vitest run src/path/to/file.test.ts
+```
+- Single test case pattern (after Vitest exists):
+```bash
+npx vitest run src/path/to/file.test.ts -t "case name"
+```
 
-## Working conventions for contributors/agents
-
-- Prefer minimal, targeted changes; keep domain constants and IDs explicit.
-- Preserve deterministic ordering when introducing new event generation.
-- If adding data content (operator/weapon/buff), ensure IDs remain stable and unique.
-- Keep UI preview behavior local; avoid dispatching on every drag frame unless intentionally changing UX/perf tradeoffs.
-- Recompute dependent stats when mutating operator builds (see existing `statUpdater` usage).
-
-## Validation checklist
-
-Run these before finalizing:
-
+## Required pre-PR validation
+Run at minimum:
 ```bash
 npm run lint
 npm run build
 ```
+When touching typing-heavy logic, also run:
+```bash
+npx tsc -p tsconfig.app.json --noEmit
+```
 
-## Useful orientation files
+## Architecture map
+- `src/features/solution/`: canonical committed app state (`SolutionState`), reducers, selectors, save/load.
+- `src/features/axis/`: timeline editor UI and drag/preview logic for lanes + skill boxes.
+- `src/features/operator/`: operator build editor and commit callbacks.
+- `src/features/sim/`: run-panel entrypoint that compiles timeline data to sim events.
+- `src/simulator/`: event queue, world state, resolvers, listeners/plugins, damage pipeline.
+- `src/data/`: content definitions (operators, buffs, weapons, gear, reactions).
+- `src/types/`: editor/simulator/operator shared type contracts.
 
-- App composition: `src/App.tsx`
+## Core domain rules to preserve
+1. Redux contains committed state only.
+2. Pointer/drag/slider interactions can hold local preview state.
+3. Timeline skill boxes are source-of-truth for scheduled casts.
+4. Simulation must remain deterministic (frame + sequence ordering).
+5. Data-driven formulas belong in content + resolver/plugin systems, not ad hoc UI code.
+
+## Code style and conventions
+
+### Formatting
+- Follow `.prettierrc.json`: `tabWidth: 2`, `semi: true`, `arrowParens: avoid`.
+- Keep line wrapping and punctuation consistent with surrounding file style.
+- Use ASCII/UTF-8-safe text unless a file already uses intentional Unicode.
+
+### Imports
+- Prefer relative imports (project does not use path aliases).
+- Group imports as: external packages, internal modules, then type-only imports.
+- Prefer `import type` (or `type` specifier) for type-only symbols.
+- Avoid unused imports; keep lint clean.
+
+### TypeScript
+- Preserve strict typing; avoid `any` unless unavoidable and justified.
+- Prefer domain types (`OperatorId`, `SkillType`, `SimEvent`, etc.) over plain `string`.
+- Use utility types (`Partial`, `Omit`, `Record`) and discriminated unions where appropriate.
+- Use `satisfies`/`as const` in literal-driven data definitions.
+- Keep reducer payloads explicit with `PayloadAction<...>`.
+
+### Naming
+- Components/classes/types: `PascalCase`.
+- Variables/functions: `camelCase`.
+- Constants: `UPPER_SNAKE_CASE` for true constants; otherwise scoped `camelCase` is fine.
+- IDs should be descriptive and stable (`buff.*`, `gear.*`, `sb_*`, etc.).
+
+### React + Redux patterns
+- Prefer functional components and hooks.
+- Keep temporary interaction state local (drag/preview/slider state).
+- Dispatch final mutations at interaction end, not every pointer move, unless required.
+- Use typed hooks/selectors from `src/app/hooks.ts` and `src/features/solution/selectors.ts`.
+- In reducers, prefer early returns for missing entities and predictable updates.
+
+### Simulator and content logic
+- Preserve deterministic ordering for events and render artifacts.
+- Include stable tie-breakers (id/skill/operator/frame) when sorting.
+- Do not introduce nondeterministic operations in event generation/resolution.
+- Keep plugin/listener ordering assumptions intact.
+- When adding content definitions, ensure IDs are unique and formulas explicit.
+
+### Error handling and logging
+- Fail fast (`throw new Error`) for impossible simulator invariants.
+- Use `console.warn` for recoverable issues (migration mismatch, partial data, TODO cases).
+- Keep error messages specific and include IDs/frames when useful.
+- Do not swallow exceptions silently.
+
+### Comments and docs
+- Add comments only for non-obvious intent or invariants.
+- Prefer clear naming and small helper functions over verbose comments.
+- Update serialization/migration notes when persisted shape changes.
+
+## File and module guidance
+- App composition entry: `src/App.tsx`
 - Store setup: `src/app/store.ts`
 - Main state slice: `src/features/solution/solutionSlice.ts`
-- Simulator runtime: `src/simulator/simulator.ts`
-- Sim entry panel: `src/features/sim/SimPanel.tsx`
+- Save/load and migration: `src/features/solution/solutionSL.ts`
+- Sim runtime: `src/simulator/simulator.ts`
+- Sim run panel: `src/features/sim/SimPanel.tsx`
+
+## Cursor/Copilot rules status
+- `.cursor/rules/`: not present
+- `.cursorrules`: not present
+- `.github/copilot-instructions.md`: not present
+
+If these files are added later, treat them as higher-priority repository instructions
+and update this document to reference any mandatory constraints.
