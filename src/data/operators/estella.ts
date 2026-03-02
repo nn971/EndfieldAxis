@@ -82,7 +82,7 @@ class EstellaDef extends OperatorDef {
               statusType: "lift",
             });
 
-            const target = ctx.read.getEntity(ctx.targetId);
+            const target = ctx.read.getEntity(ctx.targetId ?? null);
             const isSolidified = Boolean(
               (target as any)?.buffs?.["buff.solidification"],
             );

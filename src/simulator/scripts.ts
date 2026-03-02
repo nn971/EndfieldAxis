@@ -219,16 +219,13 @@ export function materializeDrafts(
     } as SimEvent;
   });
 }
-export function clampSkillRank(rank: number): number {
-  if (!Number.isFinite(rank)) return 9;
-  return Math.max(1, Math.min(12, Math.round(rank)));
-}
 export function getSkillRank(
   ctx: SimScriptContext,
   skillType: SkillType = ctx.skillType,
 ): number {
   const rank = Number(ctx.sourceBuild?.skillRanks?.[skillType] ?? 9);
-  return clampSkillRank(rank);
+  if (!Number.isFinite(rank)) return 9;
+  return Math.max(1, Math.min(12, Math.round(rank)));
 }
 /** Rank table format: [lv1..lv9, m1, m2, m3]. */
 
