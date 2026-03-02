@@ -23,7 +23,7 @@ import type {
 } from "./damage/damageModel";
 import { pushLog, type SimLog, type SimLogEntryCat } from "./log";
 import { SimRegistry } from "./listeners/registry";
-import { makeSimEventId } from "../shared/lib/utils";
+import { DistOmit, makeSimEventId, WithOptional } from "../shared/lib/utils";
 
 import { buildDamageContext } from "./damage/damageEngine";
 // import { dispatchAfterHit } from "./listeners/handlers";
@@ -378,8 +378,8 @@ export class SimWorld {
     if ((ev as any).ref === undefined && this.currentEvent) {
       (ev as any).ref = this.currentEvent.id;
     }
-    this.queue.push(ev);
-    this.eventById.set(ev.id, ev);
+    this.queue.push(ev as SimEvent);
+    this.eventById.set(ev.id, ev as SimEvent);
     sortEventsInPlace(this.queue);
   }
 

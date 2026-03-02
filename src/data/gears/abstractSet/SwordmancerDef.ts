@@ -21,7 +21,7 @@ function countSetPieces(build: OperatorBuild, set: GearSetBonusData): number {
 }
 
 export abstract class SwordmancerDef extends GearsDef {
-  private static simPluginRegistered = false;
+  private static registeredRegistries = new WeakSet<SimRegistry>();
 
   static readonly setData: GearSetBonusData = {
     id: "set.swordmancer",
@@ -70,8 +70,8 @@ export abstract class SwordmancerDef extends GearsDef {
   }
 
   registerSimPlugins(registry: SimRegistry): void {
-    if (SwordmancerDef.simPluginRegistered) return;
-    SwordmancerDef.simPluginRegistered = true;
+    if (SwordmancerDef.registeredRegistries.has(registry)) return;
+    SwordmancerDef.registeredRegistries.add(registry);
 
     registry.registerOnStatusApply({
       id: SWORDMANCER_ON_STATUS_APPLY_PLUGIN_ID,

@@ -35,3 +35,8 @@ const EVENT_PREFIX = "SimEvent_";
 export function makeSimEventId() {
   return makeId(EVENT_PREFIX);
 }
+export type DistOmit<T, K extends PropertyKey> = T extends any
+  ? Omit<T, K>
+  : never;
+export type WithOptional<T, K extends keyof T> = Omit<T, K> &
+  Partial<Pick<T, K>>;

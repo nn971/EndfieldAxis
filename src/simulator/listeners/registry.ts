@@ -205,9 +205,7 @@ export class SimRegistry {
     });
   }
 
-  registerOnCastEnd(
-    params: RegisterTriggerParams<OnCastTriggerContext>,
-  ): void {
+  registerOnCastEnd(params: RegisterTriggerParams<OnCastTriggerContext>): void {
     this.onCastEnd.push({
       id: params.id,
       fn: params.fn,
@@ -300,9 +298,9 @@ export class SimRegistry {
   runBuffDamageBonus(ctx: BuffDamageBonusListenerContext): void {
     const list = this.buffDamageBonus[ctx.buff.id];
     if (!list || list.length === 0) {
-      console.warn(
-        `No damage bonus listeners registered for buffId=${ctx.buff.id}`,
-      );
+      // console.warn(
+      //   `No damage bonus listeners registered for buffId=${ctx.buff.id}`,
+      // );
       return;
     }
     for (const e of list) e.fn(ctx);
@@ -363,7 +361,9 @@ export class SimRegistry {
     return out;
   }
 
-  private buildScriptContext(ctx: TriggerContext): SimScriptContext {
+  private buildScriptContext(
+    ctx: TriggerContext,
+  ): Omit<SimScriptContext, "emit"> {
     const sourceId = "sourceId" in ctx ? ctx.sourceId : ctx.ev.targetId;
     const targetId =
       "targetId" in ctx && ctx.targetId ? ctx.targetId : sourceId;

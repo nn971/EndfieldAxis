@@ -1,10 +1,7 @@
 import type { SkillType } from "../data/operators/OperatorDef";
 import type { SimRead } from "./simulator";
 import type { SimEvent, SimEventType } from "../types/simulator/simulator";
-import { makeSimEventId } from "../shared/lib/utils";
-
-type DistOmit<T, K extends PropertyKey> = T extends any ? Omit<T, K> : never;
-type WithOptional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
+import { DistOmit, makeSimEventId, WithOptional } from "../shared/lib/utils";
 
 export type SimEventDraft = DistOmit<SimEvent, "id" | "seq">;
 type Draft<T extends SimEvent> = DistOmit<
@@ -173,7 +170,7 @@ export const emit = {
 
 export function runSimScript(params: {
   script: SimScript;
-  ctx: SimScriptContext;
+  ctx: Omit<SimScriptContext, "emit">;
   baseFrame: number;
 }): SimEventDraft[] {
   const { script, ctx, baseFrame } = params;
@@ -208,16 +205,22 @@ export function materializeDrafts(
   opts?: { defaultRef?: string },
 ): SimEvent[] {
   const id = makeId ?? makeSimEventId;
+  const out: SimEvent[] = new Array(drafts.length);
 
-  return drafts.map(draft => {
+  // Queue pops larger seq first within the same frame.
+  // Assign seq in reverse emit order so script emit order is preserved.
+  for (let i = drafts.length - 1; i >= 0; i -= 1) {
+    const draft = drafts[i]!;
     const ref = draft.ref ?? opts?.defaultRef;
-    return {
+    out[i] = {
       ...draft,
       id: id(),
       seq: nextSeq(),
       ...(ref !== undefined ? { ref } : {}),
     } as SimEvent;
-  });
+  }
+
+  return out;
 }
 export function getSkillRank(
   ctx: SimScriptContext,

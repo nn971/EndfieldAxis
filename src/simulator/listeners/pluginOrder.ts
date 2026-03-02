@@ -27,15 +27,19 @@ export type PluginOrderingConfig = Partial<
   Record<PluginOrderingBucket, PluginOrderingConstraint[]>
 >;
 
+/** Configures which plugin should affect simulation first.
+ *  "before" plugin triggers later so affects earlier.
+ *  "after" plugin vice versa.
+ */
 const config: PluginOrderingConfig = {
   onStatusApply: [
     {
-      before: SWORDMANCER_ON_STATUS_APPLY_PLUGIN_ID,
-      after: SUNDERING_STEEL_ON_STATUS_APPLY_PLUGIN_ID,
+      before: SUNDERING_STEEL_ON_STATUS_APPLY_PLUGIN_ID,
+      after: SWORDMANCER_ON_STATUS_APPLY_PLUGIN_ID,
     },
     {
-      before: SWORDMANCER_ON_STATUS_APPLY_PLUGIN_ID,
-      after: CRYSTAL_ON_STATUS_APPLY_PLUGIN_ID,
+      before: CRYSTAL_ON_STATUS_APPLY_PLUGIN_ID,
+      after: SWORDMANCER_ON_STATUS_APPLY_PLUGIN_ID,
     },
   ],
 };

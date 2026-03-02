@@ -36,7 +36,7 @@ export type SimEventBase = {
   when?: SimEventWhen;
 
   /** Reference to a related event (parent / originating action). */
-  ref: string | null;
+  ref?: string | null;
   // org?: string | null;
 
   // sourceId?: SimEntityId;

@@ -28,7 +28,11 @@ export default function SimPanel() {
 
     const finalWorldDescription = JSON.stringify(result.env, null, 2);
     setLogText(
-      summarizeLog(result.log, ["sim", "act", "buff", "stat", "dmg", "SP", "dev"], false) +
+      summarizeLog(
+        result.log,
+        ["sim", "act", "buff", "stat", "dmg", "SP", "dev"],
+        false,
+      ) +
         "\n\n" +
         `Final world state:\n${finalWorldDescription}`,
     );
@@ -39,11 +43,14 @@ export default function SimPanel() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Simulator</h2>
-          <div className="text-xs text-zinc-400">Console-style simulation log</div>
+          <div className="text-xs text-zinc-400">
+            Console-style simulation log
+          </div>
         </div>
 
         <div className="text-xs text-zinc-400 mt-1">
-          Axis: {skillBoxes.length} skill boxes | Team: {teamOperatorIds.join(", ")}
+          Axis: {skillBoxes.length} skill boxes | Team:{" "}
+          {teamOperatorIds.join(", ")}
         </div>
 
         <div className="flex items-center gap-2">
