@@ -130,19 +130,19 @@ class EstellaDef extends OperatorDef {
   }
 
   override registerSimPlugins(registry: SimRegistry): void {
+    const selfId = this.id;
+
     registry.registerOnBuffApply({
       id: "operator.estella.combo.triggerOnSolidification",
       when: { buffId: "buff.solidification" },
-      fn: ({ read, ev }) => {
-        if (!read.env.entitiesById[this.id]) return null;
+      fn: function* ({ read, ev, emit }) {
+        if (!read.env.entitiesById[selfId]) return;
+        if (ev?.type !== "buffApply") return;
 
-        const selfId = this.id;
-        return function* (ctx) {
-          yield ctx.emit.comboTriggered({
-            sourceId: selfId,
-            targetId: ev.ownerId,
-          });
-        }.bind(this);
+        yield emit.comboTriggered({
+          sourceId: selfId,
+          targetId: ev.ownerId,
+        });
       },
     });
   }

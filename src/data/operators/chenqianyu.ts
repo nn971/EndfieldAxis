@@ -127,25 +127,27 @@ class ChenQianyuDef extends OperatorDef {
 
   override registerSimPlugins(registry: SimRegistry): void {
     const BONUS_BUFF = "buff.chenqianyu.talent1.atkInc" as const;
+    const selfId = this.id;
 
     registry.registerOnInflictionApply({
       id: "operator.chenqianyu.combo.triggerOnVulnerableApply",
-      fn: ({ ev, read }) => {
-        if (ev.inflictionType !== "vulnerable") return null;
-        const selfId = this.id;
-        return function* (ctx) {
-          yield ctx.emit.comboTriggered({
-            sourceId: selfId,
-            targetId: ev.ownerId,
-          });
-        }.bind(this);
+      fn: function* ({ ev, emit }) {
+        if (ev?.type !== "inflictionApply" || ev.inflictionType !== "vulnerable") {
+          return;
+        }
+
+        yield emit.comboTriggered({
+          sourceId: selfId,
+          targetId: ev.ownerId,
+        });
       },
     });
 
     registry.registerAfterHit({
       id: "operator.chenqianyu.talent.atkStack",
-      when: { sourceOperatorId: this.id },
-      fn: ({ read, ev, sourceId }) => {
+      when: { sourceOperatorId: selfId },
+      fn: function* ({ read, ev, sourceId, emit }) {
+        if (ev?.type !== "hit" || !sourceId) return;
         const parent = ev.ref ? read.getEvent(ev.ref) : null;
         const isSkillHit = parent
           ? parent.type === "castStart" && parent.skillType != "normalAttack"
@@ -155,22 +157,20 @@ class ChenQianyuDef extends OperatorDef {
         const talentRank = Number(
           read.getBuild(sourceId)?.talentRanks?.talent1 ?? 0,
         );
-        if (talentRank <= 0) return null;
+        if (talentRank <= 0) return;
 
-        return function* (ctx) {
-          yield ctx.emit.buffApply({
-            sourceId,
-            ownerId: sourceId,
-            buffId: BONUS_BUFF,
-          });
-        };
+        yield emit.buffApply({
+          sourceId,
+          ownerId: sourceId,
+          buffId: BONUS_BUFF,
+        });
       },
     });
 
     registry.registerGlobalDamageBonus({
       id: "operator.chenqianyu.potential3.skillDmgInc",
       fn: ({ read, ev, sourceId, collector }) => {
-        if (sourceId !== this.id) return;
+        if (sourceId !== selfId) return;
         if (ev?.type !== "hit") return;
 
         const parent = ev.ref ? read.getEvent(ev.ref) : null;
@@ -180,7 +180,7 @@ class ChenQianyuDef extends OperatorDef {
         if (!isSkillHit) return;
 
         const potentialRank = Number(
-          read.getBuild(this.id)?.potentialRank ?? 0,
+          read.getBuild(selfId)?.potentialRank ?? 0,
         );
         if (potentialRank < 3) return;
 

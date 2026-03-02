@@ -54,9 +54,7 @@ export type AfterHitTriggerContext = {
   sourceId: SimEntityId;
   targetId: SimEntityId;
 };
-export type AfterHitTrigger = (
-  ctx: AfterHitTriggerContext,
-) => SimScript | null | undefined;
+export type AfterHitTrigger = SimScript;
 
 export type OnCastTriggerContext = {
   read: SimRead;
@@ -64,9 +62,7 @@ export type OnCastTriggerContext = {
   sourceId: SimEntityId;
   targetId?: SimEntityId;
 };
-export type OnCastTrigger = (
-  ctx: OnCastTriggerContext,
-) => SimScript | null | undefined;
+export type OnCastTrigger = SimScript;
 
 export type OnStatusApplyTriggerContext = {
   read: SimRead;
@@ -74,9 +70,7 @@ export type OnStatusApplyTriggerContext = {
   sourceId: SimEntityId;
   targetId: SimEntityId;
 };
-export type OnStatusApplyTrigger = (
-  ctx: OnStatusApplyTriggerContext,
-) => SimScript | null | undefined;
+export type OnStatusApplyTrigger = SimScript;
 
 export type OnBuffApplyTriggerContext = {
   read: SimRead;
@@ -84,18 +78,14 @@ export type OnBuffApplyTriggerContext = {
   sourceId?: SimEntityId;
   targetId: SimEntityId;
 };
-export type OnBuffApplyTrigger = (
-  ctx: OnBuffApplyTriggerContext,
-) => SimScript | null | undefined;
+export type OnBuffApplyTrigger = SimScript;
 
 export type OnBuffConsumedTriggerContext = {
   read: SimRead;
   ev: Extract<SimEvent, { type: "buffRemove" }>;
   sourceId: SimEntityId;
 };
-export type OnBuffConsumedTrigger = (
-  ctx: OnBuffConsumedTriggerContext,
-) => SimScript | null | undefined;
+export type OnBuffConsumedTrigger = SimScript;
 
 export type OnInflictionApplyTriggerContext = {
   read: SimRead;
@@ -103,18 +93,14 @@ export type OnInflictionApplyTriggerContext = {
   sourceId: SimEntityId;
   targetId: SimEntityId;
 };
-export type OnInflictionApplyTrigger = (
-  ctx: OnInflictionApplyTriggerContext,
-) => SimScript | null | undefined;
+export type OnInflictionApplyTrigger = SimScript;
 
 export type OnInflictionConsumedTriggerContext = {
   read: SimRead;
   ev: Extract<SimEvent, { type: "inflictionExpire" }>;
   sourceId: SimEntityId;
 };
-export type OnInflictionConsumedTrigger = (
-  ctx: OnInflictionConsumedTriggerContext,
-) => SimScript | null | undefined;
+export type OnInflictionConsumedTrigger = SimScript;
 
 type ListenerEntry<TFn> = {
   id: string;
@@ -135,9 +121,9 @@ type TriggerContext =
 
 type TriggerWhen = SimEventWhen;
 
-type RegisterTriggerParams<TFn, TCtx extends TriggerContext> = {
+type RegisterTriggerParams<TCtx extends TriggerContext> = {
   id: string;
-  fn: TFn;
+  fn: SimScript;
   priority?: number;
   when?: TriggerWhen;
   match?: (ctx: TCtx) => boolean;
@@ -196,7 +182,7 @@ export class SimRegistry {
   }
 
   registerAfterHit(
-    params: RegisterTriggerParams<AfterHitTrigger, AfterHitTriggerContext>,
+    params: RegisterTriggerParams<AfterHitTriggerContext>,
   ): void {
     this.afterHit.push({
       id: params.id,
@@ -208,7 +194,7 @@ export class SimRegistry {
   }
 
   registerOnCastStart(
-    params: RegisterTriggerParams<OnCastTrigger, OnCastTriggerContext>,
+    params: RegisterTriggerParams<OnCastTriggerContext>,
   ): void {
     this.onCastStart.push({
       id: params.id,
@@ -220,7 +206,7 @@ export class SimRegistry {
   }
 
   registerOnCastEnd(
-    params: RegisterTriggerParams<OnCastTrigger, OnCastTriggerContext>,
+    params: RegisterTriggerParams<OnCastTriggerContext>,
   ): void {
     this.onCastEnd.push({
       id: params.id,
@@ -232,10 +218,7 @@ export class SimRegistry {
   }
 
   registerOnStatusApply(
-    params: RegisterTriggerParams<
-      OnStatusApplyTrigger,
-      OnStatusApplyTriggerContext
-    >,
+    params: RegisterTriggerParams<OnStatusApplyTriggerContext>,
   ): void {
     this.onStatusApply.push({
       id: params.id,
@@ -247,10 +230,7 @@ export class SimRegistry {
   }
 
   registerOnBuffApply(
-    params: RegisterTriggerParams<
-      OnBuffApplyTrigger,
-      OnBuffApplyTriggerContext
-    >,
+    params: RegisterTriggerParams<OnBuffApplyTriggerContext>,
   ): void {
     this.onBuffApply.push({
       id: params.id,
@@ -262,10 +242,7 @@ export class SimRegistry {
   }
 
   registerOnBuffConsumed(
-    params: RegisterTriggerParams<
-      OnBuffConsumedTrigger,
-      OnBuffConsumedTriggerContext
-    >,
+    params: RegisterTriggerParams<OnBuffConsumedTriggerContext>,
   ): void {
     this.onBuffConsumed.push({
       id: params.id,
@@ -277,10 +254,7 @@ export class SimRegistry {
   }
 
   registerOnInflictionApply(
-    params: RegisterTriggerParams<
-      OnInflictionApplyTrigger,
-      OnInflictionApplyTriggerContext
-    >,
+    params: RegisterTriggerParams<OnInflictionApplyTriggerContext>,
   ): void {
     this.onInflictionApply.push({
       id: params.id,
@@ -292,10 +266,7 @@ export class SimRegistry {
   }
 
   registerOnInflictionConsumed(
-    params: RegisterTriggerParams<
-      OnInflictionConsumedTrigger,
-      OnInflictionConsumedTriggerContext
-    >,
+    params: RegisterTriggerParams<OnInflictionConsumedTriggerContext>,
   ): void {
     this.onInflictionConsumed.push({
       id: params.id,
@@ -372,7 +343,7 @@ export class SimRegistry {
   }
 
   private runTriggers<TCtx extends TriggerContext>(
-    entries: ListenerEntry<(ctx: TCtx) => SimScript | null | undefined>[],
+    entries: ListenerEntry<SimScript>[],
     ctx: TCtx,
   ): SimEventDraft[] {
     const out: SimEventDraft[] = [];
@@ -381,12 +352,9 @@ export class SimRegistry {
         continue;
       }
 
-      const script = e.fn(ctx);
-      if (!script) continue;
-
       out.push(
         ...runSimScript({
-          script,
+          script: e.fn,
           baseFrame: ctx.ev.frame,
           ctx: this.buildScriptContext(ctx),
         }),
@@ -419,7 +387,7 @@ export class SimRegistry {
   }
 
   private matchesListener<TCtx extends TriggerContext>(
-    entry: ListenerEntry<(ctx: TCtx) => SimScript | null | undefined>,
+    entry: ListenerEntry<SimScript>,
     ctx: TCtx,
   ): boolean {
     if (entry.when && !this.matchesWhen(ctx, entry.when)) return false;
@@ -490,7 +458,7 @@ export function loadSimRegistry(): SimRegistry {
       registry.registerOnCastStart({
         id: `operator.${op.id}.skill.${skillType}.script`,
         match: ({ ev }) => ev.sourceId === op.id && ev.skillType === skillType,
-        fn: () => script,
+        fn: script,
       });
     }
 

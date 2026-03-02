@@ -1,5 +1,4 @@
 import type { SimRegistry } from "../../../simulator/listeners/registry";
-import { type SimScript } from "../../../simulator/scripts";
 import { BuffDef } from "../BuffDef";
 
 export const SOLIDIFICATION_BUFF_ID = "buff.solidification" as const;
@@ -22,19 +21,18 @@ class SolidificationBuffDef extends BuffDef {
   }
 
   override registerSimPlugins(registry: SimRegistry): void {
-    const spawnShatter = (params: {
+    const spawnShatter = function* (params: {
       sourceId: string;
       targetId: string;
       stacks: number;
       ref?: string | null;
-    }): SimScript => {
-      return function* (ctx) {
-        yield ctx.emit.buffRemove({
+    }, emit: { buffRemove: (draft: any) => any; hit: (draft: any) => any }) {
+      yield emit.buffRemove({
           ownerId: params.targetId,
           buffId: SOLIDIFICATION_BUFF_ID,
           ref: params.ref,
-        });
-        yield ctx.emit.hit({
+      });
+      yield emit.hit({
           sourceId: params.sourceId,
           targetId: params.targetId,
           damageType: "physical",
@@ -42,54 +40,55 @@ class SolidificationBuffDef extends BuffDef {
             SOLIDIFICATION_SHATTER_BASE_MUL +
             params.stacks * SOLIDIFICATION_SHATTER_PER_STACK_MUL,
           ref: params.ref,
-        });
-      };
+      });
     };
 
     registry.registerOnStatusApply({
       id: "buff.solidification.shatter.onPhysicalStatus",
-      fn: ({ read, ev, sourceId, targetId }) => {
+      fn: function* ({ read, ev, sourceId, targetId, emit }) {
+        if (ev?.type !== "statusApply" || !sourceId || !targetId) return;
         if (
           ev.statusType !== "lift" &&
           ev.statusType !== "knockDown" &&
           ev.statusType !== "crush" &&
           ev.statusType !== "breach"
         ) {
-          return null;
+          return;
         }
 
         const target = read.getEntity(targetId);
         const stacks = Number(
           (target as any).buffs?.[SOLIDIFICATION_BUFF_ID]?.stacks ?? 0,
         );
-        if (stacks <= 0) return null;
+        if (stacks <= 0) return;
 
-        return spawnShatter({
+        yield* spawnShatter({
           sourceId,
           targetId,
           stacks,
           ref: ev.id,
-        });
+        }, emit);
       },
     });
 
     registry.registerOnInflictionApply({
       id: "buff.solidification.shatter.onVulnerable",
-      fn: ({ read, ev, sourceId, targetId }) => {
-        if (ev.inflictionType !== "vulnerable") return null;
+      fn: function* ({ read, ev, sourceId, targetId, emit }) {
+        if (ev?.type !== "inflictionApply" || !sourceId || !targetId) return;
+        if (ev.inflictionType !== "vulnerable") return;
 
         const target = read.getEntity(targetId);
         const stacks = Number(
           (target as any).buffs?.[SOLIDIFICATION_BUFF_ID]?.stacks ?? 0,
         );
-        if (stacks <= 0) return null;
+        if (stacks <= 0) return;
 
-        return spawnShatter({
+        yield* spawnShatter({
           sourceId,
           targetId,
           stacks,
           ref: ev.id,
-        });
+        }, emit);
       },
     });
   }
