@@ -383,7 +383,8 @@ export class SimWorld {
   ): void {
     const events = materializeDrafts(
       drafts,
-      { nextSeq: () => this.nextSeq(), makeId: makeSimEventId },
+      () => this.nextSeq(),
+      makeSimEventId,
       opts,
     );
     for (const ev of events) {
@@ -391,6 +392,7 @@ export class SimWorld {
     }
   }
 
+  /** @deprecated */
   public createEmit(baseFrame: number) {
     return createDraftEmitter(baseFrame);
   }

@@ -30,7 +30,6 @@ import type { SimEventWhen } from "./when";
 
 export type SimEventBase = {
   id: string; // unique id within a simulation, for endding events to refer to
-  type: string;
   frame: number;
   seq: number; // larger seq earlier when frame equal
   when?: SimEventWhen;

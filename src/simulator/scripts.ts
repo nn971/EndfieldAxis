@@ -1,73 +1,12 @@
 import type { SkillType } from "../data/operators/OperatorDef";
 import type { SimRead } from "./simulator";
-import type { SimEvent } from "../types/simulator/simulator";
+import type { SimEvent, SimEventType } from "../types/simulator/simulator";
 import { makeSimEventId } from "../shared/lib/utils";
 
-export type StripEventRuntimeFields<T> = T extends SimEvent
-  ? Omit<T, "id" | "seq">
-  : never;
-export type SimEventDraft = StripEventRuntimeFields<SimEvent>;
+type DistOmit<T, K extends PropertyKey> = T extends any ? Omit<T, K> : never;
 
-export type DraftAllocator = {
-  nextSeq: () => number;
-  makeId?: () => string;
-};
-
-export type OmitFrame<T> = T extends SimEventDraft ? Omit<T, "frame"> : never;
-
-export type DraftEmitter = {
-  now: <T extends SimEventDraft>(draft: OmitFrame<T>) => T;
-  after: <T extends SimEventDraft>(
-    deltaFrames: number,
-    draft: OmitFrame<T>,
-  ) => T;
-};
-
-export function createDraftEmitter(baseFrame: number): DraftEmitter {
-  return {
-    now: draft => ({ ...draft, frame: baseFrame }) as any,
-    after: (deltaFrames, draft) =>
-      ({ ...draft, frame: baseFrame + deltaFrames }) as any,
-  };
-}
-
-export function materializeDrafts(
-  drafts: readonly SimEventDraft[],
-  alloc: DraftAllocator,
-  opts?: { defaultRef?: string },
-): SimEvent[] {
-  const makeId = alloc.makeId ?? makeSimEventId;
-  const grouped = new Map<number, SimEventDraft[]>();
-
-  for (const draft of drafts) {
-    const list = grouped.get(draft.frame);
-    if (list) {
-      list.push(draft);
-      continue;
-    }
-    grouped.set(draft.frame, [draft]);
-  }
-
-  const frames = [...grouped.keys()].sort((a, b) => a - b);
-  const frameSeqEntries = new Map<SimEventDraft, number>();
-
-  for (const frame of frames) {
-    const frameDrafts = grouped.get(frame) ?? [];
-    for (let i = frameDrafts.length - 1; i >= 0; i -= 1) {
-      frameSeqEntries.set(frameDrafts[i], alloc.nextSeq());
-    }
-  }
-
-  return drafts.map(draft => {
-    const ref = draft.ref ?? opts?.defaultRef;
-    return {
-      ...draft,
-      id: makeId(),
-      seq: frameSeqEntries.get(draft) ?? alloc.nextSeq(),
-      ...(ref !== undefined ? { ref } : {}),
-    } as SimEvent;
-  });
-}
+export type SimEventDraft = DistOmit<SimEvent, "id" | "seq">;
+type Draft<T extends SimEvent> = DistOmit<T, "id" | "seq" | "type" | "frame">;
 
 export type SimScriptContext = {
   read: SimRead;
@@ -88,16 +27,13 @@ export type SimScriptCommand =
     }
   | {
       type: "emit";
-      draft: OmitFrame<SimEventDraft>;
+      draft: DistOmit<SimEventDraft, "frame">;
     };
 
 export type SimScript = (
   ctx: SimScriptContext,
 ) => Generator<SimScriptCommand, void, undefined>;
 
-/**
- * New unified event scripting commands used by both skills and plugins.
- */
 export function delay(frames: number): SimScriptCommand {
   return {
     type: "delay",
@@ -105,34 +41,31 @@ export function delay(frames: number): SimScriptCommand {
   };
 }
 
-function emitCommand<T extends SimEventDraft>(
-  draft: OmitFrame<T>,
+function emitCommand(
+  draft: DistOmit<SimEventDraft, "frame">,
 ): SimScriptCommand {
-  return { type: "emit", draft: draft as OmitFrame<SimEventDraft> };
+  return { type: "emit", draft: draft as DistOmit<SimEventDraft, "frame"> };
 }
 
-type Draft<T extends SimEvent> = Omit<T, "type" | "frame" | "ref">;
+let A: Extract<SimEvent, { type: "hit" }>;
 
 export const emit = {
   hit: (draft: Draft<Extract<SimEvent, { type: "hit" }>>) =>
     emitCommand({ ...draft, type: "hit" }),
-  statusApply: (
-    draft: OmitFrame<Extract<SimEventDraft, { type: "statusApply" }>>,
-  ) => emitCommand(draft),
-  buffApply: (
-    draft: OmitFrame<Extract<SimEventDraft, { type: "buffApply" }>>,
-  ) => emitCommand(draft),
+  statusApply: (draft: Draft<Extract<SimEvent, { type: "statusApply" }>>) =>
+    emitCommand({ ...draft, type: "statusApply" }),
+  buffApply: (draft: Draft<Extract<SimEvent, { type: "buffApply" }>>) =>
+    emitCommand({ ...draft, type: "buffApply" }),
   inflictionApply: (
-    draft: OmitFrame<Extract<SimEventDraft, { type: "inflictionApply" }>>,
-  ) => emitCommand(draft),
-  spRecover: (
-    draft: OmitFrame<Extract<SimEventDraft, { type: "spRecover" }>>,
-  ) => emitCommand(draft),
-  spReturn: (draft: OmitFrame<Extract<SimEventDraft, { type: "spReturn" }>>) =>
-    emitCommand(draft),
+    draft: Draft<Extract<SimEvent, { type: "inflictionApply" }>>,
+  ) => emitCommand({ ...draft, type: "inflictionApply" }),
+  spRecover: (draft: Draft<Extract<SimEvent, { type: "spRecover" }>>) =>
+    emitCommand({ ...draft, type: "spRecover" }),
+  spReturn: (draft: Draft<Extract<SimEvent, { type: "spReturn" }>>) =>
+    emitCommand({ ...draft, type: "spReturn" }),
   comboTriggered: (
-    draft: OmitFrame<Extract<SimEventDraft, { type: "comboTriggered" }>>,
-  ) => emitCommand(draft),
+    draft: Draft<Extract<SimEvent, { type: "comboTriggered" }>>,
+  ) => emitCommand({ ...draft, type: "comboTriggered" }),
 };
 
 export function runSimScript(params: {
@@ -159,4 +92,41 @@ export function runSimScript(params: {
   }
 
   return out;
+}
+
+export function materializeDrafts(
+  drafts: readonly SimEventDraft[],
+  nextSeq: () => number,
+  makeId?: () => string,
+  opts?: { defaultRef?: string },
+): SimEvent[] {
+  const id = makeId ?? makeSimEventId;
+
+  return drafts.map(draft => {
+    const ref = draft.ref ?? opts?.defaultRef;
+    return {
+      ...draft,
+      id: id(),
+      seq: nextSeq(),
+      ...(ref !== undefined ? { ref } : {}),
+    } as SimEvent;
+  });
+}
+
+/** @deprecated Use generator-style `SimScript` + `emit` helpers instead. */
+export type DraftEmitter = {
+  now: <T extends SimEventDraft>(draft: Omit<T, "frame">) => T;
+  after: <T extends SimEventDraft>(
+    deltaFrames: number,
+    draft: Omit<T, "frame">,
+  ) => T;
+};
+
+/** @deprecated Use generator-style `SimScript` + `emit` helpers instead. */
+export function createDraftEmitter(baseFrame: number): DraftEmitter {
+  return {
+    now: draft => ({ ...draft, frame: baseFrame }) as any,
+    after: (deltaFrames, draft) =>
+      ({ ...draft, frame: baseFrame + deltaFrames }) as any,
+  };
 }
