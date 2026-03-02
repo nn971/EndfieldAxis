@@ -54,7 +54,7 @@ import {
   COMBUSTION_BUFF_ID,
   COMBUSTION_DOT_INTERVAL_FRAMES,
 } from "../data/buffs/reactions/combustion";
-import { createDraftEmitter, materializeDrafts } from "./scripts";
+import { materializeDrafts } from "./scripts";
 
 /**
  * SimWorld
@@ -80,7 +80,7 @@ export type SimRead = {
   /** Returns operator build if this entityId corresponds to an operator, else undefined. */
   getBuild(entityId: SimEntityId): OperatorBuild | undefined;
   /** Lookup an event by id (useful for provenance via SimEventBase.ref). */
-  getEvent(id: string): SimEvent | undefined;
+  getEvent(id: string | null): SimEvent | undefined;
 };
 
 export type SimOps = {
@@ -284,7 +284,8 @@ export class SimWorld {
       },
       getEntity: (id: SimEntityId) => self.getEntityOrThrow(id),
       getBuild: (entityId: SimEntityId) => self.buildByOperatorId?.[entityId],
-      getEvent: (id: string) => self.eventById.get(id),
+      getEvent: (id: string | null) =>
+        id ? self.eventById.get(id) : undefined,
     };
 
     this.ops = {
@@ -390,11 +391,6 @@ export class SimWorld {
     for (const ev of events) {
       this.schedule(ev);
     }
-  }
-
-  /** @deprecated */
-  public createEmit(baseFrame: number) {
-    return createDraftEmitter(baseFrame);
   }
 
   private popNextEvent(): SimEvent | null {
@@ -841,7 +837,6 @@ export class SimWorld {
               ev,
               sourceId: source.id,
               targetId: target.id,
-              emit: this.createEmit(ev.frame),
             });
             this.ops.scheduleDrafts(spawned);
           };
@@ -865,7 +860,6 @@ export class SimWorld {
             ev: ev,
             sourceId: source?.id,
             targetId: owner.id,
-            emit: this.createEmit(ev.frame),
           });
           this.ops.scheduleDrafts(spawned);
           break;
@@ -883,7 +877,6 @@ export class SimWorld {
             read: this.read,
             ev,
             sourceId: ev.ownerId,
-            emit: this.createEmit(ev.frame),
           });
           this.ops.scheduleDrafts(spawned);
           break;

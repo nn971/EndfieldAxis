@@ -1,6 +1,6 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
 import { pickSkillValueByRank } from "../../simulator/skillOps";
-import { delay, emit } from "../../simulator/scripts";
+import { delay } from "../../simulator/scripts";
 import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 
 const NS_DMG_MUL = [
@@ -62,14 +62,10 @@ class ChenQianyuDef extends OperatorDef {
           icon: "CHENQIANYU_NS.png",
           script: function* (ctx) {
             yield delay(26);
-            yield emit.statusApply({
-              sourceId: ctx.sourceId,
-              targetId: ctx.targetId,
+            yield ctx.emit.statusApply({
               statusType: "lift",
             });
-            yield emit.hit({
-              sourceId: ctx.sourceId,
-              targetId: ctx.targetId,
+            yield ctx.emit.hit({
               damageType: "physical",
               dmgMultiplier: pickSkillValueByRank(ctx, NS_DMG_MUL),
             });
@@ -81,14 +77,10 @@ class ChenQianyuDef extends OperatorDef {
           icon: "CHENQIANYU_CS.png",
           script: function* (ctx) {
             yield delay(34);
-            yield emit.statusApply({
-              sourceId: ctx.sourceId,
-              targetId: ctx.targetId,
+            yield ctx.emit.statusApply({
               statusType: "lift",
             });
-            yield emit.hit({
-              sourceId: ctx.sourceId,
-              targetId: ctx.targetId,
+            yield ctx.emit.hit({
               damageType: "physical",
               dmgMultiplier: pickSkillValueByRank(ctx, CS_DMG_MUL),
             });
@@ -102,9 +94,7 @@ class ChenQianyuDef extends OperatorDef {
             const slash = pickSkillValueByRank(ctx, ULT_SLASH_DMG_MUL);
             yield delay(32);
             for (let i = 0; i < 7; i += 1) {
-              yield emit.hit({
-                sourceId: ctx.sourceId,
-                targetId: ctx.targetId,
+              yield ctx.emit.hit({
                 damageType: "physical",
                 dmgMultiplier: slash,
               });
@@ -113,9 +103,7 @@ class ChenQianyuDef extends OperatorDef {
               }
             }
             yield delay(29);
-            yield emit.hit({
-              sourceId: ctx.sourceId,
-              targetId: ctx.targetId,
+            yield ctx.emit.hit({
               damageType: "physical",
               dmgMultiplier: pickSkillValueByRank(ctx, ULT_FINAL_DMG_MUL),
             });
@@ -142,23 +130,22 @@ class ChenQianyuDef extends OperatorDef {
 
     registry.registerOnInflictionApply({
       id: "operator.chenqianyu.combo.triggerOnVulnerableApply",
-      fn: ({ ev, emit }) => {
-        if (ev.inflictionType !== "vulnerable") return [];
-        return [
-          emit.now({
-            type: "comboTriggered",
-            sourceId: this.id,
+      fn: ({ ev, read }) => {
+        if (ev.inflictionType !== "vulnerable") return null;
+        const selfId = this.id;
+        return function* (ctx) {
+          yield ctx.emit.comboTriggered({
+            sourceId: selfId,
             targetId: ev.ownerId,
-            ref: ev.id,
-          }),
-        ];
+          });
+        }.bind(this);
       },
     });
 
     registry.registerAfterHit({
       id: "operator.chenqianyu.talent.atkStack",
       when: { sourceOperatorId: this.id },
-      fn: ({ read, ev, sourceId, emit }) => {
+      fn: ({ read, ev, sourceId }) => {
         const parent = ev.ref ? read.getEvent(ev.ref) : null;
         const isSkillHit = parent
           ? parent.type === "castStart" && parent.skillType != "normalAttack"
@@ -168,17 +155,15 @@ class ChenQianyuDef extends OperatorDef {
         const talentRank = Number(
           read.getBuild(sourceId)?.talentRanks?.talent1 ?? 0,
         );
-        if (talentRank <= 0) return [];
+        if (talentRank <= 0) return null;
 
-        return [
-          emit.now({
-            type: "buffApply",
-            ref: ev.id,
-            sourceId: sourceId,
+        return function* (ctx) {
+          yield ctx.emit.buffApply({
+            sourceId,
             ownerId: sourceId,
             buffId: BONUS_BUFF,
-          }),
-        ];
+          });
+        };
       },
     });
 

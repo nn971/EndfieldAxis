@@ -4,14 +4,53 @@ import type { SimEvent, SimEventType } from "../types/simulator/simulator";
 import { makeSimEventId } from "../shared/lib/utils";
 
 type DistOmit<T, K extends PropertyKey> = T extends any ? Omit<T, K> : never;
+type WithOptional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 
 export type SimEventDraft = DistOmit<SimEvent, "id" | "seq">;
-type Draft<T extends SimEvent> = DistOmit<T, "id" | "seq" | "type" | "frame">;
+type Draft<T extends SimEvent> = DistOmit<
+  T,
+  "id" | "seq" | "type" | "frame" | "ref"
+>;
+
+type EmitDraftByType = {
+  hit: WithOptional<Draft<Extract<SimEvent, { type: "hit" }>>, "sourceId" | "targetId">;
+  statusApply: WithOptional<
+    Draft<Extract<SimEvent, { type: "statusApply" }>>,
+    "sourceId" | "targetId"
+  >;
+  buffApply: WithOptional<
+    Draft<Extract<SimEvent, { type: "buffApply" }>>,
+    "sourceId" | "ownerId"
+  >;
+  buffRemove: WithOptional<Draft<Extract<SimEvent, { type: "buffRemove" }>>, "ownerId">;
+  inflictionApply: WithOptional<
+    Draft<Extract<SimEvent, { type: "inflictionApply" }>>,
+    "sourceId" | "ownerId"
+  >;
+  spRecover: WithOptional<Draft<Extract<SimEvent, { type: "spRecover" }>>, "sourceId">;
+  spReturn: WithOptional<Draft<Extract<SimEvent, { type: "spReturn" }>>, "sourceId">;
+  comboTriggered: WithOptional<
+    Draft<Extract<SimEvent, { type: "comboTriggered" }>>,
+    "sourceId" | "targetId"
+  >;
+  reactionTick: WithOptional<
+    Draft<Extract<SimEvent, { type: "reactionTick" }>>,
+    "sourceId" | "targetId"
+  >;
+};
+
+export type SimScriptEmit = {
+  [K in keyof EmitDraftByType]: (draft: EmitDraftByType[K]) => SimScriptCommand;
+};
 
 export type SimScriptContext = {
   read: SimRead;
-  sourceId: string;
-  targetId: string;
+  emit: SimScriptEmit;
+
+  /** @deprecated */
+  sourceId?: string;
+  /** @deprecated */
+  targetId?: string;
   startFrame: number;
   skillType: SkillType;
   sourceBuild?: {
@@ -27,7 +66,7 @@ export type SimScriptCommand =
     }
   | {
       type: "emit";
-      draft: DistOmit<SimEventDraft, "frame">;
+      draft: DistOmit<SimEventDraft, "frame" | "ref">;
     };
 
 export type SimScript = (
@@ -42,30 +81,82 @@ export function delay(frames: number): SimScriptCommand {
 }
 
 function emitCommand(
-  draft: DistOmit<SimEventDraft, "frame">,
+  draft: DistOmit<SimEventDraft, "frame" | "ref">,
 ): SimScriptCommand {
-  return { type: "emit", draft: draft as DistOmit<SimEventDraft, "frame"> };
+  return {
+    type: "emit",
+    draft: draft as DistOmit<SimEventDraft, "frame" | "ref">,
+  };
 }
 
-let A: Extract<SimEvent, { type: "hit" }>;
+function makeCtxEmit(ctx: Pick<SimScriptContext, "sourceId" | "targetId">): SimScriptEmit {
+  return {
+    hit: draft =>
+      emitCommand({
+        ...draft,
+        sourceId: draft.sourceId ?? ctx.sourceId,
+        targetId: draft.targetId ?? ctx.targetId,
+        type: "hit",
+      } as DistOmit<SimEventDraft, "frame" | "ref">),
+    statusApply: draft =>
+      emitCommand({
+        ...draft,
+        sourceId: draft.sourceId ?? ctx.sourceId,
+        targetId: draft.targetId ?? ctx.targetId,
+        type: "statusApply",
+      } as DistOmit<SimEventDraft, "frame" | "ref">),
+    buffApply: draft =>
+      emitCommand({
+        ...draft,
+        sourceId: draft.sourceId ?? ctx.sourceId,
+        ownerId: draft.ownerId ?? ctx.targetId,
+        type: "buffApply",
+      } as DistOmit<SimEventDraft, "frame" | "ref">),
+    buffRemove: draft =>
+      emitCommand({
+        ...draft,
+        ownerId: draft.ownerId ?? ctx.targetId,
+        type: "buffRemove",
+      } as DistOmit<SimEventDraft, "frame" | "ref">),
+    inflictionApply: draft =>
+      emitCommand({
+        ...draft,
+        sourceId: draft.sourceId ?? ctx.sourceId,
+        ownerId: draft.ownerId ?? ctx.targetId,
+        type: "inflictionApply",
+      } as DistOmit<SimEventDraft, "frame" | "ref">),
+    spRecover: draft =>
+      emitCommand({
+        ...draft,
+        sourceId: draft.sourceId ?? ctx.sourceId,
+        type: "spRecover",
+      } as DistOmit<SimEventDraft, "frame" | "ref">),
+    spReturn: draft =>
+      emitCommand({
+        ...draft,
+        sourceId: draft.sourceId ?? ctx.sourceId,
+        type: "spReturn",
+      } as DistOmit<SimEventDraft, "frame" | "ref">),
+    comboTriggered: draft =>
+      emitCommand({
+        ...draft,
+        sourceId: draft.sourceId ?? ctx.sourceId,
+        targetId: draft.targetId ?? ctx.targetId,
+        type: "comboTriggered",
+      } as DistOmit<SimEventDraft, "frame" | "ref">),
+    reactionTick: draft =>
+      emitCommand({
+        ...draft,
+        sourceId: draft.sourceId ?? ctx.sourceId,
+        targetId: draft.targetId ?? ctx.targetId,
+        type: "reactionTick",
+      } as DistOmit<SimEventDraft, "frame" | "ref">),
+  };
+}
 
 export const emit = {
-  hit: (draft: Draft<Extract<SimEvent, { type: "hit" }>>) =>
-    emitCommand({ ...draft, type: "hit" }),
-  statusApply: (draft: Draft<Extract<SimEvent, { type: "statusApply" }>>) =>
-    emitCommand({ ...draft, type: "statusApply" }),
-  buffApply: (draft: Draft<Extract<SimEvent, { type: "buffApply" }>>) =>
-    emitCommand({ ...draft, type: "buffApply" }),
-  inflictionApply: (
-    draft: Draft<Extract<SimEvent, { type: "inflictionApply" }>>,
-  ) => emitCommand({ ...draft, type: "inflictionApply" }),
-  spRecover: (draft: Draft<Extract<SimEvent, { type: "spRecover" }>>) =>
-    emitCommand({ ...draft, type: "spRecover" }),
-  spReturn: (draft: Draft<Extract<SimEvent, { type: "spReturn" }>>) =>
-    emitCommand({ ...draft, type: "spReturn" }),
-  comboTriggered: (
-    draft: Draft<Extract<SimEvent, { type: "comboTriggered" }>>,
-  ) => emitCommand({ ...draft, type: "comboTriggered" }),
+  /** @deprecated Prefer ctx.emit.* from SimScriptContext */
+  ...makeCtxEmit({ sourceId: undefined, targetId: undefined }),
 };
 
 export function runSimScript(params: {
@@ -74,10 +165,14 @@ export function runSimScript(params: {
   baseFrame: number;
 }): SimEventDraft[] {
   const { script, ctx, baseFrame } = params;
+  const runtimeCtx = {
+    ...ctx,
+    emit: makeCtxEmit(ctx),
+  } satisfies SimScriptContext;
   const out: SimEventDraft[] = [];
   let frameCursor = baseFrame;
 
-  for (const op of script(ctx)) {
+  for (const op of script(runtimeCtx)) {
     if (!op) continue;
 
     if (op.type === "delay") {
@@ -111,22 +206,4 @@ export function materializeDrafts(
       ...(ref !== undefined ? { ref } : {}),
     } as SimEvent;
   });
-}
-
-/** @deprecated Use generator-style `SimScript` + `emit` helpers instead. */
-export type DraftEmitter = {
-  now: <T extends SimEventDraft>(draft: Omit<T, "frame">) => T;
-  after: <T extends SimEventDraft>(
-    deltaFrames: number,
-    draft: Omit<T, "frame">,
-  ) => T;
-};
-
-/** @deprecated Use generator-style `SimScript` + `emit` helpers instead. */
-export function createDraftEmitter(baseFrame: number): DraftEmitter {
-  return {
-    now: draft => ({ ...draft, frame: baseFrame }) as any,
-    after: (deltaFrames, draft) =>
-      ({ ...draft, frame: baseFrame + deltaFrames }) as any,
-  };
 }

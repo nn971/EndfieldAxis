@@ -1,6 +1,6 @@
 import { BuffDef } from "../../BuffDef";
 import type { SimRegistry } from "../../../../simulator/listeners/registry";
-import type { SimEventDraft } from "../../../../simulator/scripts";
+import { type SimScript, type SimScriptContext } from "../../../../simulator/scripts";
 import type { SimRead } from "../../../../simulator/simulator";
 
 const ENDMINISTRATOR_ID = "endministrator";
@@ -21,32 +21,27 @@ function getEndministratorComboRank(read: SimRead): number {
 
 function spawnCrystalConsumeEvents(params: {
   read: SimRead;
-  frame: number;
   targetId: string;
   ref?: string | null;
-}): SimEventDraft[] {
+}): SimScript {
   const csRank = getEndministratorComboRank(params.read);
   const crystalShatterMul = CRYSTAL_SHATTER_MUL_BY_CS_RANK[csRank - 1] ?? 3.2;
 
-  return [
-    {
-      type: "buffRemove",
-      frame: params.frame,
+  return function* (ctx: SimScriptContext) {
+    yield ctx.emit.buffRemove({
       ownerId: params.targetId,
       buffId: "buff.crystal" as any,
       ref: params.ref,
-    },
-    {
-      type: "hit",
-      frame: params.frame,
+    });
+    yield ctx.emit.hit({
       sourceId: ENDMINISTRATOR_ID,
       targetId: params.targetId,
       damageType: "physical",
       hitTypes: { comboSkill: true },
       dmgMultiplier: crystalShatterMul,
       ref: params.ref,
-    } as SimEventDraft,
-  ];
+    });
+  };
 }
 
 class CrystalBuffDef extends BuffDef {
@@ -78,22 +73,21 @@ class CrystalBuffDef extends BuffDef {
     registry.registerOnStatusApply({
       id: CRYSTAL_ON_STATUS_APPLY_PLUGIN_ID,
       fn: ({ read, ev, targetId }) => {
-        if (!read.env.entitiesById[ENDMINISTRATOR_ID]) return [];
+        if (!read.env.entitiesById[ENDMINISTRATOR_ID]) return null;
 
         const target = read.getEntity(targetId);
-        if (!(target as any).buffs?.["buff.crystal"]) return [];
+        if (!(target as any).buffs?.["buff.crystal"]) return null;
         if (
           ev.statusType !== "lift" &&
           ev.statusType !== "knockDown" &&
           ev.statusType !== "crush" &&
           ev.statusType !== "breach"
         ) {
-          return [];
+          return null;
         }
 
         return spawnCrystalConsumeEvents({
           read,
-          frame: ev.frame,
           targetId,
           ref: ev.id,
         });
@@ -103,21 +97,20 @@ class CrystalBuffDef extends BuffDef {
     registry.registerOnInflictionApply({
       id: "buff.crystal.consume.onInflictionApply",
       fn: ({ read, ev, targetId }) => {
-        if (!read.env.entitiesById[ENDMINISTRATOR_ID]) return [];
+        if (!read.env.entitiesById[ENDMINISTRATOR_ID]) return null;
 
         const target = read.getEntity(targetId);
-        if (!(target as any).buffs?.["buff.crystal"]) return [];
-        if (ev.inflictionType !== "vulnerable") return [];
+        if (!(target as any).buffs?.["buff.crystal"]) return null;
+        if (ev.inflictionType !== "vulnerable") return null;
 
         // Skip inflictions spawned by statusApply to avoid double consume.
         if (ev.ref) {
           const parent = read.getEvent(ev.ref);
-          if (parent?.type === "statusApply") return [];
+          if (parent?.type === "statusApply") return null;
         }
 
         return spawnCrystalConsumeEvents({
           read,
-          frame: ev.frame,
           targetId,
           ref: ev.id,
         });

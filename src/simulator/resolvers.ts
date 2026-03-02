@@ -373,7 +373,6 @@ export function resolveCastStart(
     ev: ev,
     sourceId: ev.sourceId,
     targetId: ev.targetId,
-    emit: self.createEmit(ev.frame),
   });
   self.ops.scheduleDrafts(spawned);
 }
@@ -398,7 +397,6 @@ export function resolveCastEnd(
     ev: ev,
     sourceId: ev.sourceId,
     targetId: ev.targetId,
-    emit: self.createEmit(ev.frame),
   });
   self.ops.scheduleDrafts(spawned);
 }
@@ -493,7 +491,6 @@ export function resolveHit(
     ev: ev,
     sourceId: source.id,
     targetId: target.id,
-    emit: self.createEmit(ev.frame),
   });
   self.ops.scheduleDrafts(spawned);
 }
@@ -913,7 +910,6 @@ export function resolveInflictionApplication(
     ev,
     sourceId: source.id,
     targetId: owner.id,
-    emit: self.createEmit(ev.frame),
   });
   self.ops.scheduleDrafts(spawned);
 

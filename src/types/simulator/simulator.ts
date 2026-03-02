@@ -32,10 +32,11 @@ export type SimEventBase = {
   id: string; // unique id within a simulation, for endding events to refer to
   frame: number;
   seq: number; // larger seq earlier when frame equal
+  /** @deprecated Check when condition in the script, outside event resolvation loop */
   when?: SimEventWhen;
 
-  /** Optional reference to a related event (parent / originating action). */
-  ref?: string | null;
+  /** Reference to a related event (parent / originating action). */
+  ref: string | null;
   // org?: string | null;
 
   // sourceId?: SimEntityId;

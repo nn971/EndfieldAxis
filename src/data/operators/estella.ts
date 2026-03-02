@@ -1,6 +1,6 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
 import { pickSkillValueByRank } from "../../simulator/skillOps";
-import { delay, emit } from "../../simulator/scripts";
+import { delay } from "../../simulator/scripts";
 import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 
 const NS_DMG_MUL = [
@@ -62,16 +62,12 @@ class EstellaDef extends OperatorDef {
           icon: "ESTELLA_NS.png",
           script: function* (ctx) {
             yield delay(26);
-            yield emit.hit({
-              sourceId: ctx.sourceId,
-              targetId: ctx.targetId,
-              damageType: "cryo",
+            yield ctx.emit.hit({
+                                          damageType: "cryo",
               dmgMultiplier: pickSkillValueByRank(ctx, NS_DMG_MUL),
             });
-            yield emit.inflictionApply({
-              sourceId: ctx.sourceId,
-              ownerId: ctx.targetId,
-              inflictionType: "cryo",
+            yield ctx.emit.inflictionApply({
+                                          inflictionType: "cryo",
               inflictionStacks: 1,
             });
           },
@@ -82,29 +78,25 @@ class EstellaDef extends OperatorDef {
           icon: "ESTELLA_CS.png",
           script: function* (ctx) {
             yield delay(34);
-            yield emit.statusApply({
-              sourceId: ctx.sourceId,
-              targetId: ctx.targetId,
-              statusType: "lift",
+            yield ctx.emit.statusApply({
+                                          statusType: "lift",
             });
 
             const target = ctx.read.getEntity(ctx.targetId);
-            const isSolidified = Boolean((target as any)?.buffs?.["buff.solidification"]);
+            const isSolidified = Boolean(
+              (target as any)?.buffs?.["buff.solidification"],
+            );
 
-            yield emit.hit({
-              sourceId: ctx.sourceId,
-              targetId: ctx.targetId,
-              damageType: "physical",
+            yield ctx.emit.hit({
+                                          damageType: "physical",
               dmgMultiplier: isSolidified
                 ? pickSkillValueByRank(ctx, CS_DMG_MUL_SOLIDIFIED)
                 : pickSkillValueByRank(ctx, CS_DMG_MUL_NON_SOLIDIFIED),
             });
 
             if (isSolidified) {
-              yield emit.buffApply({
-                sourceId: ctx.sourceId,
-                ownerId: ctx.targetId,
-                buffId: "buff.estella.combo.physicalSusceptibility",
+              yield ctx.emit.buffApply({
+                                                buffId: "buff.estella.combo.physicalSusceptibility",
               });
             }
           },
@@ -115,10 +107,8 @@ class EstellaDef extends OperatorDef {
           icon: "ESTELLA_ULT.png",
           script: function* (ctx) {
             yield delay(55);
-            yield emit.hit({
-              sourceId: ctx.sourceId,
-              targetId: ctx.targetId,
-              damageType: "physical",
+            yield ctx.emit.hit({
+                                          damageType: "physical",
               dmgMultiplier: pickSkillValueByRank(ctx, ULT_DMG_MUL),
             });
           },
@@ -143,17 +133,16 @@ class EstellaDef extends OperatorDef {
     registry.registerOnBuffApply({
       id: "operator.estella.combo.triggerOnSolidification",
       when: { buffId: "buff.solidification" },
-      fn: ({ read, ev, emit }) => {
-        if (!read.env.entitiesById[this.id]) return [];
+      fn: ({ read, ev }) => {
+        if (!read.env.entitiesById[this.id]) return null;
 
-        return [
-          emit.now({
-            type: "comboTriggered",
-            sourceId: this.id,
+        const selfId = this.id;
+        return function* (ctx) {
+          yield ctx.emit.comboTriggered({
+            sourceId: selfId,
             targetId: ev.ownerId,
-            ref: ev.id,
-          }),
-        ];
+          });
+        }.bind(this);
       },
     });
   }

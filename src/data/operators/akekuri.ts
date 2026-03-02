@@ -1,6 +1,6 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
 import { pickSkillValueByRank } from "../../simulator/skillOps";
-import { delay, emit } from "../../simulator/scripts";
+import { delay } from "../../simulator/scripts";
 import type { SimEnv } from "../../types/simulator/simulator";
 import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 
@@ -63,15 +63,11 @@ class AkekuriDef extends OperatorDef {
           icon: PLACEHOLDER_ICON,
           script: function* (ctx) {
             yield delay(28);
-            yield emit.hit({
-              sourceId: ctx.sourceId,
-              targetId: ctx.targetId,
+            yield ctx.emit.hit({
               damageType: "heat",
               dmgMultiplier: pickSkillValueByRank(ctx, NS_DMG_MUL),
             });
-            yield emit.inflictionApply({
-              sourceId: ctx.sourceId,
-              ownerId: ctx.targetId,
+            yield ctx.emit.inflictionApply({
               inflictionType: "heat",
               inflictionStacks: 1,
             });
@@ -86,22 +82,18 @@ class AkekuriDef extends OperatorDef {
             const sp = pickSkillValueByRank(ctx, CS_SP_RECOVERY_PER_SEQ);
 
             yield delay(24);
-            yield emit.hit({
-              sourceId: ctx.sourceId,
-              targetId: ctx.targetId,
+            yield ctx.emit.hit({
               damageType: "physical",
               dmgMultiplier: dmg,
             });
-            yield emit.spRecover({ sourceId: ctx.sourceId, amount: sp });
+            yield ctx.emit.spRecover({ amount: sp });
 
             yield delay(20);
-            yield emit.hit({
-              sourceId: ctx.sourceId,
-              targetId: ctx.targetId,
+            yield ctx.emit.hit({
               damageType: "physical",
               dmgMultiplier: dmg,
             });
-            yield emit.spRecover({ sourceId: ctx.sourceId, amount: sp });
+            yield ctx.emit.spRecover({ amount: sp });
           },
         },
         ultimate: {
@@ -111,11 +103,11 @@ class AkekuriDef extends OperatorDef {
           script: function* (ctx) {
             const amount = pickSkillValueByRank(ctx, ULT_SP_RECOVERY) * (1 / 3);
             yield delay(40);
-            yield emit.spRecover({ sourceId: ctx.sourceId, amount });
+            yield ctx.emit.spRecover({ amount });
             yield delay(45);
-            yield emit.spRecover({ sourceId: ctx.sourceId, amount });
+            yield ctx.emit.spRecover({ amount });
             yield delay(45);
-            yield emit.spRecover({ sourceId: ctx.sourceId, amount });
+            yield ctx.emit.spRecover({ amount });
           },
         },
       },
@@ -166,7 +158,7 @@ class AkekuriDef extends OperatorDef {
           );
         }
 
-        return [];
+        return null;
       },
     });
 
@@ -178,7 +170,7 @@ class AkekuriDef extends OperatorDef {
         if (map && ev.ref) {
           delete map[ev.ref];
         }
-        return [];
+        return null;
       },
     });
 

@@ -33,111 +33,106 @@ class GrandVisionDef extends WeaponDef {
     registry.registerOnBuffApply({
       id: "weapon.grandvision.longWish.prime",
       when: { buffId: "buff.crystal" },
-      fn: ({ read, sourceId, emit }) => {
-        if (!sourceId) return [];
+      fn: ({ read, sourceId, ev }) => {
+        if (!sourceId) return null;
 
         const build = read.getBuild(sourceId);
-        if (!build || build.weapon.id !== this.id) return [];
+        if (!build || build.weapon.id !== this.id) return null;
 
         const self = read.getEntity(sourceId);
         const existing = (self as any).buffs?.[LONG_WISH_BUFF];
         const stacks = Math.max(0, Number((existing as any)?.stacks ?? 0));
 
         // Prime as stacks=1. If already active (stacks=2), do nothing.
-        if (stacks >= 2) return [];
+        if (stacks >= 2) return null;
 
         // If already primed (stacks=1), refresh by removing then applying.
         if (stacks === 1) {
-          return [
-            emit.now({
-              type: "buffRemove",
+          return function* (ctx) {
+            yield ctx.emit.buffRemove({
               ownerId: sourceId,
               buffId: LONG_WISH_BUFF as any,
-            }),
-            emit.now({
-              type: "buffApply",
+            });
+            yield ctx.emit.buffApply({
               sourceId,
               targetId: sourceId,
               ownerId: sourceId,
               buffId: LONG_WISH_BUFF as any,
-            }),
-          ];
+            });
+          };
         }
 
-        return [
-          emit.now({
-            type: "buffApply",
+        return function* (ctx) {
+          yield ctx.emit.buffApply({
             sourceId,
             targetId: sourceId,
             ownerId: sourceId,
             buffId: LONG_WISH_BUFF as any,
-          }),
-        ];
+          });
+        };
       },
     });
 
     // Activate Long Wish during the next battle-skill or ultimate cast.
     registry.registerOnCastStart({
       id: "weapon.grandvision.longWish.activate",
-      fn: ({ read, ev, sourceId, emit }) => {
-        if (!sourceId) return [];
+      fn: ({ read, ev, sourceId }) => {
+        if (!sourceId) return null;
 
         const build = read.getBuild(sourceId);
-        if (!build || build.weapon.id !== this.id) return [];
+        if (!build || build.weapon.id !== this.id) return null;
         if (
           ev.skillType !== "normalSkill" &&
           ev.skillType !== "comboSkill" &&
           ev.skillType !== "ultimate"
         ) {
-          return [];
+          return null;
         }
 
         const self = read.getEntity(sourceId);
         const existing = (self as any).buffs?.[LONG_WISH_BUFF];
         const stacks = Math.max(0, Number((existing as any)?.stacks ?? 0));
-        if (stacks !== 1) return [];
+        if (stacks !== 1) return null;
 
         // Apply again to stack to 2 (active) for the duration of this cast.
-        return [
-          emit.now({
-            type: "buffApply",
+        return function* (ctx) {
+          yield ctx.emit.buffApply({
             sourceId,
             targetId: sourceId,
             ownerId: sourceId,
             buffId: LONG_WISH_BUFF as any,
-          }),
-        ];
+          });
+        };
       },
     });
 
     // Consume Long Wish at cast end.
     registry.registerOnCastEnd({
       id: "weapon.grandvision.longWish.consume",
-      fn: ({ read, ev, sourceId, emit }) => {
-        if (!sourceId) return [];
+      fn: ({ read, ev, sourceId }) => {
+        if (!sourceId) return null;
 
         const build = read.getBuild(sourceId);
-        if (!build || build.weapon.id !== this.id) return [];
+        if (!build || build.weapon.id !== this.id) return null;
         if (
           ev.skillType !== "normalSkill" &&
           ev.skillType !== "comboSkill" &&
           ev.skillType !== "ultimate"
         ) {
-          return [];
+          return null;
         }
 
         const self = read.getEntity(sourceId);
         const existing = (self as any).buffs?.[LONG_WISH_BUFF];
         const stacks = Math.max(0, Number((existing as any)?.stacks ?? 0));
-        if (stacks < 2) return [];
+        if (stacks < 2) return null;
 
-        return [
-          emit.now({
-            type: "buffRemove",
+        return function* (ctx) {
+          yield ctx.emit.buffRemove({
             ownerId: sourceId,
             buffId: LONG_WISH_BUFF as any,
-          }),
-        ];
+          });
+        };
       },
     });
   }

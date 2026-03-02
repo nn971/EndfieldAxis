@@ -1,4 +1,5 @@
 import type { SimRegistry } from "../../../simulator/listeners/registry";
+import { delay } from "../../../simulator/scripts";
 import { BuffDef } from "../BuffDef";
 
 export const COMBUSTION_BUFF_ID = "buff.combustion" as const;
@@ -24,23 +25,23 @@ class CombustionBuffDef extends BuffDef {
     registry.registerOnBuffApply({
       id: "buff.combustion.scheduleDot",
       when: { buffId: this.id },
-      fn: ({ ev, read, emit }) => {
+      fn: ({ ev, read }) => {
         const target = read.getEntity(ev.ownerId);
         const buff = (target as any).buffs?.[this.id];
-        if (!buff) return [];
+        if (!buff) return null;
 
         const sourceId = String((buff as any).meta?.reactionSourceId ?? "");
-        if (!sourceId) return [];
+        if (!sourceId) return null;
 
-        return [
-          emit.after(COMBUSTION_DOT_INTERVAL_FRAMES, {
-            type: "reactionTick",
+        return function* (ctx) {
+          yield delay(COMBUSTION_DOT_INTERVAL_FRAMES);
+          yield ctx.emit.reactionTick({
             sourceId,
             targetId: ev.ownerId,
             reactionBuffId: this.id,
             ref: ev.id,
-          }),
-        ];
+          });
+        }.bind(this);
       },
     });
   }

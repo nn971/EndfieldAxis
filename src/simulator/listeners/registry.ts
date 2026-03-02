@@ -1,6 +1,6 @@
 import type { SimBuff } from "../../types/simulator/infliction";
 import type { SimEntityId, SimEvent } from "../../types/simulator/simulator";
-import type { SimEventDraft } from "../scripts";
+import type { SimEventDraft, SimScript } from "../scripts";
 import type { DamageBonusCollector } from "../damage/damageBonuses";
 import type { SimRead } from "../simulator";
 import operatorsData from "../../data/operators";
@@ -15,9 +15,9 @@ import {
   sortPluginsByGameOrder,
   type PluginOrderingBucket,
 } from "./pluginOrder";
-import type { DraftEmitter } from "../scripts";
 import type { SimEventWhen } from "../../types/simulator/when";
 import { runSimScript, type SimScriptContext } from "../scripts";
+import type { SkillType } from "../../data/operators/OperatorDef";
 
 /**
  * Listener/registry layer:
@@ -30,6 +30,7 @@ export type DamageBonusListenerContext = {
   /** The event that caused this damage. For status procs, this can be undefined. */
   ev?: SimEvent;
   type: DamageType;
+
   sourceId: SimEntityId;
   targetId: SimEntityId;
   collector: DamageBonusCollector;
@@ -52,71 +53,68 @@ export type AfterHitTriggerContext = {
   ev: Extract<SimEvent, { type: "hit" }>;
   sourceId: SimEntityId;
   targetId: SimEntityId;
-  emit: DraftEmitter;
 };
-export type AfterHitTrigger = (ctx: AfterHitTriggerContext) => SimEventDraft[];
+export type AfterHitTrigger = (
+  ctx: AfterHitTriggerContext,
+) => SimScript | null | undefined;
 
 export type OnCastTriggerContext = {
   read: SimRead;
   ev: Extract<SimEvent, { type: "castStart" | "castEnd" }>;
   sourceId: SimEntityId;
   targetId?: SimEntityId;
-  emit: DraftEmitter;
 };
-export type OnCastTrigger = (ctx: OnCastTriggerContext) => SimEventDraft[];
+export type OnCastTrigger = (
+  ctx: OnCastTriggerContext,
+) => SimScript | null | undefined;
 
 export type OnStatusApplyTriggerContext = {
   read: SimRead;
   ev: Extract<SimEvent, { type: "statusApply" }>;
   sourceId: SimEntityId;
   targetId: SimEntityId;
-  emit: DraftEmitter;
 };
 export type OnStatusApplyTrigger = (
   ctx: OnStatusApplyTriggerContext,
-) => SimEventDraft[];
+) => SimScript | null | undefined;
 
 export type OnBuffApplyTriggerContext = {
   read: SimRead;
   ev: Extract<SimEvent, { type: "buffApply" }>;
   sourceId?: SimEntityId;
   targetId: SimEntityId;
-  emit: DraftEmitter;
 };
 export type OnBuffApplyTrigger = (
   ctx: OnBuffApplyTriggerContext,
-) => SimEventDraft[];
+) => SimScript | null | undefined;
 
 export type OnBuffConsumedTriggerContext = {
   read: SimRead;
   ev: Extract<SimEvent, { type: "buffRemove" }>;
   sourceId: SimEntityId;
-  emit: DraftEmitter;
 };
 export type OnBuffConsumedTrigger = (
   ctx: OnBuffConsumedTriggerContext,
-) => SimEventDraft[];
+) => SimScript | null | undefined;
 
 export type OnInflictionApplyTriggerContext = {
   read: SimRead;
   ev: Extract<SimEvent, { type: "inflictionApply" }>;
   sourceId: SimEntityId;
   targetId: SimEntityId;
-  emit: DraftEmitter;
 };
 export type OnInflictionApplyTrigger = (
   ctx: OnInflictionApplyTriggerContext,
-) => SimEventDraft[];
+) => SimScript | null | undefined;
 
 export type OnInflictionConsumedTriggerContext = {
   read: SimRead;
   ev: Extract<SimEvent, { type: "inflictionExpire" }>;
   sourceId: SimEntityId;
-  emit: DraftEmitter;
 };
 export type OnInflictionConsumedTrigger = (
   ctx: OnInflictionConsumedTriggerContext,
-) => SimEventDraft[];
+) => SimScript | null | undefined;
 
 type ListenerEntry<TFn> = {
   id: string;
@@ -370,22 +368,11 @@ export class SimRegistry {
   runOnInflictionConsumed(
     ctx: OnInflictionConsumedTriggerContext,
   ): SimEventDraft[] {
-    const out: SimEventDraft[] = [];
-    for (const e of this.onInflictionConsumed) {
-      if (
-        !this.matchesListener(
-          e as ListenerEntry<(ctx: TriggerContext) => SimEventDraft[]>,
-          ctx,
-        )
-      )
-        continue;
-      out.push(...(e.fn(ctx) ?? []));
-    }
-    return out;
+    return this.runTriggers(this.onInflictionConsumed, ctx);
   }
 
   private runTriggers<TCtx extends TriggerContext>(
-    entries: ListenerEntry<(ctx: TCtx) => SimEventDraft[]>[],
+    entries: ListenerEntry<(ctx: TCtx) => SimScript | null | undefined>[],
     ctx: TCtx,
   ): SimEventDraft[] {
     const out: SimEventDraft[] = [];
@@ -393,13 +380,46 @@ export class SimRegistry {
       if (!this.matchesListener(e, ctx)) {
         continue;
       }
-      out.push(...(e.fn(ctx) ?? []));
+
+      const script = e.fn(ctx);
+      if (!script) continue;
+
+      out.push(
+        ...runSimScript({
+          script,
+          baseFrame: ctx.ev.frame,
+          ctx: this.buildScriptContext(ctx),
+        }),
+      );
     }
     return out;
   }
 
+  private buildScriptContext(ctx: TriggerContext): SimScriptContext {
+    const sourceId = "sourceId" in ctx ? ctx.sourceId : ctx.ev.ownerId;
+    const targetId =
+      "targetId" in ctx && ctx.targetId ? ctx.targetId : sourceId;
+
+    return {
+      read: ctx.read,
+      ev: ctx.ev,
+      sourceId,
+      targetId,
+      startFrame: ctx.ev.frame,
+      skillType: this.getSkillTypeFromEvent(ctx.ev),
+      sourceBuild: sourceId ? ctx.read.getBuild(sourceId) : undefined,
+    };
+  }
+
+  private getSkillTypeFromEvent(ev: SimEvent): SkillType {
+    if (ev.type === "castStart" || ev.type === "castEnd") {
+      return ev.skillType;
+    }
+    return "normalSkill";
+  }
+
   private matchesListener<TCtx extends TriggerContext>(
-    entry: ListenerEntry<(ctx: TCtx) => SimEventDraft[]>,
+    entry: ListenerEntry<(ctx: TCtx) => SimScript | null | undefined>,
     ctx: TCtx,
   ): boolean {
     if (entry.when && !this.matchesWhen(ctx, entry.when)) return false;
@@ -470,26 +490,7 @@ export function loadSimRegistry(): SimRegistry {
       registry.registerOnCastStart({
         id: `operator.${op.id}.skill.${skillType}.script`,
         match: ({ ev }) => ev.sourceId === op.id && ev.skillType === skillType,
-        fn: ({ read, ev }) => {
-          const targetId = ev.targetId;
-          if (!targetId) return [];
-
-          const scriptCtx: SimScriptContext = {
-            read,
-            sourceId: ev.sourceId,
-            targetId,
-            startFrame: ev.frame,
-            skillType: ev.skillType,
-            sourceBuild: read.getBuild(ev.sourceId),
-            ev,
-          };
-
-          return runSimScript({
-            script,
-            ctx: scriptCtx,
-            baseFrame: ev.frame,
-          });
-        },
+        fn: () => script,
       });
     }
 
