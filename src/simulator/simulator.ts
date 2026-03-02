@@ -48,6 +48,7 @@ import {
   resolveCastEnd,
   resolveCastStart,
   validateEventWhen,
+  resolveComboTriggerElapse,
 } from "./resolvers";
 import { BuffId } from "../data/buffs/BuffDef";
 import {
@@ -152,6 +153,9 @@ type SimResolvers = {
   ) => void;
   resolveComboTriggered: (
     ev: Extract<SimEvent, { type: "comboTriggered" }>,
+  ) => void;
+  resolveComboTriggerElapse: (
+    ev: Extract<SimEvent, { type: "comboTriggerElapse" }>,
   ) => void;
   resolveComboCooldownEnd: (
     ev: Extract<SimEvent, { type: "comboCooldownEnd" }>,
@@ -325,6 +329,7 @@ export class SimWorld {
         resolveStatusApplication(self, triggerPlugins, ev),
       resolveReactionTick: ev => resolveReactionTick(self, ev),
       resolveComboTriggered: ev => resolveComboTriggered(self, ev),
+      resolveComboTriggerElapse: ev => resolveComboTriggerElapse(self, ev),
       resolveComboCooldownEnd: ev => resolveComboCooldownEnd(self, ev),
       resolveSpRecover: ev => resolveSpRecover(self, ev),
       resolveSpReturn: ev => resolveSpReturn(self, ev),
@@ -915,6 +920,7 @@ export class SimWorld {
         }
 
         case "comboTriggerElapse": {
+          this.resolvers.resolveComboTriggerElapse(ev);
           break;
         }
 

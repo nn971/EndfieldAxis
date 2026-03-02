@@ -93,7 +93,6 @@ export abstract class SwordmancerDef extends GearsDef {
         yield ctx.emit.hit({
           damageType: set.statusProc.damageType,
           dmgMultiplier: set.statusProc.dmgMultiplier,
-          ref: ctx.ev.id,
         });
       },
     });
