@@ -14,7 +14,7 @@ import type {
   SimEvent,
   SimComboState,
 } from "../types/simulator/simulator";
-import type { SimEventDraft } from "./listeners/drafts";
+import type { SimEventDraft } from "./scripts";
 import type { DamageBonusLogEntry } from "./damage/damageBonuses";
 import type {
   DamageBreakdown,
@@ -54,7 +54,7 @@ import {
   COMBUSTION_BUFF_ID,
   COMBUSTION_DOT_INTERVAL_FRAMES,
 } from "../data/buffs/reactions/combustion";
-import { createDraftEmitter, materializeDrafts } from "./listeners/drafts";
+import { createDraftEmitter, materializeDrafts } from "./scripts";
 
 /**
  * SimWorld

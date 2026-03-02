@@ -1,6 +1,6 @@
 import type { SimBuff } from "../../types/simulator/infliction";
 import type { SimEntityId, SimEvent } from "../../types/simulator/simulator";
-import type { SimEventDraft } from "./drafts";
+import type { SimEventDraft } from "../scripts";
 import type { DamageBonusCollector } from "../damage/damageBonuses";
 import type { SimRead } from "../simulator";
 import operatorsData from "../../data/operators";
@@ -15,8 +15,9 @@ import {
   sortPluginsByGameOrder,
   type PluginOrderingBucket,
 } from "./pluginOrder";
-import type { DraftEmitter } from "./drafts";
+import type { DraftEmitter } from "../scripts";
 import type { SimEventWhen } from "../../types/simulator/when";
+import { runSimScript, type SimScriptContext } from "../scripts";
 
 /**
  * Listener/registry layer:
@@ -462,6 +463,36 @@ export function loadSimRegistry(): SimRegistry {
   const registry = new SimRegistry();
 
   for (const op of Object.values(operatorsData)) {
+    for (const [skillType, skillDef] of Object.entries(op.skills ?? {})) {
+      const script = (skillDef as any)?.script;
+      if (typeof script !== "function") continue;
+
+      registry.registerOnCastStart({
+        id: `operator.${op.id}.skill.${skillType}.script`,
+        match: ({ ev }) => ev.sourceId === op.id && ev.skillType === skillType,
+        fn: ({ read, ev }) => {
+          const targetId = ev.targetId;
+          if (!targetId) return [];
+
+          const scriptCtx: SimScriptContext = {
+            read,
+            sourceId: ev.sourceId,
+            targetId,
+            startFrame: ev.frame,
+            skillType: ev.skillType,
+            sourceBuild: read.getBuild(ev.sourceId),
+            ev,
+          };
+
+          return runSimScript({
+            script,
+            ctx: scriptCtx,
+            baseFrame: ev.frame,
+          });
+        },
+      });
+    }
+
     const anyOp = op as any;
     if (typeof anyOp?.registerSimPlugins === "function") {
       anyOp.registerSimPlugins(registry);

@@ -1,5 +1,5 @@
 import type { SimRegistry } from "../../../simulator/listeners/registry";
-import { SimEventDraft } from "../../../simulator/listeners/drafts";
+import { SimEventDraft } from "../../../simulator/scripts";
 import { BuffDef } from "../BuffDef";
 
 export const SOLIDIFICATION_BUFF_ID = "buff.solidification" as const;

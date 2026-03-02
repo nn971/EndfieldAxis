@@ -1,6 +1,6 @@
 import { BuffDef } from "../../BuffDef";
 import type { SimRegistry } from "../../../../simulator/listeners/registry";
-import type { SimEventDraft } from "../../../../simulator/listeners/drafts";
+import type { SimEventDraft } from "../../../../simulator/scripts";
 import type { SimRead } from "../../../../simulator/simulator";
 
 const ENDMINISTRATOR_ID = "endministrator";

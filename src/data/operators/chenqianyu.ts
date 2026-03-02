@@ -1,10 +1,7 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
-import { physicalHitByRank } from "../../simulator/skillOps";
-import {
-  ComboTriggerContext,
-  OperatorDef,
-  OperatorDefInit,
-} from "./OperatorDef";
+import { pickSkillValueByRank } from "../../simulator/skillOps";
+import { delay, emit } from "../../simulator/scripts";
+import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 
 const NS_DMG_MUL = [
   1.69, 1.86, 2.03, 2.19, 2.36, 2.53, 2.7, 2.87, 3.04, 3.25, 3.5, 3.8,
@@ -63,56 +60,66 @@ class ChenQianyuDef extends OperatorDef {
           name: "Ascending Strike",
           durationFrames: 50,
           icon: "CHENQIANYU_NS.png",
-          timeline: [
-            physicalHitByRank(26, {
-              rankTable: NS_DMG_MUL,
-              withStatus: true,
+          script: function* (ctx) {
+            yield delay(26);
+            yield emit.statusApply({
+              sourceId: ctx.sourceId,
+              targetId: ctx.targetId,
               statusType: "lift",
-            }),
-          ],
+            });
+            yield emit.hit({
+              sourceId: ctx.sourceId,
+              targetId: ctx.targetId,
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, NS_DMG_MUL),
+            });
+          },
         },
         comboSkill: {
           name: "Soar to the Stars",
           durationFrames: 46,
           icon: "CHENQIANYU_CS.png",
-          timeline: [
-            physicalHitByRank(34, {
-              rankTable: CS_DMG_MUL,
-              withStatus: true,
+          script: function* (ctx) {
+            yield delay(34);
+            yield emit.statusApply({
+              sourceId: ctx.sourceId,
+              targetId: ctx.targetId,
               statusType: "lift",
-            }),
-          ],
+            });
+            yield emit.hit({
+              sourceId: ctx.sourceId,
+              targetId: ctx.targetId,
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, CS_DMG_MUL),
+            });
+          },
         },
         ultimate: {
           name: "Blade Gale",
           durationFrames: 224,
           icon: "CHENQIANYU_ULT.png",
-          timeline: [
-            physicalHitByRank(32, {
-              rankTable: ULT_SLASH_DMG_MUL,
-            }),
-            physicalHitByRank(56, {
-              rankTable: ULT_SLASH_DMG_MUL,
-            }),
-            physicalHitByRank(80, {
-              rankTable: ULT_SLASH_DMG_MUL,
-            }),
-            physicalHitByRank(104, {
-              rankTable: ULT_SLASH_DMG_MUL,
-            }),
-            physicalHitByRank(128, {
-              rankTable: ULT_SLASH_DMG_MUL,
-            }),
-            physicalHitByRank(152, {
-              rankTable: ULT_SLASH_DMG_MUL,
-            }),
-            physicalHitByRank(176, {
-              rankTable: ULT_SLASH_DMG_MUL,
-            }),
-            physicalHitByRank(205, {
-              rankTable: ULT_FINAL_DMG_MUL,
-            }),
-          ],
+          script: function* (ctx) {
+            const slash = pickSkillValueByRank(ctx, ULT_SLASH_DMG_MUL);
+            yield delay(32);
+            for (let i = 0; i < 7; i += 1) {
+              yield emit.hit({
+                sourceId: ctx.sourceId,
+                targetId: ctx.targetId,
+                damageType: "physical",
+                dmgMultiplier: slash,
+              });
+              if (i < 6) {
+                yield delay(24);
+              }
+            }
+            yield delay(29);
+            yield emit.hit({
+              sourceId: ctx.sourceId,
+              targetId: ctx.targetId,
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, ULT_FINAL_DMG_MUL),
+            });
+          },
         },
       },
     } satisfies OperatorDefInit);
@@ -156,7 +163,7 @@ class ChenQianyuDef extends OperatorDef {
         const isSkillHit = parent
           ? parent.type === "castStart" && parent.skillType != "normalAttack"
           : false;
-        if (!isSkillHit) return [];
+        if (!isSkillHit) return;
 
         const talentRank = Number(
           read.getBuild(sourceId)?.talentRanks?.talent1 ?? 0,
@@ -185,7 +192,7 @@ class ChenQianyuDef extends OperatorDef {
         const isSkillHit = parent
           ? parent.type === "castStart" && parent.skillType != "normalAttack"
           : false;
-        if (!isSkillHit) return [];
+        if (!isSkillHit) return;
 
         const potentialRank = Number(
           read.getBuild(this.id)?.potentialRank ?? 0,

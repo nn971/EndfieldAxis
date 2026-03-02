@@ -1,8 +1,9 @@
-import { applyBuff, physicalHitByRank } from "../../simulator/skillOps";
-import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 import type { SimRegistry } from "../../simulator/listeners/registry";
-import { SimEventDraft } from "../../simulator/listeners/drafts";
+import { SimEventDraft } from "../../simulator/scripts";
+import { pickSkillValueByRank } from "../../simulator/skillOps";
+import { delay, emit } from "../../simulator/scripts";
 import { OperatorBuild } from "../../types/operator";
+import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 
 const NS_DMG_MUL = [
   1.56, 1.71, 1.87, 2.02, 2.18, 2.34, 2.49, 2.65, 2.8, 3.0, 3.23, 3.5,
@@ -61,40 +62,60 @@ class EndministratorDef extends OperatorDef {
           name: "Constructive Sequence",
           durationFrames: 48,
           icon: "ENDMINISTRATOR_NS.png",
-          timeline: [
-            physicalHitByRank(24, {
-              rankTable: NS_DMG_MUL,
-              withStatus: true,
+          script: function* (ctx) {
+            yield delay(24);
+            yield emit.statusApply({
+              sourceId: ctx.sourceId,
+              targetId: ctx.targetId,
               statusType: "crush",
-            }),
-          ],
+            });
+            yield emit.hit({
+              sourceId: ctx.sourceId,
+              targetId: ctx.targetId,
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, NS_DMG_MUL),
+            });
+          },
         },
         comboSkill: {
           name: "Sealing Sequence",
           durationFrames: 46,
           icon: "ENDMINISTRATOR_CS.png",
-          timeline: [
-            applyBuff(45, "buff.crystal"),
-            physicalHitByRank(45, {
-              rankTable: CS_DMG_MUL,
-              withStatus: false,
-            }),
-          ],
+          script: function* (ctx) {
+            yield delay(45);
+            yield emit.buffApply({
+              sourceId: ctx.sourceId,
+              ownerId: ctx.targetId,
+              buffId: "buff.crystal",
+            });
+            yield emit.hit({
+              sourceId: ctx.sourceId,
+              targetId: ctx.targetId,
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, CS_DMG_MUL),
+            });
+          },
         },
         ultimate: {
           name: "Bombardment Sequence",
           durationFrames: 110,
           icon: "ENDMINISTRATOR_ULT.png",
-          timeline: [
-            physicalHitByRank(55, {
-              rankTable: ULT_DMG_MUL,
-              withStatus: false,
-            }),
-            physicalHitByRank(56, {
-              rankTable: ULT_BONUS_DMG_MUL,
-              withStatus: false,
-            }),
-          ],
+          script: function* (ctx) {
+            yield delay(55);
+            yield emit.hit({
+              sourceId: ctx.sourceId,
+              targetId: ctx.targetId,
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, ULT_DMG_MUL),
+            });
+            yield delay(1);
+            yield emit.hit({
+              sourceId: ctx.sourceId,
+              targetId: ctx.targetId,
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, ULT_BONUS_DMG_MUL),
+            });
+          },
         },
       },
     } satisfies OperatorDefInit);

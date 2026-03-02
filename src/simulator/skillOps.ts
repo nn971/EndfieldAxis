@@ -4,8 +4,14 @@ import type {
   SimStatusType,
 } from "../types/simulator/infliction";
 import type { DmgType, SkillType } from "../data/operators/OperatorDef";
-import type { SimEventDraft } from "./listeners/drafts";
+import type { SimEventDraft } from "./scripts";
 import type { SimEventWhen } from "../types/simulator/when";
+
+/**
+ * @deprecated Legacy skill-op timeline helpers.
+ * Skill event emission is now unified under simulator/scripts.ts generator scripts.
+ * Keep this module temporarily for rank-table helpers during migration.
+ */
 
 export type SkillCompileContext = {
   sourceId: string;

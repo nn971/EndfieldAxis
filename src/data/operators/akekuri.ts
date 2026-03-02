@@ -1,10 +1,7 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
+import { pickSkillValueByRank } from "../../simulator/skillOps";
+import { delay, emit } from "../../simulator/scripts";
 import type { SimEnv } from "../../types/simulator/simulator";
-import {
-  artsHitByRank,
-  physicalHitByRank,
-  spRecoverByRank,
-} from "../../simulator/skillOps";
 import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 
 const PLACEHOLDER_ICON = "placeholder.jpg";
@@ -64,51 +61,62 @@ class AkekuriDef extends OperatorDef {
           name: "Burst of Passion",
           durationFrames: 56,
           icon: PLACEHOLDER_ICON,
-          timeline: [
-            artsHitByRank(28, {
-              rankTable: NS_DMG_MUL,
-              dmgType: "heat",
-              withInfliction: true,
-            }),
-          ],
+          script: function* (ctx) {
+            yield delay(28);
+            yield emit.hit({
+              sourceId: ctx.sourceId,
+              targetId: ctx.targetId,
+              damageType: "heat",
+              dmgMultiplier: pickSkillValueByRank(ctx, NS_DMG_MUL),
+            });
+            yield emit.inflictionApply({
+              sourceId: ctx.sourceId,
+              ownerId: ctx.targetId,
+              inflictionType: "heat",
+              inflictionStacks: 1,
+            });
+          },
         },
         comboSkill: {
           name: "Flash and Dash",
           durationFrames: 66,
           icon: PLACEHOLDER_ICON,
-          timeline: [
-            physicalHitByRank(24, {
-              rankTable: CS_DMG_MUL_PER_SEQ,
-            }),
-            spRecoverByRank(24, {
-              rankTable: CS_SP_RECOVERY_PER_SEQ,
-            }),
-            physicalHitByRank(44, {
-              rankTable: CS_DMG_MUL_PER_SEQ,
-            }),
-            spRecoverByRank(44, {
-              rankTable: CS_SP_RECOVERY_PER_SEQ,
-            }),
-          ],
+          script: function* (ctx) {
+            const dmg = pickSkillValueByRank(ctx, CS_DMG_MUL_PER_SEQ);
+            const sp = pickSkillValueByRank(ctx, CS_SP_RECOVERY_PER_SEQ);
+
+            yield delay(24);
+            yield emit.hit({
+              sourceId: ctx.sourceId,
+              targetId: ctx.targetId,
+              damageType: "physical",
+              dmgMultiplier: dmg,
+            });
+            yield emit.spRecover({ sourceId: ctx.sourceId, amount: sp });
+
+            yield delay(20);
+            yield emit.hit({
+              sourceId: ctx.sourceId,
+              targetId: ctx.targetId,
+              damageType: "physical",
+              dmgMultiplier: dmg,
+            });
+            yield emit.spRecover({ sourceId: ctx.sourceId, amount: sp });
+          },
         },
         ultimate: {
           name: "SQUAD! ON ME!",
           durationFrames: 180,
           icon: PLACEHOLDER_ICON,
-          timeline: [
-            spRecoverByRank(40, {
-              rankTable: ULT_SP_RECOVERY,
-              ratio: 1 / 3,
-            }),
-            spRecoverByRank(85, {
-              rankTable: ULT_SP_RECOVERY,
-              ratio: 1 / 3,
-            }),
-            spRecoverByRank(130, {
-              rankTable: ULT_SP_RECOVERY,
-              ratio: 1 / 3,
-            }),
-          ],
+          script: function* (ctx) {
+            const amount = pickSkillValueByRank(ctx, ULT_SP_RECOVERY) * (1 / 3);
+            yield delay(40);
+            yield emit.spRecover({ sourceId: ctx.sourceId, amount });
+            yield delay(45);
+            yield emit.spRecover({ sourceId: ctx.sourceId, amount });
+            yield delay(45);
+            yield emit.spRecover({ sourceId: ctx.sourceId, amount });
+          },
         },
       },
     } satisfies OperatorDefInit);
