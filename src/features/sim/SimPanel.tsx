@@ -55,7 +55,7 @@ function buildSimRenderCache(
       markers.push({
         id: `status:${ev.id}`,
         type: "status",
-        ownerId: ev.targetId,
+        targetId: ev.targetId,
         effectId: ev.statusType,
         frame: ev.frame,
       });
@@ -63,15 +63,15 @@ function buildSimRenderCache(
     }
 
     if (ev.type === "buffApply") {
-      const ownerId = ev.ownerId;
-      const key = `buff:${ownerId}:${ev.buffId}`;
+      const targetId = ev.targetId;
+      const key = `buff:${targetId}:${ev.buffId}`;
       const active = activeByKey.get(key);
       if (active) {
         active.refreshFrames.push(ev.frame);
         markers.push({
           id: `buff-refresh:${ev.id}`,
           type: "buffRefresh",
-          ownerId,
+          targetId,
           effectId: ev.buffId,
           frame: ev.frame,
         });
@@ -80,7 +80,7 @@ function buildSimRenderCache(
           id: `bar:${key}:${ev.id}`,
           key,
           type: "buff",
-          ownerId,
+          targetId,
           effectId: ev.buffId,
           startFrame: ev.frame,
           endFrame: ev.frame,
@@ -91,13 +91,13 @@ function buildSimRenderCache(
     }
 
     if (ev.type === "buffExpire" || ev.type === "buffRemove") {
-      closeBar(`buff:${ev.ownerId}:${ev.buffId}`, ev.frame);
+      closeBar(`buff:${ev.targetId}:${ev.buffId}`, ev.frame);
       continue;
     }
 
     if (ev.type === "inflictionApply") {
-      const ownerId = ev.ownerId;
-      const key = `infliction:${ownerId}:${ev.inflictionType}`;
+      const targetId = ev.targetId;
+      const key = `infliction:${targetId}:${ev.inflictionType}`;
       const active = activeByKey.get(key);
       if (active) {
         active.endFrame = Math.max(active.endFrame, ev.frame);
@@ -106,7 +106,7 @@ function buildSimRenderCache(
           id: `bar:${key}:${ev.id}`,
           key,
           type: "infliction",
-          ownerId,
+          targetId,
           effectId: ev.inflictionType,
           startFrame: ev.frame,
           endFrame: ev.frame,
@@ -117,8 +117,8 @@ function buildSimRenderCache(
     }
 
     if (ev.type === "inflictionExpire" || ev.type === "inflictionRemove") {
-      if (!ev.ownerId) continue;
-      closeBar(`infliction:${ev.ownerId}:${ev.inflictionType}`, ev.frame);
+      if (!ev.targetId) continue;
+      closeBar(`infliction:${ev.targetId}:${ev.inflictionType}`, ev.frame);
     }
   }
 

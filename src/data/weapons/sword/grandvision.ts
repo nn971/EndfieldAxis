@@ -51,13 +51,12 @@ class GrandVisionDef extends WeaponDef {
         // If already primed (stacks=1), refresh by removing then applying.
         if (stacks === 1) {
           yield emit.buffRemove({
-              ownerId: sourceId,
+              targetId: sourceId,
               buffId: LONG_WISH_BUFF as any,
             });
           yield emit.buffApply({
               sourceId,
               targetId: sourceId,
-              ownerId: sourceId,
               buffId: LONG_WISH_BUFF as any,
             });
           return;
@@ -66,7 +65,6 @@ class GrandVisionDef extends WeaponDef {
         yield emit.buffApply({
           sourceId,
           targetId: sourceId,
-          ownerId: sourceId,
           buffId: LONG_WISH_BUFF as any,
         });
       },
@@ -97,7 +95,6 @@ class GrandVisionDef extends WeaponDef {
         yield emit.buffApply({
           sourceId,
           targetId: sourceId,
-          ownerId: sourceId,
           buffId: LONG_WISH_BUFF as any,
         });
       },
@@ -125,7 +122,7 @@ class GrandVisionDef extends WeaponDef {
         if (stacks < 2) return;
 
         yield emit.buffRemove({
-          ownerId: sourceId,
+          targetId: sourceId,
           buffId: LONG_WISH_BUFF as any,
         });
       },

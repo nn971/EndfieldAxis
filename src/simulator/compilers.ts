@@ -3,6 +3,9 @@ import { SkillType } from "../data/operators/OperatorDef";
 import type { SimEvent } from "../types/simulator/simulator";
 import type { OperatorBuild } from "../types/operator";
 import { makeSimEventId } from "../shared/lib/utils";
+import { SkillCompileContextclampSkillRank } from "./skillOps";
+
+/** @deprecated */
 
 export function compileSkillCast(params: {
   sourceId: string;

@@ -1,5 +1,5 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
-import { pickSkillValueByRank } from "../../simulator/skillOps";
+import { pickSkillValueByRank } from "../../simulator/scripts";
 import { delay } from "../../simulator/scripts";
 import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 
@@ -63,11 +63,11 @@ class EstellaDef extends OperatorDef {
           script: function* (ctx) {
             yield delay(26);
             yield ctx.emit.hit({
-                                          damageType: "cryo",
+              damageType: "cryo",
               dmgMultiplier: pickSkillValueByRank(ctx, NS_DMG_MUL),
             });
             yield ctx.emit.inflictionApply({
-                                          inflictionType: "cryo",
+              inflictionType: "cryo",
               inflictionStacks: 1,
             });
           },
@@ -79,7 +79,7 @@ class EstellaDef extends OperatorDef {
           script: function* (ctx) {
             yield delay(34);
             yield ctx.emit.statusApply({
-                                          statusType: "lift",
+              statusType: "lift",
             });
 
             const target = ctx.read.getEntity(ctx.targetId);
@@ -88,7 +88,7 @@ class EstellaDef extends OperatorDef {
             );
 
             yield ctx.emit.hit({
-                                          damageType: "physical",
+              damageType: "physical",
               dmgMultiplier: isSolidified
                 ? pickSkillValueByRank(ctx, CS_DMG_MUL_SOLIDIFIED)
                 : pickSkillValueByRank(ctx, CS_DMG_MUL_NON_SOLIDIFIED),
@@ -96,7 +96,7 @@ class EstellaDef extends OperatorDef {
 
             if (isSolidified) {
               yield ctx.emit.buffApply({
-                                                buffId: "buff.estella.combo.physicalSusceptibility",
+                buffId: "buff.estella.combo.physicalSusceptibility",
               });
             }
           },
@@ -108,7 +108,7 @@ class EstellaDef extends OperatorDef {
           script: function* (ctx) {
             yield delay(55);
             yield ctx.emit.hit({
-                                          damageType: "physical",
+              damageType: "physical",
               dmgMultiplier: pickSkillValueByRank(ctx, ULT_DMG_MUL),
             });
           },
@@ -141,7 +141,7 @@ class EstellaDef extends OperatorDef {
 
         yield emit.comboTriggered({
           sourceId: selfId,
-          targetId: ev.ownerId,
+          targetId: ev.targetId,
         });
       },
     });

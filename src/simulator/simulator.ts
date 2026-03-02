@@ -849,8 +849,8 @@ export class SimWorld {
           const source = ev.sourceId
             ? (this.read.getEntity(ev.sourceId) as SimEntity)
             : null;
-          const owner = ev.ownerId
-            ? (this.read.getEntity(ev.ownerId) as SimEntity)
+          const owner = ev.targetId
+            ? (this.read.getEntity(ev.targetId) as SimEntity)
             : null;
           if (!owner) throw new Error(`undefined target`);
           this.resolvers.resolveBuffApplication(ev);
@@ -866,8 +866,8 @@ export class SimWorld {
         }
 
         case "buffRemove": {
-          const owner = this.read.getEntity(ev.ownerId);
-          this.ops.removeBuff(ev.ownerId, ev.buffId);
+          const owner = this.read.getEntity(ev.targetId);
+          this.ops.removeBuff(ev.targetId, ev.buffId);
           this.ops.log(
             "buff",
             `BUFF ${ev.buffId} removed (entity=${(owner as any).name})`,
@@ -876,7 +876,7 @@ export class SimWorld {
           const spawned = this.registry.runOnBuffConsumed({
             read: this.read,
             ev,
-            sourceId: ev.ownerId,
+            sourceId: ev.targetId,
           });
           this.ops.scheduleDrafts(spawned);
           break;
@@ -893,7 +893,7 @@ export class SimWorld {
         }
 
         case "inflictionExpire": {
-          if (!ev.ownerId)
+          if (!ev.targetId)
             throw new Error(`event with type inflictionExpire but no sourceId`);
           this.resolvers.resolveInflictionExpiration(ev);
           break;

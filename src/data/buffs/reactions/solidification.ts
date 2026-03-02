@@ -28,7 +28,7 @@ class SolidificationBuffDef extends BuffDef {
       ref?: string | null;
     }, emit: { buffRemove: (draft: any) => any; hit: (draft: any) => any }) {
       yield emit.buffRemove({
-          ownerId: params.targetId,
+          targetId: params.targetId,
           buffId: SOLIDIFICATION_BUFF_ID,
           ref: params.ref,
       });

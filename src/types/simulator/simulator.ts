@@ -78,37 +78,37 @@ export type SimEvent =
   | (SimEventBase & {
       type: "inflictionApply";
       sourceId: SimEntityId;
-      ownerId: SimEntityId;
+      targetId: SimEntityId;
       inflictionType: InflictionType;
       inflictionStacks: number;
     })
   | (SimEventBase & {
       type: "inflictionExpire";
-      ownerId: SimEntityId;
+      targetId: SimEntityId;
       inflictionType: InflictionType;
       ref: string;
     })
   | (SimEventBase & {
       type: "inflictionRemove";
-      ownerId: SimEntityId;
+      targetId: SimEntityId;
       inflictionType: InflictionType;
     })
   | (SimEventBase & {
       type: "buffApply";
       sourceId?: SimEntityId;
-      ownerId: SimEntityId;
+      targetId: SimEntityId;
       buffId: BuffId;
       isForced?: boolean;
     })
   | (SimEventBase & {
       type: "buffRemove";
       /** entity who owns the buff */
-      ownerId: SimEntityId;
+      targetId: SimEntityId;
       buffId: BuffId;
     })
   | (SimEventBase & {
       type: "buffExpire";
-      ownerId: SimEntityId; // entity who owns the buff
+      targetId: SimEntityId; // entity who owns the buff
       buffId: BuffId;
       ref: string;
     })

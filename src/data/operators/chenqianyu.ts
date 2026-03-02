@@ -1,5 +1,5 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
-import { pickSkillValueByRank } from "../../simulator/skillOps";
+import { pickSkillValueByRank } from "../../simulator/scripts";
 import { delay } from "../../simulator/scripts";
 import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 
@@ -132,13 +132,16 @@ class ChenQianyuDef extends OperatorDef {
     registry.registerOnInflictionApply({
       id: "operator.chenqianyu.combo.triggerOnVulnerableApply",
       fn: function* ({ ev, emit }) {
-        if (ev?.type !== "inflictionApply" || ev.inflictionType !== "vulnerable") {
+        if (
+          ev?.type !== "inflictionApply" ||
+          ev.inflictionType !== "vulnerable"
+        ) {
           return;
         }
 
         yield emit.comboTriggered({
           sourceId: selfId,
-          targetId: ev.ownerId,
+          targetId: ev.targetId,
         });
       },
     });
@@ -161,7 +164,7 @@ class ChenQianyuDef extends OperatorDef {
 
         yield emit.buffApply({
           sourceId,
-          ownerId: sourceId,
+          targetId: sourceId,
           buffId: BONUS_BUFF,
         });
       },
@@ -179,9 +182,7 @@ class ChenQianyuDef extends OperatorDef {
           : false;
         if (!isSkillHit) return;
 
-        const potentialRank = Number(
-          read.getBuild(selfId)?.potentialRank ?? 0,
-        );
+        const potentialRank = Number(read.getBuild(selfId)?.potentialRank ?? 0);
         if (potentialRank < 3) return;
 
         collector.addValue(

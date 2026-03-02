@@ -364,7 +364,7 @@ export class SimRegistry {
   }
 
   private buildScriptContext(ctx: TriggerContext): SimScriptContext {
-    const sourceId = "sourceId" in ctx ? ctx.sourceId : ctx.ev.ownerId;
+    const sourceId = "sourceId" in ctx ? ctx.sourceId : ctx.ev.targetId;
     const targetId =
       "targetId" in ctx && ctx.targetId ? ctx.targetId : sourceId;
 
@@ -414,9 +414,9 @@ export class SimRegistry {
     }
 
     if (when.ownerHasBuffId) {
-      const ownerId = this.getOwnerIdForContext(ctx);
-      if (!ownerId) return false;
-      const owner = ctx.read.getEntity(ownerId);
+      const targetId = this.getOwnerIdForContext(ctx);
+      if (!targetId) return false;
+      const owner = ctx.read.getEntity(targetId);
       if (!(owner as any)?.buffs?.[when.ownerHasBuffId]) return false;
     }
 
@@ -432,13 +432,13 @@ export class SimRegistry {
 
   private getOwnerIdForContext(ctx: TriggerContext): SimEntityId | undefined {
     if (ctx.ev.type === "buffApply" || ctx.ev.type === "buffRemove") {
-      return ctx.ev.ownerId;
+      return ctx.ev.targetId;
     }
     if (
       ctx.ev.type === "inflictionApply" ||
       ctx.ev.type === "inflictionExpire"
     ) {
-      return ctx.ev.ownerId;
+      return ctx.ev.targetId;
     }
     if ("targetId" in ctx && ctx.targetId) return ctx.targetId;
     return undefined;

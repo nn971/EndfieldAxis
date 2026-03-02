@@ -1,5 +1,5 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
-import { pickSkillValueByRank } from "../../simulator/skillOps";
+import { pickSkillValueByRank } from "../../simulator/scripts";
 import { delay } from "../../simulator/scripts";
 import { OperatorBuild } from "../../types/operator";
 import { OperatorDef, OperatorDefInit } from "./OperatorDef";
@@ -159,27 +159,27 @@ class EndministratorDef extends OperatorDef {
 
         yield emit.buffApply({
           sourceId: selfId,
-          ownerId: selfId,
+          targetId: selfId,
           buffId: buffId,
         });
 
-          if (build.potentialRank >= 1) {
-            const consumerEvent = read.getEvent(ev.ref);
-            if (consumerEvent && consumerEvent.ref) {
-              const castEvent = read.getEvent(consumerEvent.ref);
-              if (
-                castEvent &&
-                castEvent.type === "castStart" &&
-                castEvent.sourceId === selfId &&
-                castEvent.skillType === "normalSkill"
-              ) {
-                yield emit.spReturn({
-                  sourceId: selfId,
-                  amount: 50,
-                });
-              }
+        if (build.potentialRank >= 1) {
+          const consumerEvent = read.getEvent(ev.ref);
+          if (consumerEvent && consumerEvent.ref) {
+            const castEvent = read.getEvent(consumerEvent.ref);
+            if (
+              castEvent &&
+              castEvent.type === "castStart" &&
+              castEvent.sourceId === selfId &&
+              castEvent.skillType === "normalSkill"
+            ) {
+              yield emit.spReturn({
+                sourceId: selfId,
+                amount: 50,
+              });
             }
           }
+        }
       },
     });
 
@@ -187,7 +187,7 @@ class EndministratorDef extends OperatorDef {
       id: "operator.endministrator.potential2.shareAtkBuff.high",
       when: { buffId: "buff.endministrator.talent1.atkInc" },
       fn: function* ({ read, ev, emit }) {
-        if (ev?.type !== "buffApply" || ev.ownerId !== selfId) return;
+        if (ev?.type !== "buffApply" || ev.targetId !== selfId) return;
         const build = read.getBuild(selfId);
         if (Number(build?.potentialRank ?? 0) < 2) return;
 
@@ -198,10 +198,10 @@ class EndministratorDef extends OperatorDef {
         for (const targetId of targetIds) {
           yield emit.buffApply({
             sourceId: selfId,
-              ownerId: targetId,
-              buffId: "buff.endministrator.potential2.teamAtkShare.high",
-            });
-          }
+            targetId: targetId,
+            buffId: "buff.endministrator.potential2.teamAtkShare.high",
+          });
+        }
       },
     });
 
@@ -209,7 +209,7 @@ class EndministratorDef extends OperatorDef {
       id: "operator.endministrator.potential2.shareAtkBuff.low",
       when: { buffId: "buff.endministrator.talent1.atkInc.low" },
       fn: function* ({ read, ev, emit }) {
-        if (ev?.type !== "buffApply" || ev.ownerId !== selfId) return;
+        if (ev?.type !== "buffApply" || ev.targetId !== selfId) return;
         const build = read.getBuild(selfId);
         if (Number(build?.potentialRank ?? 0) < 2) return;
 
@@ -220,8 +220,8 @@ class EndministratorDef extends OperatorDef {
         for (const targetId of targetIds) {
           yield emit.buffApply({
             sourceId: selfId,
-              ownerId: targetId,
-              buffId: "buff.endministrator.potential2.teamAtkShare.low",
+            targetId: targetId,
+            buffId: "buff.endministrator.potential2.teamAtkShare.low",
           });
         }
       },

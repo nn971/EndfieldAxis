@@ -29,7 +29,7 @@ class CombustionBuffDef extends BuffDef {
       when: { buffId },
       fn: function* ({ ev, read, emit }) {
         if (ev?.type !== "buffApply") return;
-        const target = read.getEntity(ev.ownerId);
+        const target = read.getEntity(ev.targetId);
         const buff = (target as any).buffs?.[buffId];
         if (!buff) return;
 
@@ -39,7 +39,7 @@ class CombustionBuffDef extends BuffDef {
         yield delay(COMBUSTION_DOT_INTERVAL_FRAMES);
         yield emit.reactionTick({
           sourceId,
-          targetId: ev.ownerId,
+          targetId: ev.targetId,
           reactionBuffId: buffId,
           ref: ev.id,
         });

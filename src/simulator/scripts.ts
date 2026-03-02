@@ -13,22 +13,34 @@ type Draft<T extends SimEvent> = DistOmit<
 >;
 
 type EmitDraftByType = {
-  hit: WithOptional<Draft<Extract<SimEvent, { type: "hit" }>>, "sourceId" | "targetId">;
+  hit: WithOptional<
+    Draft<Extract<SimEvent, { type: "hit" }>>,
+    "sourceId" | "targetId"
+  >;
   statusApply: WithOptional<
     Draft<Extract<SimEvent, { type: "statusApply" }>>,
     "sourceId" | "targetId"
   >;
   buffApply: WithOptional<
     Draft<Extract<SimEvent, { type: "buffApply" }>>,
-    "sourceId" | "ownerId"
+    "sourceId" | "targetId"
   >;
-  buffRemove: WithOptional<Draft<Extract<SimEvent, { type: "buffRemove" }>>, "ownerId">;
+  buffRemove: WithOptional<
+    Draft<Extract<SimEvent, { type: "buffRemove" }>>,
+    "targetId"
+  >;
   inflictionApply: WithOptional<
     Draft<Extract<SimEvent, { type: "inflictionApply" }>>,
-    "sourceId" | "ownerId"
+    "sourceId" | "targetId"
   >;
-  spRecover: WithOptional<Draft<Extract<SimEvent, { type: "spRecover" }>>, "sourceId">;
-  spReturn: WithOptional<Draft<Extract<SimEvent, { type: "spReturn" }>>, "sourceId">;
+  spRecover: WithOptional<
+    Draft<Extract<SimEvent, { type: "spRecover" }>>,
+    "sourceId"
+  >;
+  spReturn: WithOptional<
+    Draft<Extract<SimEvent, { type: "spReturn" }>>,
+    "sourceId"
+  >;
   comboTriggered: WithOptional<
     Draft<Extract<SimEvent, { type: "comboTriggered" }>>,
     "sourceId" | "targetId"
@@ -47,9 +59,7 @@ export type SimScriptContext = {
   read: SimRead;
   emit: SimScriptEmit;
 
-  /** @deprecated */
   sourceId?: string;
-  /** @deprecated */
   targetId?: string;
   startFrame: number;
   skillType: SkillType;
@@ -89,7 +99,9 @@ function emitCommand(
   };
 }
 
-function makeCtxEmit(ctx: Pick<SimScriptContext, "sourceId" | "targetId">): SimScriptEmit {
+function makeCtxEmit(
+  ctx: Pick<SimScriptContext, "sourceId" | "targetId">,
+): SimScriptEmit {
   return {
     hit: draft =>
       emitCommand({
@@ -109,20 +121,20 @@ function makeCtxEmit(ctx: Pick<SimScriptContext, "sourceId" | "targetId">): SimS
       emitCommand({
         ...draft,
         sourceId: draft.sourceId ?? ctx.sourceId,
-        ownerId: draft.ownerId ?? ctx.targetId,
+        targetId: draft.targetId ?? ctx.targetId,
         type: "buffApply",
       } as DistOmit<SimEventDraft, "frame" | "ref">),
     buffRemove: draft =>
       emitCommand({
         ...draft,
-        ownerId: draft.ownerId ?? ctx.targetId,
+        targetId: draft.targetId ?? ctx.targetId,
         type: "buffRemove",
       } as DistOmit<SimEventDraft, "frame" | "ref">),
     inflictionApply: draft =>
       emitCommand({
         ...draft,
         sourceId: draft.sourceId ?? ctx.sourceId,
-        ownerId: draft.ownerId ?? ctx.targetId,
+        targetId: draft.targetId ?? ctx.targetId,
         type: "inflictionApply",
       } as DistOmit<SimEventDraft, "frame" | "ref">),
     spRecover: draft =>
@@ -206,4 +218,30 @@ export function materializeDrafts(
       ...(ref !== undefined ? { ref } : {}),
     } as SimEvent;
   });
+}
+export function clampSkillRank(rank: number): number {
+  if (!Number.isFinite(rank)) return 9;
+  return Math.max(1, Math.min(12, Math.round(rank)));
+}
+export function getSkillRank(
+  ctx: SimScriptContext,
+  skillType: SkillType = ctx.skillType,
+): number {
+  const rank = Number(ctx.sourceBuild?.skillRanks?.[skillType] ?? 9);
+  return clampSkillRank(rank);
+}
+/** Rank table format: [lv1..lv9, m1, m2, m3]. */
+
+export function pickSkillValueByRank(
+  ctx: SimScriptContext,
+  table: readonly number[],
+  skillType: SkillType = ctx.skillType,
+): number {
+  if (!Array.isArray(table) || table.length !== 12) {
+    throw new Error(
+      `pickSkillValueByRank requires a 12-value table, got length=${table?.length ?? 0}`,
+    );
+  }
+  const rank = getSkillRank(ctx, skillType);
+  return Number(table[rank - 1] ?? table[8]);
 }

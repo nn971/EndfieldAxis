@@ -29,7 +29,7 @@ function spawnCrystalConsumeEvents(params: {
 
   return function* (ctx: SimScriptContext) {
     yield ctx.emit.buffRemove({
-      ownerId: params.targetId,
+      targetId: params.targetId,
       buffId: "buff.crystal" as any,
       ref: params.ref,
     });

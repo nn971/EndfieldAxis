@@ -124,14 +124,14 @@ function validateWhenAgainstEvent(
   }
 
   if (when.ownerHasBuffId) {
-    const ownerId = "ownerId" in ev ? ev.ownerId : undefined;
-    if (!ownerId) {
+    const targetId = "targetId" in ev ? ev.targetId : undefined;
+    if (!targetId) {
       return {
         isValid: false,
-        reason: `ownerHasBuffId requires ownerId`,
+        reason: `ownerHasBuffId requires targetId`,
       };
     }
-    const owner = read.getEntity(ownerId);
+    const owner = read.getEntity(targetId);
     if (!(owner as any)?.buffs?.[when.ownerHasBuffId]) {
       return {
         isValid: false,
@@ -172,7 +172,7 @@ function scheduleApplyVulnerable(
     frame: world.read.nowInFrames,
     seq: world.ops.nextSeq(),
     sourceId,
-    ownerId: targetId,
+    targetId: targetId,
     inflictionType: "vulnerable",
     inflictionStacks: 1,
     ref,
@@ -181,7 +181,7 @@ function scheduleApplyVulnerable(
 
 function scheduleInflictionRemove(
   world: SimWorld,
-  ownerId: SimEntityId,
+  targetId: SimEntityId,
   inflictionType: InflictionType,
   ref?: string,
 ): void {
@@ -190,7 +190,7 @@ function scheduleInflictionRemove(
     type: "inflictionRemove",
     frame: world.read.nowInFrames,
     seq: world.ops.nextSeq(),
-    ownerId,
+    targetId,
     inflictionType,
     ref,
   } as SimEvent);
@@ -265,7 +265,7 @@ function scheduleBuffExpire(
     type: "buffExpire",
     frame: world.read.nowInFrames + duration,
     seq: world.ops.nextSeq(),
-    ownerId: targetId,
+    targetId: targetId,
     buffId: buffId,
     ref: "auto",
   } as SimEvent);
@@ -653,24 +653,24 @@ export function resolveBuffApplication(
   ev: Extract<SimEvent, { type: "buffApply" }>,
 ) {
   const sourceId = ev.sourceId ?? null;
-  const ownerId = ev.ownerId;
+  const targetId = ev.targetId;
   const buffId = ev.buffId;
 
   const source = sourceId ? self.read.getEntity(sourceId) : null;
 
-  const target = self.read.getEntity(ownerId);
-  if (!target) throw new Error(`Unknown target with targetId=${ownerId}`);
+  const target = self.read.getEntity(targetId);
+  if (!target) throw new Error(`Unknown target with targetId=${targetId}`);
 
   const existing = (target as any).buffs?.[buffId];
 
   if (buffId === "buff.crystal") {
     const had = Boolean(existing);
-    self.ops.addBuff(ownerId, {
+    self.ops.addBuff(targetId, {
       id: buffId,
       lastApplyFrame: self.read.nowInFrames,
       stacks: 1,
     } as SimBuff);
-    scheduleBuffExpire(self, ownerId, buffId);
+    scheduleBuffExpire(self, targetId, buffId);
     self.ops.log(
       "buff",
       `BUFF ${buffId} ${had ? "refresh" : "apply"} (source=${(source as any)?.name ?? "system"} target=${(target as any).name})`,
@@ -698,7 +698,7 @@ export function resolveBuffApplication(
   const afterStacks = Math.min(maxStacks, beforeStacks + 1);
 
   const had = Boolean(existing);
-  self.ops.addBuff(ownerId, {
+  self.ops.addBuff(targetId, {
     id: buffId,
     lastApplyFrame: self.read.nowInFrames,
     stacks: afterStacks,
@@ -707,7 +707,7 @@ export function resolveBuffApplication(
         ? (existing as any).meta
         : ((ev as any).meta ?? (existing as any)?.meta),
   } as SimBuff);
-  scheduleBuffExpire(self, ownerId, buffId);
+  scheduleBuffExpire(self, targetId, buffId);
 
   if (maxStacks > 1) {
     self.ops.log(
@@ -729,8 +729,8 @@ export function resolveBuffExpiration(
 ) {
   // return false if expiration event is stale
 
-  const ent = self.read.getEntity(ev.ownerId);
-  if (!ent) throw new Error(`Unknown entity with entityId ${ev.ownerId}`);
+  const ent = self.read.getEntity(ev.targetId);
+  if (!ent) throw new Error(`Unknown entity with entityId ${ev.targetId}`);
 
   const buffId = ev.buffId;
   const buff = (ent as any).buffs?.[buffId];
@@ -763,8 +763,8 @@ export function resolveInflictionApplication(
   const source = self.read.getEntity(ev.sourceId ?? null);
   if (!source) throw new Error(`Unknown source with sourceId=${ev.sourceId}`);
 
-  const owner = self.read.getEntity(ev.ownerId ?? null);
-  if (!owner) throw new Error(`Unknown target with targetId=${ev.ownerId}`);
+  const owner = self.read.getEntity(ev.targetId ?? null);
+  if (!owner) throw new Error(`Unknown target with targetId=${ev.targetId}`);
 
   if (isArtsInflictionType(ev.inflictionType)) {
     const artsType = ev.inflictionType;
@@ -853,7 +853,7 @@ export function resolveInflictionApplication(
         frame: ev.frame,
         seq: self.ops.nextSeq(),
         sourceId: source.id,
-        ownerId: owner.id,
+        targetId: owner.id,
         buffId: reactionBuffId,
         isForced: false,
         ref: ev.id,
@@ -918,8 +918,7 @@ export function resolveInflictionApplication(
     type: "inflictionExpire",
     frame: self.read.nowInFrames + DEFAULT_INFLICTION_DURATION_FRAMES,
     seq: self.ops.nextSeq(),
-    ownerId: owner.id,
-    targetId: undefined,
+    targetId: owner.id,
     inflictionType: ev.inflictionType,
     ref: ev.id,
   } as SimEvent);
@@ -931,8 +930,8 @@ export function resolveInflictionExpiration(
 ) {
   // return false if expiration event is stale
 
-  const ent = self.read.getEntity(ev.ownerId);
-  if (!ent) throw new Error(`Unknown entity with entityId ${ev.ownerId}`);
+  const ent = self.read.getEntity(ev.targetId);
+  if (!ent) throw new Error(`Unknown entity with entityId ${ev.targetId}`);
 
   const inflictionType = ev.inflictionType;
   const inf = (ent as any).inflictions?.[inflictionType];
@@ -957,7 +956,7 @@ export function resolveInflictionRemoval(
   self: SimWorld,
   ev: Extract<SimEvent, { type: "inflictionRemove" }>,
 ) {
-  self.ops.removeInfliction(ev.ownerId, ev.inflictionType);
+  self.ops.removeInfliction(ev.targetId, ev.inflictionType);
 }
 
 export function resolveReactionTick(

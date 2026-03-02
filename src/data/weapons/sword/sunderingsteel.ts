@@ -41,7 +41,6 @@ class SunderingSteelDef extends WeaponDef {
         yield emit.buffApply({
           sourceId,
           targetId: sourceId,
-          ownerId: sourceId,
           buffId: BONUS_BUFF as any,
         });
       },

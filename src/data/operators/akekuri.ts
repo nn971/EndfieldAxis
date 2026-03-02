@@ -1,5 +1,5 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
-import { pickSkillValueByRank } from "../../simulator/skillOps";
+import { pickSkillValueByRank } from "../../simulator/scripts";
 import { delay } from "../../simulator/scripts";
 import type { SimEnv } from "../../types/simulator/simulator";
 import { OperatorDef, OperatorDefInit } from "./OperatorDef";
@@ -160,7 +160,6 @@ class AkekuriDef extends OperatorDef {
             Math.max(0, Number(state.stacks ?? 0)) + 1,
           );
         }
-
       },
     });
 
