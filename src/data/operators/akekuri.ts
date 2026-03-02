@@ -127,9 +127,12 @@ class AkekuriDef extends OperatorDef {
   }
 
   override registerSimPlugins(registry: SimRegistry): void {
+    const selfId = this.id;
+
     registry.registerOnCastStart({
       id: "global.link.consumeOnCastStart",
-      fn: ({ read, ev }) => {
+      fn: function* ({ read, ev }) {
+        if (ev?.type !== "castStart") return;
         const globalBuffs = (read.env as SimEnv).globalBuffs;
         const link = globalBuffs.link;
 
@@ -147,7 +150,7 @@ class AkekuriDef extends OperatorDef {
         }
 
         // Akekuri talent placeholder: while ultimate is active, gains Link.
-        if (ev.sourceId === this.id && ev.skillType === "ultimate") {
+        if (ev.sourceId === selfId && ev.skillType === "ultimate") {
           const state = (globalBuffs.link ??= {
             stacks: 0,
             castBonusByCastStartId: {},
@@ -158,19 +161,18 @@ class AkekuriDef extends OperatorDef {
           );
         }
 
-        return null;
       },
     });
 
     registry.registerOnCastEnd({
       id: "global.link.cleanupCastMap",
-      fn: ({ read, ev }) => {
+      fn: function* ({ read, ev }) {
+        if (ev?.type !== "castEnd") return;
         const globalBuffs = (read.env as SimEnv).globalBuffs;
         const map = globalBuffs?.link?.castBonusByCastStartId;
         if (map && ev.ref) {
           delete map[ev.ref];
         }
-        return null;
       },
     });
 

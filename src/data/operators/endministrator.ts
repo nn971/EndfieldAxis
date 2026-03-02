@@ -121,49 +121,47 @@ class EndministratorDef extends OperatorDef {
   }
 
   override registerSimPlugins(registry: SimRegistry): void {
+    const selfId = this.id;
+
     registry.registerAfterHit({
       id: "operator.endministrator.combo.triggerOnAllyComboHit",
-      fn: ({ read, ev, sourceId }) => {
-        if (sourceId === this.id) return null;
+      fn: function* ({ read, ev, sourceId, emit }) {
+        if (ev?.type !== "hit" || !sourceId || sourceId === selfId) return;
         const source = read.getEntity(sourceId);
-        if (!source || source.type !== "operator") return null;
+        if (!source || source.type !== "operator") return;
 
         const parent = ev.ref ? read.getEvent(ev.ref) : null;
         const isComboHit =
           parent?.type === "castStart" && parent.skillType === "comboSkill";
-        if (!isComboHit) return null;
-        const selfId = this.id;
-        return function* (ctx) {
-          yield ctx.emit.comboTriggered({
-            sourceId: selfId,
-            targetId: ev.targetId,
-          });
-        }.bind(this);
+        if (!isComboHit) return;
+
+        yield emit.comboTriggered({
+          sourceId: selfId,
+          targetId: ev.targetId,
+        });
       },
     });
 
     registry.registerOnBuffConsumed({
       id: "operator.endministrator.talent1.onCrystalConsumed",
       when: { buffId: "buff.crystal" },
-      fn: ({ read, ev }) => {
-        if (!read.env.entitiesById[this.id]) return null;
-        const build = read.getBuild(this.id) as OperatorBuild;
+      fn: function* ({ read, ev, emit }) {
+        if (ev?.type !== "buffRemove" || !read.env.entitiesById[selfId]) return;
+        const build = read.getBuild(selfId) as OperatorBuild;
         const talentRank = Number(build?.talentRanks?.talent1 ?? 0);
-        if (talentRank <= 0) return null;
-        if (ev.ref === undefined || ev.ref === null) return null;
+        if (talentRank <= 0) return;
+        if (ev.ref === undefined || ev.ref === null) return;
 
         const buffId =
           talentRank >= 2
             ? "buff.endministrator.talent1.atkInc"
             : "buff.endministrator.talent1.atkInc.low";
 
-        const selfId = this.id;
-        return function* (ctx) {
-          yield ctx.emit.buffApply({
-            sourceId: selfId,
-            ownerId: selfId,
-            buffId: buffId,
-          });
+        yield emit.buffApply({
+          sourceId: selfId,
+          ownerId: selfId,
+          buffId: buffId,
+        });
 
           if (build.potentialRank >= 1) {
             const consumerEvent = read.getEvent(ev.ref);
@@ -175,64 +173,57 @@ class EndministratorDef extends OperatorDef {
                 castEvent.sourceId === selfId &&
                 castEvent.skillType === "normalSkill"
               ) {
-                yield ctx.emit.spReturn({
+                yield emit.spReturn({
                   sourceId: selfId,
                   amount: 50,
                 });
               }
             }
           }
-        }.bind(this);
       },
     });
 
     registry.registerOnBuffApply({
       id: "operator.endministrator.potential2.shareAtkBuff.high",
       when: { buffId: "buff.endministrator.talent1.atkInc" },
-      fn: ({ read, ev }) => {
-        if (ev.ownerId !== this.id) return null;
-        const build = read.getBuild(this.id);
-        if (Number(build?.potentialRank ?? 0) < 2) return null;
+      fn: function* ({ read, ev, emit }) {
+        if (ev?.type !== "buffApply" || ev.ownerId !== selfId) return;
+        const build = read.getBuild(selfId);
+        if (Number(build?.potentialRank ?? 0) < 2) return;
 
         const targetIds = Object.values(read.env.entitiesById)
-          .filter(e => e.type === "operator" && e.id !== this.id)
+          .filter(e => e.type === "operator" && e.id !== selfId)
           .map(e => e.id);
 
-        const selfId = this.id;
-        return function* (ctx) {
-          for (const targetId of targetIds) {
-            yield ctx.emit.buffApply({
-              sourceId: selfId,
+        for (const targetId of targetIds) {
+          yield emit.buffApply({
+            sourceId: selfId,
               ownerId: targetId,
               buffId: "buff.endministrator.potential2.teamAtkShare.high",
             });
           }
-        }.bind(this);
       },
     });
 
     registry.registerOnBuffApply({
       id: "operator.endministrator.potential2.shareAtkBuff.low",
       when: { buffId: "buff.endministrator.talent1.atkInc.low" },
-      fn: ({ read, ev }) => {
-        if (ev.ownerId !== this.id) return null;
-        const build = read.getBuild(this.id);
-        if (Number(build?.potentialRank ?? 0) < 2) return null;
+      fn: function* ({ read, ev, emit }) {
+        if (ev?.type !== "buffApply" || ev.ownerId !== selfId) return;
+        const build = read.getBuild(selfId);
+        if (Number(build?.potentialRank ?? 0) < 2) return;
 
         const targetIds = Object.values(read.env.entitiesById)
-          .filter(e => e.type === "operator" && e.id !== this.id)
+          .filter(e => e.type === "operator" && e.id !== selfId)
           .map(e => e.id);
 
-        const selfId = this.id;
-        return function* (ctx) {
-          for (const targetId of targetIds) {
-            yield ctx.emit.buffApply({
-              sourceId: selfId,
+        for (const targetId of targetIds) {
+          yield emit.buffApply({
+            sourceId: selfId,
               ownerId: targetId,
               buffId: "buff.endministrator.potential2.teamAtkShare.low",
-            });
-          }
-        }.bind(this);
+          });
+        }
       },
     });
   }

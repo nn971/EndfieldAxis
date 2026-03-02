@@ -22,26 +22,27 @@ class CombustionBuffDef extends BuffDef {
   }
 
   override registerSimPlugins(registry: SimRegistry): void {
+    const buffId = this.id;
+
     registry.registerOnBuffApply({
       id: "buff.combustion.scheduleDot",
-      when: { buffId: this.id },
-      fn: ({ ev, read }) => {
+      when: { buffId },
+      fn: function* ({ ev, read, emit }) {
+        if (ev?.type !== "buffApply") return;
         const target = read.getEntity(ev.ownerId);
-        const buff = (target as any).buffs?.[this.id];
-        if (!buff) return null;
+        const buff = (target as any).buffs?.[buffId];
+        if (!buff) return;
 
         const sourceId = String((buff as any).meta?.reactionSourceId ?? "");
-        if (!sourceId) return null;
+        if (!sourceId) return;
 
-        return function* (ctx) {
-          yield delay(COMBUSTION_DOT_INTERVAL_FRAMES);
-          yield ctx.emit.reactionTick({
-            sourceId,
-            targetId: ev.ownerId,
-            reactionBuffId: this.id,
-            ref: ev.id,
-          });
-        }.bind(this);
+        yield delay(COMBUSTION_DOT_INTERVAL_FRAMES);
+        yield emit.reactionTick({
+          sourceId,
+          targetId: ev.ownerId,
+          reactionBuffId: buffId,
+          ref: ev.id,
+        });
       },
     });
   }
