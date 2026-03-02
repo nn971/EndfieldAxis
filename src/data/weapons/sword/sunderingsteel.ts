@@ -36,17 +36,13 @@ class SunderingSteelDef extends WeaponDef {
     registry.registerOnStatusApply({
       id: SUNDERING_STEEL_ON_STATUS_APPLY_PLUGIN_ID,
       when: { sourceWeaponId: this.id },
-      fn: ({ sourceId, emit }) => {
-        // Each trigger adds 1 stack by applying the buff once.
-        return [
-          emit.now({
-            type: "buffApply",
-            sourceId: sourceId,
-            targetId: sourceId,
-            ownerId: sourceId,
-            buffId: BONUS_BUFF as any,
-          }),
-        ];
+      fn: function* ({ sourceId, emit, ev }) {
+        if (ev?.type !== "statusApply" || !sourceId) return;
+        yield emit.buffApply({
+          sourceId,
+          targetId: sourceId,
+          buffId: BONUS_BUFF as any,
+        });
       },
     });
   }

@@ -1,10 +1,7 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
+import { pickSkillValueByRank } from "../../simulator/scripts";
+import { delay } from "../../simulator/scripts";
 import type { SimEnv } from "../../types/simulator/simulator";
-import {
-  artsHitByRank,
-  physicalHitByRank,
-  spRecoverByRank,
-} from "../../simulator/skillOps";
 import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 
 const PLACEHOLDER_ICON = "placeholder.jpg";
@@ -64,51 +61,54 @@ class AkekuriDef extends OperatorDef {
           name: "Burst of Passion",
           durationFrames: 56,
           icon: PLACEHOLDER_ICON,
-          timeline: [
-            artsHitByRank(28, {
-              rankTable: NS_DMG_MUL,
-              dmgType: "heat",
-              withInfliction: true,
-            }),
-          ],
+          script: function* (ctx) {
+            yield delay(28);
+            yield ctx.emit.hit({
+              damageType: "heat",
+              dmgMultiplier: pickSkillValueByRank(ctx, NS_DMG_MUL),
+            });
+            yield ctx.emit.inflictionApply({
+              inflictionType: "heat",
+              inflictionStacks: 1,
+            });
+          },
         },
         comboSkill: {
           name: "Flash and Dash",
           durationFrames: 66,
           icon: PLACEHOLDER_ICON,
-          timeline: [
-            physicalHitByRank(24, {
-              rankTable: CS_DMG_MUL_PER_SEQ,
-            }),
-            spRecoverByRank(24, {
-              rankTable: CS_SP_RECOVERY_PER_SEQ,
-            }),
-            physicalHitByRank(44, {
-              rankTable: CS_DMG_MUL_PER_SEQ,
-            }),
-            spRecoverByRank(44, {
-              rankTable: CS_SP_RECOVERY_PER_SEQ,
-            }),
-          ],
+          script: function* (ctx) {
+            const dmg = pickSkillValueByRank(ctx, CS_DMG_MUL_PER_SEQ);
+            const sp = pickSkillValueByRank(ctx, CS_SP_RECOVERY_PER_SEQ);
+
+            yield delay(24);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: dmg,
+            });
+            yield ctx.emit.spRecover({ amount: sp });
+
+            yield delay(20);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: dmg,
+            });
+            yield ctx.emit.spRecover({ amount: sp });
+          },
         },
         ultimate: {
           name: "SQUAD! ON ME!",
           durationFrames: 180,
           icon: PLACEHOLDER_ICON,
-          timeline: [
-            spRecoverByRank(40, {
-              rankTable: ULT_SP_RECOVERY,
-              ratio: 1 / 3,
-            }),
-            spRecoverByRank(85, {
-              rankTable: ULT_SP_RECOVERY,
-              ratio: 1 / 3,
-            }),
-            spRecoverByRank(130, {
-              rankTable: ULT_SP_RECOVERY,
-              ratio: 1 / 3,
-            }),
-          ],
+          script: function* (ctx) {
+            const amount = pickSkillValueByRank(ctx, ULT_SP_RECOVERY) * (1 / 3);
+            yield delay(40);
+            yield ctx.emit.spRecover({ amount });
+            yield delay(45);
+            yield ctx.emit.spRecover({ amount });
+            yield delay(45);
+            yield ctx.emit.spRecover({ amount });
+          },
         },
       },
     } satisfies OperatorDefInit);
@@ -127,9 +127,12 @@ class AkekuriDef extends OperatorDef {
   }
 
   override registerSimPlugins(registry: SimRegistry): void {
+    const selfId = this.id;
+
     registry.registerOnCastStart({
       id: "global.link.consumeOnCastStart",
-      fn: ({ read, ev }) => {
+      fn: function* ({ read, ev }) {
+        if (ev?.type !== "castStart") return;
         const globalBuffs = (read.env as SimEnv).globalBuffs;
         const link = globalBuffs.link;
 
@@ -147,7 +150,7 @@ class AkekuriDef extends OperatorDef {
         }
 
         // Akekuri talent placeholder: while ultimate is active, gains Link.
-        if (ev.sourceId === this.id && ev.skillType === "ultimate") {
+        if (ev.sourceId === selfId && ev.skillType === "ultimate") {
           const state = (globalBuffs.link ??= {
             stacks: 0,
             castBonusByCastStartId: {},
@@ -157,20 +160,18 @@ class AkekuriDef extends OperatorDef {
             Math.max(0, Number(state.stacks ?? 0)) + 1,
           );
         }
-
-        return [];
       },
     });
 
     registry.registerOnCastEnd({
       id: "global.link.cleanupCastMap",
-      fn: ({ read, ev }) => {
+      fn: function* ({ read, ev }) {
+        if (ev?.type !== "castEnd") return;
         const globalBuffs = (read.env as SimEnv).globalBuffs;
         const map = globalBuffs?.link?.castBonusByCastStartId;
         if (map && ev.ref) {
           delete map[ev.ref];
         }
-        return [];
       },
     });
 

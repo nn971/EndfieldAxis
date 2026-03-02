@@ -420,14 +420,14 @@ export default function AxisEditor({
     return map;
   }, [effectiveTeamOperatorIds]);
 
-  const toLaneIndex = (ownerId: string): number =>
-    laneIndexByOwnerId.get(ownerId) ?? ENEMY_LANE_INDEX;
+  const toLaneIndex = (targetId: string): number =>
+    laneIndexByOwnerId.get(targetId) ?? ENEMY_LANE_INDEX;
 
   const barRowById = useMemo(() => {
     const byLane: Record<number, number[]> = {};
     const rows = new Map<string, number>();
     const sorted = [...simRenderCache.bars].sort((a, b) => {
-      const laneDelta = toLaneIndex(a.ownerId) - toLaneIndex(b.ownerId);
+      const laneDelta = toLaneIndex(a.targetId) - toLaneIndex(b.targetId);
       if (laneDelta !== 0) return laneDelta;
       if (a.startFrame !== b.startFrame) return a.startFrame - b.startFrame;
       if (a.endFrame !== b.endFrame) return a.endFrame - b.endFrame;
@@ -435,7 +435,7 @@ export default function AxisEditor({
     });
 
     for (const bar of sorted) {
-      const laneIndex = toLaneIndex(bar.ownerId);
+      const laneIndex = toLaneIndex(bar.targetId);
       const laneRows = (byLane[laneIndex] ??= []);
       let rowIndex = laneRows.findIndex(
         lastEnd => bar.startFrame > lastEnd + 2,
@@ -456,14 +456,14 @@ export default function AxisEditor({
     const byLane: Record<number, number[]> = {};
     const rows = new Map<string, number>();
     const sorted = [...simRenderCache.markers].sort((a, b) => {
-      const laneDelta = toLaneIndex(a.ownerId) - toLaneIndex(b.ownerId);
+      const laneDelta = toLaneIndex(a.targetId) - toLaneIndex(b.targetId);
       if (laneDelta !== 0) return laneDelta;
       if (a.frame !== b.frame) return a.frame - b.frame;
       return a.id.localeCompare(b.id);
     });
 
     for (const marker of sorted) {
-      const laneIndex = toLaneIndex(marker.ownerId);
+      const laneIndex = toLaneIndex(marker.targetId);
       const laneRows = (byLane[laneIndex] ??= []);
       let rowIndex = laneRows.findIndex(
         lastFrame => marker.frame > lastFrame + 10,
@@ -743,7 +743,7 @@ export default function AxisEditor({
 
             {/* buff bars */}
             {simRenderCache.bars.map(bar => {
-              const laneIndex = toLaneIndex(bar.ownerId);
+              const laneIndex = toLaneIndex(bar.targetId);
               const width = Math.max(2, bar.endFrame - bar.startFrame);
               const rowIndex = barRowById.get(bar.id) ?? 0;
               const top =
@@ -786,7 +786,7 @@ export default function AxisEditor({
             })}
 
             {simRenderCache.markers.map(marker => {
-              const laneIndex = toLaneIndex(marker.ownerId);
+              const laneIndex = toLaneIndex(marker.targetId);
               const rowIndex = markerRowById.get(marker.id) ?? 0;
               const top =
                 laneIndex * LANE_HEIGHT +

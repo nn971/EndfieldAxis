@@ -4,8 +4,15 @@ import type {
   SimStatusType,
 } from "../types/simulator/infliction";
 import type { DmgType, SkillType } from "../data/operators/OperatorDef";
-import type { SimEventDraft } from "./listeners/drafts";
+import type { SimEventDraft } from "./scripts";
 import type { SimEventWhen } from "../types/simulator/when";
+import { pickSkillValueByRank } from "./scripts";
+
+/**
+ * @deprecated Legacy skill-op timeline helpers.
+ * Skill event emission is now unified under simulator/scripts.ts generator scripts.
+ * Keep this module temporarily for rank-table helpers during migration.
+ */
 
 export type SkillCompileContext = {
   sourceId: string;
@@ -19,34 +26,6 @@ export type SkillCompileContext = {
 };
 
 export type SkillOpFn = (ctx: SkillCompileContext) => SimEventDraft[];
-
-function clampSkillRank(rank: number): number {
-  if (!Number.isFinite(rank)) return 9;
-  return Math.max(1, Math.min(12, Math.round(rank)));
-}
-
-export function getSkillRank(
-  ctx: SkillCompileContext,
-  skillType: SkillType = ctx.skillType,
-): number {
-  const rank = Number(ctx.sourceBuild?.skillRanks?.[skillType] ?? 9);
-  return clampSkillRank(rank);
-}
-
-/** Rank table format: [lv1..lv9, m1, m2, m3]. */
-export function pickSkillValueByRank(
-  ctx: SkillCompileContext,
-  table: readonly number[],
-  skillType: SkillType = ctx.skillType,
-): number {
-  if (!Array.isArray(table) || table.length !== 12) {
-    throw new Error(
-      `pickSkillValueByRank requires a 12-value table, got length=${table?.length ?? 0}`,
-    );
-  }
-  const rank = getSkillRank(ctx, skillType);
-  return Number(table[rank - 1] ?? table[8]);
-}
 
 export function physicalHit(
   frame: number,
@@ -106,7 +85,7 @@ export function applyBuff(
       type: "buffApply",
       frame: ctx.startFrame + frame,
       sourceId: ctx.sourceId,
-      ownerId: ctx.targetId,
+      targetId: ctx.targetId,
       buffId,
       isForced: opts?.isForced,
       when: opts?.when,
@@ -171,7 +150,7 @@ export function artsHitByRank(
         type: "inflictionApply",
         frame: ctx.startFrame + frame,
         sourceId: ctx.sourceId,
-        ownerId: ctx.targetId,
+        targetId: ctx.targetId,
         inflictionType: opts.dmgType as InflictionType,
         inflictionStacks: 1,
         when: opts.when,

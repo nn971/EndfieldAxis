@@ -1,9 +1,6 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
-import {
-  applyBuff,
-  artsHitByRank,
-  physicalHitByRank,
-} from "../../simulator/skillOps";
+import { pickSkillValueByRank } from "../../simulator/scripts";
+import { delay } from "../../simulator/scripts";
 import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 
 const NS_DMG_MUL = [
@@ -17,10 +14,6 @@ const CS_DMG_MUL_NON_SOLIDIFIED = [
 const CS_DMG_MUL_SOLIDIFIED = [
   2.8, 3.08, 3.36, 3.64, 3.92, 4.2, 4.48, 4.76, 5.04, 5.39, 5.81, 6.3,
 ] as const;
-
-const CS_DMG_MUL_SOLIDIFIED_DELTA = CS_DMG_MUL_SOLIDIFIED.map(
-  (v, i) => v - CS_DMG_MUL_NON_SOLIDIFIED[i],
-) as readonly number[];
 
 const ULT_DMG_MUL = [
   4.89, 5.38, 5.86, 6.35, 6.84, 7.33, 7.82, 8.31, 8.8, 9.41, 10.14, 11.0,
@@ -67,45 +60,58 @@ class EstellaDef extends OperatorDef {
           name: "Onomatopoeia",
           durationFrames: 52,
           icon: "ESTELLA_NS.png",
-          timeline: [
-            artsHitByRank(26, {
-              rankTable: NS_DMG_MUL,
-              dmgType: "cryo",
-              withInfliction: true,
-            }),
-          ],
+          script: function* (ctx) {
+            yield delay(26);
+            yield ctx.emit.hit({
+              damageType: "cryo",
+              dmgMultiplier: pickSkillValueByRank(ctx, NS_DMG_MUL),
+            });
+            yield ctx.emit.inflictionApply({
+              inflictionType: "cryo",
+              inflictionStacks: 1,
+            });
+          },
         },
         comboSkill: {
           name: "Distortion",
           durationFrames: 52,
           icon: "ESTELLA_CS.png",
-          // TODO: currently simulator does not support conditional skill multipliers
-          // by target state (solidification / physical susceptibility) natively.
-          timeline: [
-            physicalHitByRank(34, {
-              rankTable: CS_DMG_MUL_NON_SOLIDIFIED,
-              withStatus: true,
+          script: function* (ctx) {
+            yield delay(34);
+            yield ctx.emit.statusApply({
               statusType: "lift",
-            }),
-            physicalHitByRank(34, {
-              rankTable: CS_DMG_MUL_SOLIDIFIED_DELTA,
-              when: { targetHasBuffId: "buff.solidification" },
-            }),
-            applyBuff(34, "buff.estella.combo.physicalSusceptibility", {
-              when: { targetHasBuffId: "buff.solidification" },
-            }),
-          ],
+            });
+
+            const target = ctx.read.getEntity(ctx.targetId);
+            const isSolidified = Boolean(
+              (target as any)?.buffs?.["buff.solidification"],
+            );
+
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: isSolidified
+                ? pickSkillValueByRank(ctx, CS_DMG_MUL_SOLIDIFIED)
+                : pickSkillValueByRank(ctx, CS_DMG_MUL_NON_SOLIDIFIED),
+            });
+
+            if (isSolidified) {
+              yield ctx.emit.buffApply({
+                buffId: "buff.estella.combo.physicalSusceptibility",
+              });
+            }
+          },
         },
         ultimate: {
           name: "Tremolo",
           durationFrames: 110,
           icon: "ESTELLA_ULT.png",
-          // TODO: Lift should apply only when target has physical susceptibility.
-          timeline: [
-            physicalHitByRank(55, {
-              rankTable: ULT_DMG_MUL,
-            }),
-          ],
+          script: function* (ctx) {
+            yield delay(55);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, ULT_DMG_MUL),
+            });
+          },
         },
       },
     } satisfies OperatorDefInit);
@@ -124,20 +130,19 @@ class EstellaDef extends OperatorDef {
   }
 
   override registerSimPlugins(registry: SimRegistry): void {
+    const selfId = this.id;
+
     registry.registerOnBuffApply({
       id: "operator.estella.combo.triggerOnSolidification",
       when: { buffId: "buff.solidification" },
-      fn: ({ read, ev, emit }) => {
-        if (!read.env.entitiesById[this.id]) return [];
+      fn: function* ({ read, ev, emit }) {
+        if (!read.env.entitiesById[selfId]) return;
+        if (ev?.type !== "buffApply") return;
 
-        return [
-          emit.now({
-            type: "comboTriggered",
-            sourceId: this.id,
-            targetId: ev.ownerId,
-            ref: ev.id,
-          }),
-        ];
+        yield emit.comboTriggered({
+          sourceId: selfId,
+          targetId: ev.targetId,
+        });
       },
     });
   }

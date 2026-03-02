@@ -29,115 +29,102 @@ class GrandVisionDef extends WeaponDef {
   }
 
   override registerSimPlugins(registry: SimRegistry): void {
+    const selfId = this.id;
+
     // When the wielder applies Crystal, prime Long Wish for 20s.
     registry.registerOnBuffApply({
       id: "weapon.grandvision.longWish.prime",
       when: { buffId: "buff.crystal" },
-      fn: ({ read, sourceId, emit }) => {
-        if (!sourceId) return [];
+      fn: function* ({ read, sourceId, emit, ev }) {
+        if (ev?.type !== "buffApply" || !sourceId) return;
 
         const build = read.getBuild(sourceId);
-        if (!build || build.weapon.id !== this.id) return [];
+        if (!build || build.weapon.id !== selfId) return;
 
         const self = read.getEntity(sourceId);
         const existing = (self as any).buffs?.[LONG_WISH_BUFF];
         const stacks = Math.max(0, Number((existing as any)?.stacks ?? 0));
 
         // Prime as stacks=1. If already active (stacks=2), do nothing.
-        if (stacks >= 2) return [];
+        if (stacks >= 2) return;
 
         // If already primed (stacks=1), refresh by removing then applying.
         if (stacks === 1) {
-          return [
-            emit.now({
-              type: "buffRemove",
-              ownerId: sourceId,
+          yield emit.buffRemove({
+              targetId: sourceId,
               buffId: LONG_WISH_BUFF as any,
-            }),
-            emit.now({
-              type: "buffApply",
+            });
+          yield emit.buffApply({
               sourceId,
               targetId: sourceId,
-              ownerId: sourceId,
               buffId: LONG_WISH_BUFF as any,
-            }),
-          ];
+            });
+          return;
         }
 
-        return [
-          emit.now({
-            type: "buffApply",
-            sourceId,
-            targetId: sourceId,
-            ownerId: sourceId,
-            buffId: LONG_WISH_BUFF as any,
-          }),
-        ];
+        yield emit.buffApply({
+          sourceId,
+          targetId: sourceId,
+          buffId: LONG_WISH_BUFF as any,
+        });
       },
     });
 
     // Activate Long Wish during the next battle-skill or ultimate cast.
     registry.registerOnCastStart({
       id: "weapon.grandvision.longWish.activate",
-      fn: ({ read, ev, sourceId, emit }) => {
-        if (!sourceId) return [];
+      fn: function* ({ read, ev, sourceId, emit }) {
+        if (ev?.type !== "castStart" || !sourceId) return;
 
         const build = read.getBuild(sourceId);
-        if (!build || build.weapon.id !== this.id) return [];
+        if (!build || build.weapon.id !== selfId) return;
         if (
           ev.skillType !== "normalSkill" &&
           ev.skillType !== "comboSkill" &&
           ev.skillType !== "ultimate"
         ) {
-          return [];
+          return;
         }
 
         const self = read.getEntity(sourceId);
         const existing = (self as any).buffs?.[LONG_WISH_BUFF];
         const stacks = Math.max(0, Number((existing as any)?.stacks ?? 0));
-        if (stacks !== 1) return [];
+        if (stacks !== 1) return;
 
         // Apply again to stack to 2 (active) for the duration of this cast.
-        return [
-          emit.now({
-            type: "buffApply",
-            sourceId,
-            targetId: sourceId,
-            ownerId: sourceId,
-            buffId: LONG_WISH_BUFF as any,
-          }),
-        ];
+        yield emit.buffApply({
+          sourceId,
+          targetId: sourceId,
+          buffId: LONG_WISH_BUFF as any,
+        });
       },
     });
 
     // Consume Long Wish at cast end.
     registry.registerOnCastEnd({
       id: "weapon.grandvision.longWish.consume",
-      fn: ({ read, ev, sourceId, emit }) => {
-        if (!sourceId) return [];
+      fn: function* ({ read, ev, sourceId, emit }) {
+        if (ev?.type !== "castEnd" || !sourceId) return;
 
         const build = read.getBuild(sourceId);
-        if (!build || build.weapon.id !== this.id) return [];
+        if (!build || build.weapon.id !== selfId) return;
         if (
           ev.skillType !== "normalSkill" &&
           ev.skillType !== "comboSkill" &&
           ev.skillType !== "ultimate"
         ) {
-          return [];
+          return;
         }
 
         const self = read.getEntity(sourceId);
         const existing = (self as any).buffs?.[LONG_WISH_BUFF];
         const stacks = Math.max(0, Number((existing as any)?.stacks ?? 0));
-        if (stacks < 2) return [];
+        if (stacks < 2) return;
 
-        return [
-          emit.now({
-            type: "buffRemove",
-            ownerId: sourceId,
-            buffId: LONG_WISH_BUFF as any,
-          }),
-        ];
+        yield emit.buffRemove({
+          targetId: sourceId,
+          buffId: LONG_WISH_BUFF as any,
+        });
       },
     });
   }

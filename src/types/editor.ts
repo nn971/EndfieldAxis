@@ -6,7 +6,7 @@ export type SimRenderMarkerType = "status" | "buffRefresh";
 export interface SimRenderBar {
   id: string;
   type: SimRenderBarType;
-  ownerId: string;
+  targetId: string;
   effectId: string;
   startFrame: number;
   endFrame: number;
@@ -16,7 +16,7 @@ export interface SimRenderBar {
 export interface SimRenderMarker {
   id: string;
   type: SimRenderMarkerType;
-  ownerId: string;
+  targetId: string;
   effectId: string;
   frame: number;
 }

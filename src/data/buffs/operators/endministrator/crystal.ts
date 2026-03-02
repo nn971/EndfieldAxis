@@ -1,6 +1,6 @@
 import { BuffDef } from "../../BuffDef";
 import type { SimRegistry } from "../../../../simulator/listeners/registry";
-import type { SimEventDraft } from "../../../../simulator/listeners/drafts";
+import { type SimScript, type SimScriptContext } from "../../../../simulator/scripts";
 import type { SimRead } from "../../../../simulator/simulator";
 
 const ENDMINISTRATOR_ID = "endministrator";
@@ -21,32 +21,27 @@ function getEndministratorComboRank(read: SimRead): number {
 
 function spawnCrystalConsumeEvents(params: {
   read: SimRead;
-  frame: number;
   targetId: string;
   ref?: string | null;
-}): SimEventDraft[] {
+}): SimScript {
   const csRank = getEndministratorComboRank(params.read);
   const crystalShatterMul = CRYSTAL_SHATTER_MUL_BY_CS_RANK[csRank - 1] ?? 3.2;
 
-  return [
-    {
-      type: "buffRemove",
-      frame: params.frame,
-      ownerId: params.targetId,
+  return function* (ctx: SimScriptContext) {
+    yield ctx.emit.buffRemove({
+      targetId: params.targetId,
       buffId: "buff.crystal" as any,
       ref: params.ref,
-    },
-    {
-      type: "hit",
-      frame: params.frame,
+    });
+    yield ctx.emit.hit({
       sourceId: ENDMINISTRATOR_ID,
       targetId: params.targetId,
       damageType: "physical",
       hitTypes: { comboSkill: true },
       dmgMultiplier: crystalShatterMul,
       ref: params.ref,
-    } as SimEventDraft,
-  ];
+    });
+  };
 }
 
 class CrystalBuffDef extends BuffDef {
@@ -77,50 +72,52 @@ class CrystalBuffDef extends BuffDef {
 
     registry.registerOnStatusApply({
       id: CRYSTAL_ON_STATUS_APPLY_PLUGIN_ID,
-      fn: ({ read, ev, targetId }) => {
-        if (!read.env.entitiesById[ENDMINISTRATOR_ID]) return [];
+      fn: function* ({ read, ev, targetId, emit, sourceId, startFrame, skillType }) {
+        if (ev?.type !== "statusApply" || !targetId) return;
+        if (!read.env.entitiesById[ENDMINISTRATOR_ID]) return;
 
         const target = read.getEntity(targetId);
-        if (!(target as any).buffs?.["buff.crystal"]) return [];
+        if (!(target as any).buffs?.["buff.crystal"]) return;
         if (
           ev.statusType !== "lift" &&
           ev.statusType !== "knockDown" &&
           ev.statusType !== "crush" &&
           ev.statusType !== "breach"
         ) {
-          return [];
+          return;
         }
 
-        return spawnCrystalConsumeEvents({
+        const script = spawnCrystalConsumeEvents({
           read,
-          frame: ev.frame,
           targetId,
           ref: ev.id,
         });
+        yield* script({ read, ev, emit, sourceId, targetId, startFrame, skillType });
       },
     });
 
     registry.registerOnInflictionApply({
       id: "buff.crystal.consume.onInflictionApply",
-      fn: ({ read, ev, targetId }) => {
-        if (!read.env.entitiesById[ENDMINISTRATOR_ID]) return [];
+      fn: function* ({ read, ev, targetId, emit, sourceId, startFrame, skillType }) {
+        if (ev?.type !== "inflictionApply" || !targetId) return;
+        if (!read.env.entitiesById[ENDMINISTRATOR_ID]) return;
 
         const target = read.getEntity(targetId);
-        if (!(target as any).buffs?.["buff.crystal"]) return [];
-        if (ev.inflictionType !== "vulnerable") return [];
+        if (!(target as any).buffs?.["buff.crystal"]) return;
+        if (ev.inflictionType !== "vulnerable") return;
 
         // Skip inflictions spawned by statusApply to avoid double consume.
         if (ev.ref) {
           const parent = read.getEvent(ev.ref);
-          if (parent?.type === "statusApply") return [];
+          if (parent?.type === "statusApply") return;
         }
 
-        return spawnCrystalConsumeEvents({
+        const script = spawnCrystalConsumeEvents({
           read,
-          frame: ev.frame,
           targetId,
           ref: ev.id,
         });
+        yield* script({ read, ev, emit, sourceId, targetId, startFrame, skillType });
       },
     });
   }

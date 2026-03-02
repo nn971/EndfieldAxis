@@ -1,10 +1,11 @@
 import operatorsData from "../data/operators";
 import { SkillType } from "../data/operators/OperatorDef";
 import type { SimEvent } from "../types/simulator/simulator";
-import type { SimEventDraft } from "./listeners/drafts";
 import type { OperatorBuild } from "../types/operator";
 import { makeSimEventId } from "../shared/lib/utils";
-import { materializeDrafts } from "./listeners/drafts";
+import { SkillCompileContextclampSkillRank } from "./skillOps";
+
+/** @deprecated */
 
 export function compileSkillCast(params: {
   sourceId: string;
@@ -53,38 +54,10 @@ export function compileSkillCast(params: {
     skillType: skillType,
   });
 
-  const timelineDrafts: SimEventDraft[] = [];
-
-  // events for skill ops
-  if (!skill?.timeline)
-    throw new Error(
-      `no timeline for skill ${skillType} of operator ${operator.name}`,
-    );
-  for (const step of skill.timeline ?? []) {
-    if (typeof step !== "function") {
-      throw new Error(
-        `Skill timeline step must be function. Found: ${JSON.stringify(step)}`,
-      );
-    }
-    const draftsToAdd = (step as any)({
-      sourceId,
-      targetId,
-      startFrame,
-      skillType,
-      sourceBuild: buildByOperatorId?.[sourceId],
-    });
-    timelineDrafts.push(...((draftsToAdd ?? []) as SimEventDraft[]));
-  }
-
-  events.push(
-    ...materializeDrafts(
-      timelineDrafts,
-      { nextSeq, makeId: makeSimEventId },
-      {
-        defaultRef: startEventId,
-      },
-    ),
-  );
+  // Legacy timeline compilation has been intentionally disabled.
+  // Skills now emit runtime events via unified script plugins on castStart.
+  // Kept buildByOperatorId in signature temporarily for compatibility while callers migrate.
+  void buildByOperatorId;
 
   // event for cast.end
   events.push({

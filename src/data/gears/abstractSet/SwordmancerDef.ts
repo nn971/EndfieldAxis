@@ -75,30 +75,26 @@ export abstract class SwordmancerDef extends GearsDef {
 
     registry.registerOnStatusApply({
       id: SWORDMANCER_ON_STATUS_APPLY_PLUGIN_ID,
-      fn: ctx => {
+      fn: function* (ctx) {
+        if (ctx.ev?.type !== "statusApply" || !ctx.sourceId) return;
+
         const sourceBuild = ctx.read.getBuild(ctx.sourceId);
 
-        if (!sourceBuild) return [];
-        if (!SwordmancerDef.hasRequiredPieces(sourceBuild)) return [];
+        if (!sourceBuild) return;
+        if (!SwordmancerDef.hasRequiredPieces(sourceBuild)) return;
 
         const set = SwordmancerDef.setData;
-        if (!set.statusProc) return [];
+        if (!set.statusProc) return;
 
         const statusType = ctx.ev.statusType as SimStatusType;
         const isPhysicalStatus = physicalStatusTypes.includes(statusType);
-        if (set.statusProc.onlyPhysicalStatus && !isPhysicalStatus) return [];
+        if (set.statusProc.onlyPhysicalStatus && !isPhysicalStatus) return;
 
-        // console.log(`triggered`);
-        return [
-          ctx.emit.now({
-            type: "hit",
-            sourceId: ctx.sourceId,
-            targetId: ctx.targetId,
-            damageType: set.statusProc.damageType,
-            dmgMultiplier: set.statusProc.dmgMultiplier,
-            ref: ctx.ev.id,
-          }),
-        ];
+        yield ctx.emit.hit({
+          damageType: set.statusProc.damageType,
+          dmgMultiplier: set.statusProc.dmgMultiplier,
+          ref: ctx.ev.id,
+        });
       },
     });
   }

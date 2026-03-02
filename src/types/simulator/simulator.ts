@@ -30,13 +30,13 @@ import type { SimEventWhen } from "./when";
 
 export type SimEventBase = {
   id: string; // unique id within a simulation, for endding events to refer to
-  type: string;
   frame: number;
   seq: number; // larger seq earlier when frame equal
+  /** @deprecated Check when condition in the script, outside event resolvation loop */
   when?: SimEventWhen;
 
-  /** Optional reference to a related event (parent / originating action). */
-  ref?: string | null;
+  /** Reference to a related event (parent / originating action). */
+  ref: string | null;
   // org?: string | null;
 
   // sourceId?: SimEntityId;
@@ -78,37 +78,37 @@ export type SimEvent =
   | (SimEventBase & {
       type: "inflictionApply";
       sourceId: SimEntityId;
-      ownerId: SimEntityId;
+      targetId: SimEntityId;
       inflictionType: InflictionType;
       inflictionStacks: number;
     })
   | (SimEventBase & {
       type: "inflictionExpire";
-      ownerId: SimEntityId;
+      targetId: SimEntityId;
       inflictionType: InflictionType;
       ref: string;
     })
   | (SimEventBase & {
       type: "inflictionRemove";
-      ownerId: SimEntityId;
+      targetId: SimEntityId;
       inflictionType: InflictionType;
     })
   | (SimEventBase & {
       type: "buffApply";
       sourceId?: SimEntityId;
-      ownerId: SimEntityId;
+      targetId: SimEntityId;
       buffId: BuffId;
       isForced?: boolean;
     })
   | (SimEventBase & {
       type: "buffRemove";
       /** entity who owns the buff */
-      ownerId: SimEntityId;
+      targetId: SimEntityId;
       buffId: BuffId;
     })
   | (SimEventBase & {
       type: "buffExpire";
-      ownerId: SimEntityId; // entity who owns the buff
+      targetId: SimEntityId; // entity who owns the buff
       buffId: BuffId;
       ref: string;
     })
