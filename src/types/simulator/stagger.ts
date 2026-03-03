@@ -1,0 +1,2 @@
+export const DEFAULT_STAGGER_CAP_MILLI = 100_000;
+export const STAGGER_DURATION_FRAMES = 300;

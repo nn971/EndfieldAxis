@@ -60,6 +60,7 @@ export type SimScriptContext = {
   targetId?: string;
   startFrame: number;
   skillType: SkillType;
+  defaultHitStaggerOnHit?: number;
   sourceBuild?: {
     skillRanks?: Record<string, number>;
   };
@@ -97,7 +98,10 @@ function emitCommand(
 }
 
 function makeCtxEmit(
-  ctx: Pick<SimScriptContext, "sourceId" | "targetId">,
+  ctx: Pick<
+    SimScriptContext,
+    "sourceId" | "targetId" | "defaultHitStaggerOnHit"
+  >,
 ): SimScriptEmit {
   return {
     hit: draft =>
@@ -105,6 +109,8 @@ function makeCtxEmit(
         ...draft,
         sourceId: draft.sourceId ?? ctx.sourceId,
         targetId: draft.targetId ?? ctx.targetId,
+        staggerOnHit:
+          draft.staggerOnHit ?? Number(ctx.defaultHitStaggerOnHit ?? 0),
         type: "hit",
       } as DistOmit<SimEventDraft, "frame" | "ref">),
     statusApply: draft =>
@@ -176,7 +182,11 @@ export function runSimScript(params: {
   const { script, ctx, baseFrame } = params;
   const runtimeCtx = {
     ...ctx,
-    emit: makeCtxEmit(ctx),
+    emit: makeCtxEmit({
+      sourceId: ctx.sourceId,
+      targetId: ctx.targetId,
+      defaultHitStaggerOnHit: ctx.defaultHitStaggerOnHit,
+    }),
   } satisfies SimScriptContext;
   const out: SimEventDraft[] = [];
   let frameCursor = baseFrame;

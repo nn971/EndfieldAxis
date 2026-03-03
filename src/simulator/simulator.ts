@@ -49,6 +49,7 @@ import {
   resolveCastStart,
   validateEventWhen,
   resolveComboTriggerElapse,
+  resolveStaggerExpire,
 } from "./resolvers";
 import { BuffId } from "../data/buffs/BuffDef";
 import {
@@ -162,6 +163,7 @@ type SimResolvers = {
   ) => void;
   resolveSpRecover: (ev: Extract<SimEvent, { type: "spRecover" }>) => void;
   resolveSpReturn: (ev: Extract<SimEvent, { type: "spReturn" }>) => void;
+  resolveStaggerExpire: (ev: Extract<SimEvent, { type: "staggerExpire" }>) => void;
 };
 
 type SimWorldInit = {
@@ -172,6 +174,7 @@ type SimWorldInit = {
   registry: SimRegistry;
   damageModel?: DamageModel;
   teamOperatorIds?: string[];
+  controlledOperatorId?: string;
 };
 
 export type SimResourceSample = {
@@ -183,6 +186,7 @@ export type SimResourceSample = {
     total: number;
   };
   ultimateCurrentByOperatorId: Record<string, number>;
+  enemyStaggerMilli: number;
 };
 
 /** Larger seq happens first in the same frame */
@@ -223,12 +227,14 @@ export class SimWorld {
   private readonly teamOperatorOrder: string[];
   private readonly comboQueue: SimEntityId[] = [];
   private readonly blockedCastStartIds = new Set<string>();
+  public readonly controlledOperatorId?: string;
 
   public readonly read: SimRead;
   public readonly ops: SimOps;
   private readonly resolvers: SimResolvers;
 
   constructor(init: SimWorldInit) {
+    this.controlledOperatorId = init.controlledOperatorId;
     this.buildByOperatorId = init.buildByOperatorId;
     const entitiesById: Record<string, SimEntity> = {};
     for (const e of init.entities) {
@@ -333,6 +339,7 @@ export class SimWorld {
       resolveComboCooldownEnd: ev => resolveComboCooldownEnd(self, ev),
       resolveSpRecover: ev => resolveSpRecover(self, ev),
       resolveSpReturn: ev => resolveSpReturn(self, ev),
+      resolveStaggerExpire: ev => resolveStaggerExpire(self, ev),
     };
   }
 
@@ -344,6 +351,10 @@ export class SimWorld {
   }
 
   private captureResourceSample(frame: number, seq: number): void {
+    const enemyStaggerMilli = Number(
+      this.env.entitiesById.enemy1?.stagger?.currentMilli ?? 0,
+    );
+
     const ultimateCurrentByOperatorId: Record<string, number> = {};
     const sortedOperatorIds = Object.keys(
       this.env.resources.ultimateByOperatorId,
@@ -365,6 +376,7 @@ export class SimWorld {
         ),
       },
       ultimateCurrentByOperatorId,
+      enemyStaggerMilli,
     });
   }
 
@@ -936,6 +948,11 @@ export class SimWorld {
 
         case "spRecover": {
           this.resolvers.resolveSpRecover(ev);
+          break;
+        }
+
+        case "staggerExpire": {
+          this.resolvers.resolveStaggerExpire(ev);
           break;
         }
 

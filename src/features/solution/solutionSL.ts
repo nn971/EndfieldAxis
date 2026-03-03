@@ -5,7 +5,7 @@ import {
 } from "../../types/editor";
 
 // Bump this when you change the serialized shape.
-export const CURRENT_SOLUTION_VERSION = 1;
+export const CURRENT_SOLUTION_VERSION = 2;
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -95,6 +95,28 @@ function migrateToCurrent(
       simRenderCache: makeEmptySimRenderCache(),
     };
     return { ok: true, solution: candidate as SolutionState };
+  }
+
+  // v1 migration: migrate to current version by coercing controlledOperatorId
+  if (version === 1) {
+    const rawAny: any = raw as any;
+    const teamOperatorIds: string[] = Array.isArray(rawAny.teamOperatorIds)
+      ? rawAny.teamOperatorIds
+      : [];
+    const hasValidControlled: boolean =
+      typeof rawAny.controlledOperatorId === "string" &&
+      teamOperatorIds.includes(rawAny.controlledOperatorId);
+    const migrated: any = {
+      ...rawAny,
+      version: CURRENT_SOLUTION_VERSION,
+      simRenderCache: makeEmptySimRenderCache(),
+    };
+    if (!hasValidControlled && teamOperatorIds.length > 0) {
+      migrated.controlledOperatorId = teamOperatorIds[0];
+    } else {
+      migrated.controlledOperatorId = rawAny.controlledOperatorId;
+    }
+    return { ok: true, solution: migrated as SolutionState };
   }
 
   if (version === CURRENT_SOLUTION_VERSION) {

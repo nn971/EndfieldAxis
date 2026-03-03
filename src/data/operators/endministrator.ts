@@ -19,6 +19,11 @@ const ULT_DMG_MUL = [
 const ULT_BONUS_DMG_MUL = [
   2.67, 2.94, 3.2, 3.47, 3.74, 4.0, 4.27, 4.54, 4.8, 5.14, 5.54, 6.0,
 ] as const;
+const NA_HIT1_DMG_MUL = new Array(12).fill(0.5) as readonly number[];
+const NA_HIT2_DMG_MUL = new Array(12).fill(0.6) as readonly number[];
+const NA_HIT3_DMG_MUL = new Array(12).fill(0.7) as readonly number[];
+const NA_HIT4_DMG_MUL = new Array(12).fill(0.8) as readonly number[];
+const NA_HIT5_DMG_MUL = new Array(12).fill(0.9) as readonly number[];
 
 const CS_COOLDOWN_SECONDS = [
   16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 15,
@@ -56,6 +61,39 @@ class EndministratorDef extends OperatorDef {
           name: "Destructive Sequence",
           durationFrames: 300,
           icon: "ENDMINISTRATOR_NA.png",
+          staggerOnHit: 18,
+          script: function* (ctx) {
+            yield delay(50);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT1_DMG_MUL),
+              staggerOnHit: 0,
+            });
+            yield delay(50);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT2_DMG_MUL),
+              staggerOnHit: 0,
+            });
+            yield delay(50);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT3_DMG_MUL),
+              staggerOnHit: 0,
+            });
+            yield delay(50);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT4_DMG_MUL),
+              staggerOnHit: 0,
+            });
+            yield delay(50);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT5_DMG_MUL),
+              staggerOnHit: 18,
+            });
+          },
         },
         normalSkill: {
           name: "Constructive Sequence",
@@ -69,6 +107,7 @@ class EndministratorDef extends OperatorDef {
             yield ctx.emit.hit({
               damageType: "physical",
               dmgMultiplier: pickSkillValueByRank(ctx, NS_DMG_MUL),
+              staggerOnHit: 10,
             });
           },
         },
@@ -84,6 +123,7 @@ class EndministratorDef extends OperatorDef {
             yield ctx.emit.hit({
               damageType: "physical",
               dmgMultiplier: pickSkillValueByRank(ctx, CS_DMG_MUL),
+              staggerOnHit: 10,
             });
           },
         },
@@ -96,8 +136,10 @@ class EndministratorDef extends OperatorDef {
             yield ctx.emit.hit({
               damageType: "physical",
               dmgMultiplier: pickSkillValueByRank(ctx, ULT_DMG_MUL),
+              staggerOnHit: 25,
             });
             yield delay(1);
+            // TODO this hit should triggered only if consumes Crystal
             yield ctx.emit.hit({
               damageType: "physical",
               dmgMultiplier: pickSkillValueByRank(ctx, ULT_BONUS_DMG_MUL),

@@ -4,6 +4,7 @@ import OperatorEditor from "./features/operator/OperatorEditor";
 import SimPanel from "./features/sim/SimPanel";
 import { useAppDispatch, useAppSelector } from "./app/hooks";
 import {
+  controlledOperatorSet,
   laneReordered,
   teammateAssigned,
   skillBoxPatched,
@@ -13,6 +14,7 @@ import {
 } from "./features/solution/solutionSlice";
 import {
   selectBuildByOperatorId,
+  selectControlledOperatorId,
   selectSimRenderCache,
   selectSkillBoxes,
   selectTeamOperatorIds,
@@ -38,6 +40,7 @@ export default function App() {
   const dispatch = useAppDispatch();
 
   const teamOperatorIds = useAppSelector(selectTeamOperatorIds);
+  const controlledOperatorId = useAppSelector(selectControlledOperatorId);
   const skillBoxes = useAppSelector(selectSkillBoxes);
   const buildByOperatorId = useAppSelector(selectBuildByOperatorId);
   const simRenderCache = useAppSelector(selectSimRenderCache);
@@ -58,6 +61,7 @@ export default function App() {
               operatorId={operatorId}
               operatorBuild={operatorBuild}
               teamOperatorIds={teamOperatorIds}
+              controlledOperatorId={controlledOperatorId}
               onCommitOperatorBuildPatch={(opId, patch) =>
                 dispatch(operatorBuildPatched({ operatorId: opId, patch }))
               }
@@ -65,12 +69,16 @@ export default function App() {
                 dispatch(teammateAssigned({ laneIndex, newOpId }))
               }
               onClose={() => setSelectedLane(null)}
+              onSetControlledOperator={operatorId =>
+                dispatch(controlledOperatorSet({ operatorId }))
+              }
             />
           </div>
 
           <div className="flex-1">
             <AxisEditor
               teamOperatorIds={teamOperatorIds}
+              controlledOperatorId={controlledOperatorId}
               skillBoxes={skillBoxes}
               simRenderCache={simRenderCache}
               onLaneLabelClick={laneIndex => setSelectedLane(laneIndex)}

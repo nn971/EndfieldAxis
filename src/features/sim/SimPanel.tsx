@@ -4,6 +4,7 @@ import { summarizeLog } from "../../simulator/log";
 import { makeEmptySimRenderCache } from "../../types/editor";
 import {
   selectBuildByOperatorId,
+  selectControlledOperatorId,
   selectSkillBoxes,
   selectTeamOperatorIds,
 } from "../solution/selectors";
@@ -14,12 +15,14 @@ export default function SimPanel() {
   const dispatch = useAppDispatch();
   const [logText, setLogText] = useState("");
   const teamOperatorIds = useAppSelector(selectTeamOperatorIds);
+  const controlledOperatorId = useAppSelector(selectControlledOperatorId);
   const skillBoxes = useAppSelector(selectSkillBoxes);
   const buildByOperatorId = useAppSelector(selectBuildByOperatorId);
 
   const run = () => {
     const result = runSolutionSim({
       teamOperatorIds,
+      controlledOperatorId,
       skillBoxes,
       buildByOperatorId,
     });

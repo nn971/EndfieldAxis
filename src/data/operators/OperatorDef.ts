@@ -42,6 +42,7 @@ export type SkillDef = {
   name: string;
   durationFrames: number;
   icon: string;
+  staggerOnHit?: number;
   /** Unified event script runtime entrypoint (preferred). */
   script?: SimScript;
 };

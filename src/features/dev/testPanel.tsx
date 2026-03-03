@@ -19,7 +19,7 @@ export default function TestPanel() {
   const [result, setResult] = useState<string>("");
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const STORAGE_KEY = "endfieldaxis.dev.simTestCase.v1";
+  const STORAGE_KEY = "endfieldaxis.dev.simTestCase.v2";
 
   const hasText = useMemo(() => text.trim().length > 0, [text]);
 
@@ -31,7 +31,7 @@ export default function TestPanel() {
       const testCase = createSimTestCase(solution, simResult);
       setText(serializeSimTestCase(testCase));
       setResult(
-        `Generated standard: ${testCase.expected.eventTypes.length} events, ${testCase.expected.hitDamageBuckets.length} hit snapshots.`,
+        `Generated standard: ${testCase.expected.eventTypes.length} events, ${testCase.expected.hitDamageBuckets.length} hit snapshots, ${testCase.expected.enemyStaggerSeries.length} stagger points.`,
       );
     } catch {
       setError("Failed to generate test case from current solution.");
@@ -231,6 +231,17 @@ export default function TestPanel() {
           onClick={() => setMode("hitDamageBuckets")}
         >
           Hit Damage Buckets
+        </button>
+        <button
+          type="button"
+          className={`px-2 py-1 rounded border ${
+            mode === "enemyStaggerSeries"
+              ? "border-zinc-500 bg-zinc-700"
+              : "border-zinc-700 bg-zinc-800 hover:bg-zinc-700"
+          }`}
+          onClick={() => setMode("enemyStaggerSeries")}
+        >
+          Enemy Stagger Series
         </button>
       </div>
 

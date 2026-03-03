@@ -14,6 +14,11 @@ import { assignNoDup, moveItem } from "../../shared/lib/utils";
 
 const DEFAULT_DURATION_FRAMES = 325;
 
+function normalizeControlledOperatorId(state: SolutionState) {
+  if (state.teamOperatorIds.includes(state.controlledOperatorId)) return;
+  state.controlledOperatorId = state.teamOperatorIds[0] ?? "";
+}
+
 function getDurationFrames(operatorId: string, skillType: SkillType): number {
   return (
     operatorsData[operatorId]?.skills?.[skillType]?.durationFrames ??
@@ -105,6 +110,7 @@ function initState(): SolutionState {
   return {
     version: 1,
     teamOperatorIds,
+    controlledOperatorId: teamOperatorIds[0] ?? "",
     skillBoxes: initialSkillBoxes,
     buildByOperatorId,
     simRenderCache: makeEmptySimRenderCache(),
@@ -122,7 +128,13 @@ export const solutionSlice = createSlice({
      * NOTE: reducers in createSlice may either mutate OR return a new state.
      */
     solutionReplaced(_state, action: PayloadAction<SolutionState>) {
-      const next = action.payload;
+      const next = {
+        ...action.payload,
+        controlledOperatorId:
+          action.payload.controlledOperatorId ??
+          action.payload.teamOperatorIds[0] ??
+          "",
+      };
       for (const [opId, build] of Object.entries(
         next.buildByOperatorId ?? {},
       )) {
@@ -136,7 +148,8 @@ export const solutionSlice = createSlice({
           );
         }
       }
-      return action.payload;
+      normalizeControlledOperatorId(next);
+      return next;
     },
     simRenderCacheReplaced(state, action: PayloadAction<SimRenderCache>) {
       state.simRenderCache = action.payload;
@@ -144,17 +157,30 @@ export const solutionSlice = createSlice({
     laneReordered(state, action: PayloadAction<{ from: number; to: number }>) {
       const { from, to } = action.payload;
       state.teamOperatorIds = moveItem(state.teamOperatorIds, from, to);
+      normalizeControlledOperatorId(state);
     },
     teammateAssigned(
       state,
       action: PayloadAction<{ laneIndex: number; newOpId: string }>,
     ) {
       const { laneIndex, newOpId } = action.payload;
+      const replacedOperatorId = state.teamOperatorIds[laneIndex];
       state.teamOperatorIds = assignNoDup(
         state.teamOperatorIds,
         laneIndex,
         newOpId,
       );
+      if (replacedOperatorId === state.controlledOperatorId) {
+        state.controlledOperatorId = newOpId;
+      }
+      normalizeControlledOperatorId(state);
+    },
+    controlledOperatorSet(
+      state,
+      action: PayloadAction<{ operatorId: string }>,
+    ) {
+      state.controlledOperatorId = action.payload.operatorId;
+      normalizeControlledOperatorId(state);
     },
     skillBoxPatched(
       state,
@@ -224,6 +250,7 @@ export const {
   skillBoxAdded,
   skillBoxDeleted,
   simRenderCacheReplaced,
+  controlledOperatorSet,
 } = solutionSlice.actions;
 
 export default solutionSlice.reducer;

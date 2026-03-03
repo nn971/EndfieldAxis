@@ -22,6 +22,11 @@ const ULT_SLASH_DMG_MUL = [
 const ULT_FINAL_DMG_MUL = [
   4.55, 5.0, 5.45, 5.91, 6.36, 6.82, 7.27, 7.73, 8.18, 8.75, 9.43, 10.23,
 ] as const;
+const NA_HIT1_DMG_MUL = new Array(12).fill(0.5) as readonly number[];
+const NA_HIT2_DMG_MUL = new Array(12).fill(0.6) as readonly number[];
+const NA_HIT3_DMG_MUL = new Array(12).fill(0.7) as readonly number[];
+const NA_HIT4_DMG_MUL = new Array(12).fill(0.8) as readonly number[];
+const NA_HIT5_DMG_MUL = new Array(12).fill(0.9) as readonly number[];
 
 class ChenQianyuDef extends OperatorDef {
   constructor() {
@@ -55,6 +60,39 @@ class ChenQianyuDef extends OperatorDef {
           name: "Soaring Break",
           durationFrames: 300,
           icon: "CHENQIANYU_NA.png",
+          staggerOnHit: 16,
+          script: function* (ctx) {
+            yield delay(50);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT1_DMG_MUL),
+              staggerOnHit: 0,
+            });
+            yield delay(50);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT2_DMG_MUL),
+              staggerOnHit: 0,
+            });
+            yield delay(50);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT3_DMG_MUL),
+              staggerOnHit: 0,
+            });
+            yield delay(50);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT4_DMG_MUL),
+              staggerOnHit: 0,
+            });
+            yield delay(50);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT5_DMG_MUL),
+              staggerOnHit: 16,
+            });
+          },
         },
         normalSkill: {
           name: "Ascending Strike",
@@ -68,6 +106,7 @@ class ChenQianyuDef extends OperatorDef {
             yield ctx.emit.hit({
               damageType: "physical",
               dmgMultiplier: pickSkillValueByRank(ctx, NS_DMG_MUL),
+              staggerOnHit: 10,
             });
           },
         },
@@ -97,6 +136,7 @@ class ChenQianyuDef extends OperatorDef {
               yield ctx.emit.hit({
                 damageType: "physical",
                 dmgMultiplier: slash,
+                staggerOnHit: i === 0 ? 15 : 0,
               });
               if (i < 6) {
                 yield delay(24);
@@ -106,6 +146,7 @@ class ChenQianyuDef extends OperatorDef {
             yield ctx.emit.hit({
               damageType: "physical",
               dmgMultiplier: pickSkillValueByRank(ctx, ULT_FINAL_DMG_MUL),
+              staggerOnHit: 20,
             });
           },
         },

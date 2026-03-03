@@ -367,6 +367,11 @@ export class SimRegistry {
     const sourceId = "sourceId" in ctx ? ctx.sourceId : ctx.ev.targetId;
     const targetId =
       "targetId" in ctx && ctx.targetId ? ctx.targetId : sourceId;
+    const skillType = this.getSkillTypeFromEvent(ctx.ev);
+    const defaultHitStaggerOnHit =
+      ctx.ev.type === "castStart" && sourceId
+        ? Number(operatorsData[sourceId]?.skills[skillType]?.staggerOnHit ?? 0)
+        : 0;
 
     return {
       read: ctx.read,
@@ -374,7 +379,8 @@ export class SimRegistry {
       sourceId,
       targetId,
       startFrame: ctx.ev.frame,
-      skillType: this.getSkillTypeFromEvent(ctx.ev),
+      skillType,
+      defaultHitStaggerOnHit,
       sourceBuild: sourceId ? ctx.read.getBuild(sourceId) : undefined,
     };
   }

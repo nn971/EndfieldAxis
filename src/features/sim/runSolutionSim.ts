@@ -25,6 +25,7 @@ import type {
 } from "../../types/editor";
 import type { OperatorBuild } from "../../types/operator";
 import { DAMAGE_BUCKETS, type DamageBucket } from "../../simulator/damage/damageBonuses";
+import { DEFAULT_STAGGER_CAP_MILLI } from "../../types/simulator/stagger";
 
 export type SimHitDamageSnapshot = {
   frame: number;
@@ -49,6 +50,7 @@ function buildSimRenderCache(
   events: SimEvent[],
   resourceSamples: SimResourceSample[],
   teamSpCap: number,
+  enemyStaggerCapMilli: number,
   ultimateEnergyMaxByOperatorId: Record<string, number>,
 ): SimRenderCache {
   const bars: SimRenderBar[] = [];
@@ -156,6 +158,12 @@ function buildSimRenderCache(
     value: sample.teamSp.total,
   }));
 
+  const enemyStaggerSeries = resourceSamples.map(sample => ({
+    frame: sample.frame,
+    seq: sample.seq,
+    value: sample.enemyStaggerMilli / 1000,
+  }));
+
   const ultimateEnergySeriesByOperatorId: Record<
     string,
     { frame: number; seq: number; value: number }[]
@@ -176,7 +184,9 @@ function buildSimRenderCache(
     markers,
     teamSpRealSeries,
     teamSpTotalSeries,
+    enemyStaggerSeries,
     teamSpCap,
+    enemyStaggerCap: enemyStaggerCapMilli / 1000,
     ultimateEnergySeriesByOperatorId,
     ultimateEnergyMaxByOperatorId,
     simEndFrame,
@@ -306,10 +316,11 @@ function extractHitDamageSnapshots(log: SimLog): SimHitDamageSnapshot[] {
 export function runSolutionSim(
   solution: Pick<
     SolutionState,
-    "teamOperatorIds" | "skillBoxes" | "buildByOperatorId"
+    "teamOperatorIds" | "controlledOperatorId" | "skillBoxes" | "buildByOperatorId"
   >,
 ): RunSolutionSimResult {
-  const { teamOperatorIds, skillBoxes, buildByOperatorId } = solution;
+  const { teamOperatorIds, controlledOperatorId, skillBoxes, buildByOperatorId } =
+    solution;
   const targetId = "enemy1";
 
   const allOperatorIds = new Set<string>(teamOperatorIds);
@@ -339,6 +350,11 @@ export function runSolutionSim(
       hp: 999999,
       inflictions: getEmptyInfliction(),
       buffs: {},
+      stagger: {
+        currentMilli: 0,
+        capMilli: DEFAULT_STAGGER_CAP_MILLI,
+        isStaggered: false,
+      },
     },
   ];
 
@@ -351,6 +367,7 @@ export function runSolutionSim(
     registry,
     damageModel: createDefaultDamageModel(),
     teamOperatorIds,
+    controlledOperatorId,
   });
 
   const events = compileSkillBoxes({
@@ -372,6 +389,7 @@ export function runSolutionSim(
     world.processedEvents,
     world.resourceSamples,
     Number(world.env.resources.teamSp.cap),
+    Number(world.env.entitiesById[targetId]?.stagger?.capMilli ?? 0),
     ultimateEnergyMaxByOperatorId,
   );
 

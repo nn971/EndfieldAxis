@@ -225,11 +225,13 @@ type Props = {
   operatorId: OperatorId | null;
   operatorBuild: OperatorBuild | null;
   teamOperatorIds: OperatorId[];
+  controlledOperatorId: OperatorId;
   onCommitOperatorBuildPatch: (
     operatorId: OperatorId,
     patch: Partial<OperatorBuild>,
   ) => void;
   onChangeTeammateId: (laneIndex: number, newOpId: OperatorId) => void;
+  onSetControlledOperator: (operatorId: OperatorId) => void;
   onClose: () => void;
 };
 
@@ -238,8 +240,10 @@ export default function OperatorEditor({
   operatorId,
   operatorBuild,
   teamOperatorIds,
+  controlledOperatorId,
   onCommitOperatorBuildPatch,
   onChangeTeammateId,
+  onSetControlledOperator,
   onClose,
 }: Props) {
   const [isPicking, setIsPicking] = useState(false);
@@ -263,6 +267,7 @@ export default function OperatorEditor({
   }
 
   const avatarUrl = getAvatarUrl(operator.avatar);
+  const isControlled = operatorId === controlledOperatorId;
 
   return (
     <div className="h-full p-4 border border-zinc-700 rounded bg-zinc-900">
@@ -286,12 +291,27 @@ export default function OperatorEditor({
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">{operator.name}</h2>
-        <button
-          className="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700"
-          onClick={onClose}
-        >
-          Close
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className={
+              "text-xs px-2 py-1 rounded border " +
+              (isControlled
+                ? "border-emerald-400/80 bg-emerald-700/30 text-emerald-100"
+                : "border-zinc-700 bg-zinc-800 hover:bg-zinc-700")
+            }
+            onClick={() => onSetControlledOperator(operatorId)}
+            disabled={isControlled}
+          >
+            {isControlled ? "Controlled" : "Set Controlled"}
+          </button>
+          <button
+            className="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700"
+            onClick={onClose}
+          >
+            Close
+          </button>
+        </div>
       </div>
 
       <button

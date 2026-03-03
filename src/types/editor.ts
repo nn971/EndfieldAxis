@@ -1,4 +1,5 @@
-import { OperatorBuild, SkillType } from "./operator";
+import type { SkillType } from "../data/operators/OperatorDef";
+import type { OperatorBuild } from "./operator";
 
 export type SimRenderBarType = "buff" | "infliction";
 export type SimRenderMarkerType = "status" | "buffRefresh";
@@ -32,7 +33,9 @@ export interface SimRenderCache {
   markers: SimRenderMarker[];
   teamSpRealSeries: SimRenderSeriesPoint[];
   teamSpTotalSeries: SimRenderSeriesPoint[];
+  enemyStaggerSeries: SimRenderSeriesPoint[];
   teamSpCap: number;
+  enemyStaggerCap: number;
   ultimateEnergySeriesByOperatorId: Record<string, SimRenderSeriesPoint[]>;
   ultimateEnergyMaxByOperatorId: Record<string, number>;
   simEndFrame: number;
@@ -44,7 +47,9 @@ export function makeEmptySimRenderCache(): SimRenderCache {
     markers: [],
     teamSpRealSeries: [],
     teamSpTotalSeries: [],
+    enemyStaggerSeries: [],
     teamSpCap: 0,
+    enemyStaggerCap: 0,
     ultimateEnergySeriesByOperatorId: {},
     ultimateEnergyMaxByOperatorId: {},
     simEndFrame: 0,
@@ -68,6 +73,7 @@ export interface SolutionState {
   version: number;
 
   teamOperatorIds: string[]; // length 4
+  controlledOperatorId: string;
   skillBoxes: SkillBox[];
   buildByOperatorId: Record<string, OperatorBuild>;
   simRenderCache: SimRenderCache;

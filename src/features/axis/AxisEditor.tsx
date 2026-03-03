@@ -57,6 +57,7 @@ const SKILL_TABS: { key: SkillType; label: string }[] = [
 
 type Props = {
   teamOperatorIds: string[];
+  controlledOperatorId: string;
   skillBoxes: SkillBox[];
   simRenderCache: SimRenderCache;
   onLaneLabelClick?: (laneIndex: number) => void;
@@ -78,6 +79,7 @@ type Props = {
 
 export default function AxisEditor({
   teamOperatorIds,
+  controlledOperatorId,
   skillBoxes,
   simRenderCache,
   onLaneLabelClick,
@@ -548,13 +550,20 @@ export default function AxisEditor({
                   ) : (
                     <button
                       type="button"
-                      className="h-full w-full text-xs bg-zinc-800 hover:bg-zinc-700 select-none touch-none cursor-grab active:cursor-grabbing"
+                      className="h-full w-full px-2 text-xs bg-zinc-800 hover:bg-zinc-700 select-none touch-none cursor-grab active:cursor-grabbing"
                       onPointerDown={e => onLanePointerDown(e, laneIndex)}
                       onPointerMove={onLanePointerMove}
                       onPointerUp={onLanePointerUp}
                       onPointerCancel={onLanePointerCancel}
                     >
-                      {name}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-left">{name}</span>
+                        {opId === controlledOperatorId && (
+                          <span className="shrink-0 rounded border border-emerald-400/80 bg-emerald-700/30 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-100">
+                            CTRL
+                          </span>
+                        )}
+                      </div>
                     </button>
                   )}
                 </div>
@@ -739,6 +748,43 @@ export default function AxisEditor({
                   </g>
                 );
               })}
+              {/* Stagger chart */}
+              {(() => {
+                const points = simRenderCache.enemyStaggerSeries;
+                const maxValue = simRenderCache.enemyStaggerCap;
+                if (!points || points.length < 2 || maxValue <= 0) return null;
+
+                const laneTop = ENEMY_LANE_INDEX * LANE_HEIGHT;
+                const chartTopPadding = 8;
+                const chartBottomPadding = 8;
+                const chartHeight =
+                  LANE_HEIGHT - chartTopPadding - chartBottomPadding;
+                const { linePath, areaPath } = buildLineAndAreaPath({
+                  points: points.map(point => ({
+                    frame: point.frame,
+                    value: point.value,
+                  })),
+                  maxFrame: AXIS_LENTH_IN_FRAMES,
+                  maxValue,
+                  width: AXIS_LENTH_IN_FRAMES,
+                  height: chartHeight,
+                });
+
+                return (
+                  <g
+                    key="enemy-stagger-series"
+                    transform={`translate(0 ${laneTop + chartTopPadding})`}
+                  >
+                    <path d={areaPath} fill="rgba(251, 146, 60, 0.12)" />
+                    <path
+                      d={linePath}
+                      fill="none"
+                      stroke="rgba(251, 146, 60, 0.88)"
+                      strokeWidth={1.3}
+                    />
+                  </g>
+                );
+              })()}
             </svg>
 
             {/* buff bars */}

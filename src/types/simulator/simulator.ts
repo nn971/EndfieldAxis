@@ -68,6 +68,7 @@ export type SimEvent =
       damageType: DmgType;
       // hitTypes: HitTypes;
       dmgMultiplier?: number; // skillMultiplier or statusMultiplier
+      staggerOnHit?: number;
     })
   | (SimEventBase & {
       type: "statusApply";
@@ -142,6 +143,11 @@ export type SimEvent =
       type: "spRecover";
       sourceId: SimEntityId;
       amount: number;
+    })
+  | (SimEventBase & {
+      type: "staggerExpire";
+      targetId: SimEntityId;
+      ref?: string;
     });
 
 export type SimEventType = SimEvent["type"];
@@ -179,6 +185,14 @@ export type SimComboState = {
   lastTriggerFrame: number;
 };
 
+export type SimStaggerState = {
+  currentMilli: number;
+  capMilli: number;
+  pendingApplyFrame?: number;
+  isStaggered: boolean;
+  staggeredExpireFrame?: number;
+};
+
 export type SimEntity = {
   id: SimEntityId;
   name: string;
@@ -189,6 +203,9 @@ export type SimEntity = {
 
   /** Operator-only combo runtime state. */
   combo?: SimComboState;
+
+  /** enemy-only stagger runtime state. */
+  stagger?: SimStaggerState;
 
   type: string; //TODO implement this
 };

@@ -35,6 +35,11 @@ function collectDamageBonuses(params: {
     throw new Error(`Can't find source ${sourceId} or target ${targetId}`);
   }
 
+  // Hardcoded staggered status - 30% extra damage when enemy is staggered
+  if (target.stagger?.isStaggered) {
+    collector.addValue("staggerMul", 0.3, "enemy.staggered(+30% dmg)");
+  }
+
   // Global listeners (system rules not tied to a particular buff)
   registry.runGlobalDamageBonus({
     read,

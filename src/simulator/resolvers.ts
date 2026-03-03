@@ -51,7 +51,9 @@ import {
 import { makeSimEventId } from "../shared/lib/utils";
 import { buildDamageContext } from "./damage/damageEngine";
 import operatorsData from "../data/operators";
+import type { SkillType } from "../data/operators/OperatorDef";
 import { SimEventWhen } from "../types/simulator/when";
+import { STAGGER_DURATION_FRAMES } from "../types/simulator/stagger";
 
 // TODO: come up with a way to configure this
 export const DEFAULT_INFLICTION_DURATION_FRAMES = 1800;
@@ -288,6 +290,23 @@ function getCastStartForEvent(
   return null;
 }
 
+function getSkillStaggerOnHit(
+  sourceId: SimEntityId,
+  skillType: SkillType,
+): number {
+  return Number(operatorsData[sourceId]?.skills[skillType]?.staggerOnHit ?? 0);
+}
+
+function getStaggerOnHitFromAncestorEvent(
+  read: SimRead,
+  sourceId: SimEntityId,
+  ev: SimEvent,
+): number {
+  const castStart = getCastStartForEvent(read, ev);
+  if (!castStart) return 0;
+  return getSkillStaggerOnHit(sourceId, castStart.skillType);
+}
+
 function getComboUltimateGain(operatorId: SimEntityId): number {
   const opDef = operatorsData[operatorId];
   const raw = Number(opDef?.getComboUltimateEnergyGainOnHit?.() ?? 6.5);
@@ -301,6 +320,71 @@ function getUltimateGainEfficiency(
   const build = read.getBuild(operatorId);
   const raw = Number(build?.restStat?.ultimateGainEfficiency ?? 0);
   return Math.max(0, Number.isFinite(raw) ? raw : 0);
+}
+
+function toMilli(value: number): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.floor(Math.max(0, numeric) * 1000);
+}
+
+function tryGainStaggerAndCheckStaggeredTrigger(
+  self: SimWorld,
+  sourceId: SimEntityId,
+  targetId: SimEntityId,
+  staggerOnHit: number,
+): boolean {
+  const target = self.read.getEntity(targetId);
+  if (!target?.stagger) return false;
+  if (target.stagger.isStaggered) return false;
+  if (target.stagger.pendingApplyFrame === self.read.nowInFrames) return false;
+
+  const baseMilli = toMilli(staggerOnHit);
+  if (baseMilli <= 0) return false;
+
+  const sourceBuild = self.read.getBuild(sourceId);
+  const effMilli = toMilli(sourceBuild?.restStat?.staggerEfficiency ?? 0);
+  const gainMilli = Math.floor((baseMilli * (1000 + effMilli)) / 1000);
+  if (gainMilli <= 0) return false;
+
+  target.stagger.currentMilli += gainMilli;
+  if (target.stagger.currentMilli < target.stagger.capMilli) return false;
+
+  target.stagger.currentMilli = 0;
+  target.stagger.pendingApplyFrame = self.read.nowInFrames;
+  return true;
+}
+
+function applyStaggeredStatus(
+  self: SimWorld,
+  sourceId: SimEntityId,
+  targetId: SimEntityId,
+  ref: string,
+): void {
+  const target = self.read.getEntity(targetId);
+  if (!target?.stagger) return;
+
+  target.stagger.isStaggered = true;
+  target.stagger.staggeredExpireFrame =
+    self.read.nowInFrames + STAGGER_DURATION_FRAMES;
+
+  self.ops.schedule({
+    id: makeSimEventId(),
+    type: "staggerExpire",
+    frame: target.stagger.staggeredExpireFrame,
+    seq: self.ops.nextSeq(),
+    targetId,
+    ref,
+  });
+}
+
+function scheduleStaggeredDebuffApply(
+  self: SimWorld,
+  sourceId: SimEntityId,
+  targetId: SimEntityId,
+  ref: string,
+): void {
+  applyStaggeredStatus(self, sourceId, targetId, ref);
 }
 
 function scheduleComboTriggerElapse(
@@ -416,6 +500,25 @@ export function resolveHit(
   if (!source) throw new Error(`undefined source`);
 
   const parentCastStart = getCastStartForEvent(self.read, ev);
+  const isNormalAttackHit = parentCastStart?.skillType === "normalAttack";
+  const isFinalNormalAttackHit = isNormalAttackHit
+    ? self.findLastHitEventIdForCast(parentCastStart.id) === ev.id
+    : false;
+  const canApplyStagger =
+    !isNormalAttackHit ||
+    (source.id === self.controlledOperatorId && isFinalNormalAttackHit);
+  const staggerOnHit = Number(
+    ev.staggerOnHit ?? getStaggerOnHitFromAncestorEvent(self.read, source.id, ev),
+  );
+  let shouldApplyStaggeredDebuff = false;
+  if (canApplyStagger && staggerOnHit > 0) {
+    shouldApplyStaggeredDebuff = tryGainStaggerAndCheckStaggeredTrigger(
+      self,
+      source.id,
+      target.id,
+      staggerOnHit,
+    );
+  }
 
   const dmgSkillMultiplier = Number(ev.dmgMultiplier ?? 1);
 
@@ -494,6 +597,10 @@ export function resolveHit(
     targetId: target.id,
   });
   self.ops.scheduleDrafts(spawned);
+
+  if (shouldApplyStaggeredDebuff) {
+    scheduleStaggeredDebuffApply(self, source.id, target.id, ev.id);
+  }
 }
 
 export function resolveStatusApplication(
@@ -519,6 +626,11 @@ export function resolveStatusApplication(
   let shouldRemoveVulnerable = false;
 
   const current = (target as any).inflictions.vulnerable?.stacks ?? 0;
+  const inheritedStaggerOnHit = getStaggerOnHitFromAncestorEvent(
+    self.read,
+    sourceId,
+    ev,
+  );
   switch (statusType) {
     case "lift": {
       if (current <= 0) break;
@@ -534,6 +646,7 @@ export function resolveStatusApplication(
         targetId,
         damageType: "physical",
         hitTypes: { lift: true },
+        staggerOnHit: inheritedStaggerOnHit,
         dmgMultiplier: computePhysicalStatusSpecialMul(self, sourceId, "lift"),
       } as SimEvent);
 
@@ -552,6 +665,7 @@ export function resolveStatusApplication(
         targetId,
         damageType: "physical",
         hitTypes: { knockDown: true }, // TODO currently status damages benefits from no other hitTypes.
+        staggerOnHit: inheritedStaggerOnHit,
         dmgMultiplier: computePhysicalStatusSpecialMul(
           self,
           sourceId,
@@ -582,6 +696,7 @@ export function resolveStatusApplication(
         targetId,
         damageType: "physical",
         hitTypes: { crush: true }, // TODO currently status damages benefits from no other hitTypes.
+        staggerOnHit: inheritedStaggerOnHit,
         // TEMP: more stacks => larger skill multiplier.
         dmgMultiplier: computePhysicalStatusSpecialMul(
           self,
@@ -613,6 +728,7 @@ export function resolveStatusApplication(
         targetId,
         damageType: "physical",
         hitTypes: { breach: true }, // TODO currently status damages benefits from no other hitTypes.
+        staggerOnHit: inheritedStaggerOnHit,
         dmgMultiplier: computePhysicalStatusSpecialMul(
           self,
           sourceId,
@@ -843,6 +959,7 @@ export function resolveInflictionApplication(
         sourceId: source.id,
         targetId: owner.id,
         damageType: artsType,
+        staggerOnHit: getStaggerOnHitFromAncestorEvent(self.read, source.id, ev),
         dmgMultiplier:
           initialHitBaseMul + consumedArtsStacks * initialHitPerStackMul,
         ref: ev.id,
@@ -892,6 +1009,7 @@ export function resolveInflictionApplication(
         sourceId: source.id,
         targetId: owner.id,
         damageType: artsType,
+        staggerOnHit: getStaggerOnHitFromAncestorEvent(self.read, source.id, ev),
         dmgMultiplier: ARTS_BURST_BASE_MUL + after * ARTS_BURST_PER_STACK_MUL,
         ref: ev.id,
       } as SimEvent);
@@ -982,14 +1100,20 @@ export function resolveReactionTick(
     (combustion as any).meta?.combustionTickMultiplier ?? 0,
   );
   if (tickMultiplier > 0) {
+    const tickSourceIdTyped = tickSourceId as SimEntityId;
     self.ops.schedule({
       id: makeSimEventId(),
       type: "hit",
       frame: ev.frame,
       seq: self.ops.nextSeq(),
-      sourceId: tickSourceId,
+      sourceId: tickSourceIdTyped,
       targetId: ev.targetId,
       damageType: "heat",
+      staggerOnHit: getStaggerOnHitFromAncestorEvent(
+        self.read,
+        tickSourceIdTyped,
+        ev,
+      ),
       dmgMultiplier: tickMultiplier,
       ref: ev.id,
     } as SimEvent);
@@ -1079,4 +1203,17 @@ export function resolveSpReturn(
     "act",
     `team SP return ${gained.toFixed(2)} from ${ev.sourceId} (real=${self.env.resources.teamSp.real.toFixed(2)}, fake=${self.env.resources.teamSp.fake.toFixed(2)})`,
   );
+}
+
+export function resolveStaggerExpire(
+  self: SimWorld,
+  ev: Extract<SimEvent, { type: "staggerExpire" }>,
+) {
+  const target = self.read.getEntity(ev.targetId);
+  if (!target?.stagger) return;
+
+  if (target.stagger.staggeredExpireFrame === ev.frame) {
+    target.stagger.isStaggered = false;
+    target.stagger.staggeredExpireFrame = undefined;
+  }
 }

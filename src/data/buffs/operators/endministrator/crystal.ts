@@ -22,7 +22,6 @@ function getEndministratorComboRank(read: SimRead): number {
 function spawnCrystalConsumeEvents(params: {
   read: SimRead;
   targetId: string;
-  ref?: string | null;
 }): SimScript {
   const csRank = getEndministratorComboRank(params.read);
   const crystalShatterMul = CRYSTAL_SHATTER_MUL_BY_CS_RANK[csRank - 1] ?? 3.2;
@@ -31,15 +30,12 @@ function spawnCrystalConsumeEvents(params: {
     yield ctx.emit.buffRemove({
       targetId: params.targetId,
       buffId: "buff.crystal" as any,
-      ref: params.ref,
     });
     yield ctx.emit.hit({
       sourceId: ENDMINISTRATOR_ID,
       targetId: params.targetId,
       damageType: "physical",
-      hitTypes: { comboSkill: true },
       dmgMultiplier: crystalShatterMul,
-      ref: params.ref,
     });
   };
 }
@@ -90,7 +86,6 @@ class CrystalBuffDef extends BuffDef {
         const script = spawnCrystalConsumeEvents({
           read,
           targetId,
-          ref: ev.id,
         });
         yield* script({ read, ev, emit, sourceId, targetId, startFrame, skillType });
       },
@@ -115,7 +110,6 @@ class CrystalBuffDef extends BuffDef {
         const script = spawnCrystalConsumeEvents({
           read,
           targetId,
-          ref: ev.id,
         });
         yield* script({ read, ev, emit, sourceId, targetId, startFrame, skillType });
       },

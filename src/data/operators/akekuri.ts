@@ -21,6 +21,11 @@ const CS_COOLDOWN_SECONDS = [
 const ULT_SP_RECOVERY = [
   58, 60, 62, 64, 66, 68, 70, 72, 74, 76, 78, 80,
 ] as const;
+const NA_HIT1_DMG_MUL = new Array(12).fill(0.5) as readonly number[];
+const NA_HIT2_DMG_MUL = new Array(12).fill(0.6) as readonly number[];
+const NA_HIT3_DMG_MUL = new Array(12).fill(0.7) as readonly number[];
+const NA_HIT4_DMG_MUL = new Array(12).fill(0.8) as readonly number[];
+const NA_HIT5_DMG_MUL = new Array(12).fill(0.9) as readonly number[];
 
 const CS_SP_RECOVERY_PER_SEQ = new Array(12).fill(7.5) as readonly number[];
 
@@ -56,6 +61,39 @@ class AkekuriDef extends OperatorDef {
           name: "Sword of Aspiration",
           durationFrames: 300,
           icon: PLACEHOLDER_ICON,
+          staggerOnHit: 17,
+          script: function* (ctx) {
+            yield delay(50);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT1_DMG_MUL),
+              staggerOnHit: 0,
+            });
+            yield delay(50);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT2_DMG_MUL),
+              staggerOnHit: 0,
+            });
+            yield delay(50);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT3_DMG_MUL),
+              staggerOnHit: 0,
+            });
+            yield delay(50);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT4_DMG_MUL),
+              staggerOnHit: 0,
+            });
+            yield delay(50);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT5_DMG_MUL),
+              staggerOnHit: 18,
+            });
+          },
         },
         normalSkill: {
           name: "Burst of Passion",
@@ -66,6 +104,7 @@ class AkekuriDef extends OperatorDef {
             yield ctx.emit.hit({
               damageType: "heat",
               dmgMultiplier: pickSkillValueByRank(ctx, NS_DMG_MUL),
+              staggerOnHit: 10,
             });
             yield ctx.emit.inflictionApply({
               inflictionType: "heat",
@@ -77,6 +116,7 @@ class AkekuriDef extends OperatorDef {
           name: "Flash and Dash",
           durationFrames: 66,
           icon: PLACEHOLDER_ICON,
+          staggerOnHit: 80,
           script: function* (ctx) {
             const dmg = pickSkillValueByRank(ctx, CS_DMG_MUL_PER_SEQ);
             const sp = pickSkillValueByRank(ctx, CS_SP_RECOVERY_PER_SEQ);
@@ -85,6 +125,7 @@ class AkekuriDef extends OperatorDef {
             yield ctx.emit.hit({
               damageType: "physical",
               dmgMultiplier: dmg,
+              staggerOnHit: 5,
             });
             yield ctx.emit.spRecover({ amount: sp });
 
@@ -92,6 +133,7 @@ class AkekuriDef extends OperatorDef {
             yield ctx.emit.hit({
               damageType: "physical",
               dmgMultiplier: dmg,
+              staggerOnHit: 5,
             });
             yield ctx.emit.spRecover({ amount: sp });
           },

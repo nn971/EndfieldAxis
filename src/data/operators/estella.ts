@@ -18,6 +18,11 @@ const CS_DMG_MUL_SOLIDIFIED = [
 const ULT_DMG_MUL = [
   4.89, 5.38, 5.86, 6.35, 6.84, 7.33, 7.82, 8.31, 8.8, 9.41, 10.14, 11.0,
 ] as const;
+const NA_HIT1_DMG_MUL = new Array(12).fill(0.5) as readonly number[];
+const NA_HIT2_DMG_MUL = new Array(12).fill(0.6) as readonly number[];
+const NA_HIT3_DMG_MUL = new Array(12).fill(0.7) as readonly number[];
+const NA_HIT4_DMG_MUL = new Array(12).fill(0.8) as readonly number[];
+const NA_HIT5_DMG_MUL = new Array(12).fill(0.9) as readonly number[];
 
 const CS_COOLDOWN_SECONDS = [
   18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 17,
@@ -55,16 +60,45 @@ class EstellaDef extends OperatorDef {
           name: "Audio Noise",
           durationFrames: 300,
           icon: "ESTELLA_NA.png",
+          staggerOnHit: 17,
+          script: function* (ctx) {
+            yield delay(50);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT1_DMG_MUL),
+              staggerOnHit: 0,
+            });
+            yield delay(50);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT2_DMG_MUL),
+              staggerOnHit: 0,
+            });
+            yield delay(50);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT3_DMG_MUL),
+              staggerOnHit: 0,
+            });
+            yield delay(50);
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT4_DMG_MUL),
+              staggerOnHit: 17,
+            });
+          },
         },
         normalSkill: {
           name: "Onomatopoeia",
           durationFrames: 52,
           icon: "ESTELLA_NS.png",
+
           script: function* (ctx) {
             yield delay(26);
             yield ctx.emit.hit({
               damageType: "cryo",
               dmgMultiplier: pickSkillValueByRank(ctx, NS_DMG_MUL),
+              staggerOnHit: 10,
             });
             yield ctx.emit.inflictionApply({
               inflictionType: "cryo",
@@ -76,6 +110,7 @@ class EstellaDef extends OperatorDef {
           name: "Distortion",
           durationFrames: 52,
           icon: "ESTELLA_CS.png",
+
           script: function* (ctx) {
             yield delay(34);
             yield ctx.emit.statusApply({
@@ -92,6 +127,7 @@ class EstellaDef extends OperatorDef {
               dmgMultiplier: isSolidified
                 ? pickSkillValueByRank(ctx, CS_DMG_MUL_SOLIDIFIED)
                 : pickSkillValueByRank(ctx, CS_DMG_MUL_NON_SOLIDIFIED),
+              staggerOnHit: 10,
             });
 
             if (isSolidified) {
@@ -105,11 +141,13 @@ class EstellaDef extends OperatorDef {
           name: "Tremolo",
           durationFrames: 110,
           icon: "ESTELLA_ULT.png",
+
           script: function* (ctx) {
             yield delay(55);
             yield ctx.emit.hit({
               damageType: "physical",
               dmgMultiplier: pickSkillValueByRank(ctx, ULT_DMG_MUL),
+              staggerOnHit: 15,
             });
           },
         },
