@@ -79,8 +79,27 @@ function applyRestStatAddValue(
       snapshot.dmgIncRatio.physical += addValue;
       return;
     }
+    case "artsDmgIncRatio": {
+      snapshot.dmgIncRatio.heat += addValue;
+      snapshot.dmgIncRatio.electric += addValue;
+      snapshot.dmgIncRatio.cryo += addValue;
+      snapshot.dmgIncRatio.nature += addValue;
+      return;
+    }
+    case "natureDmgIncRatio": {
+      snapshot.dmgIncRatio.nature += addValue;
+      return;
+    }
+    case "cryoDmgIncRatio": {
+      snapshot.dmgIncRatio.cryo += addValue;
+      return;
+    }
     case "ultimateDmgIncRatio": {
       snapshot.ultimateDmgIncRatio += addValue;
+      return;
+    }
+    case "criticalRate": {
+      snapshot.criticalHitChance += addValue;
       return;
     }
     default: {

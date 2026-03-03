@@ -350,7 +350,7 @@ function tryGainStaggerAndCheckStaggeredTrigger(
   target.stagger.currentMilli += gainMilli;
   if (target.stagger.currentMilli < target.stagger.capMilli) return false;
 
-  target.stagger.currentMilli = 0;
+  target.stagger.currentMilli = target.stagger.capMilli;
   target.stagger.pendingApplyFrame = self.read.nowInFrames;
   return true;
 }
@@ -365,6 +365,7 @@ function applyStaggeredStatus(
   if (!target?.stagger) return;
 
   target.stagger.isStaggered = true;
+  target.stagger.pendingApplyFrame = undefined;
   target.stagger.staggeredExpireFrame =
     self.read.nowInFrames + STAGGER_DURATION_FRAMES;
 
@@ -1213,6 +1214,8 @@ export function resolveStaggerExpire(
   if (!target?.stagger) return;
 
   if (target.stagger.staggeredExpireFrame === ev.frame) {
+    target.stagger.currentMilli = 0;
+    target.stagger.pendingApplyFrame = undefined;
     target.stagger.isStaggered = false;
     target.stagger.staggeredExpireFrame = undefined;
   }

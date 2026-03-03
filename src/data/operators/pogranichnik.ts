@@ -1,5 +1,4 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
-import { pickSkillValueByRank } from "../../simulator/scripts";
 import { delay } from "../../simulator/scripts";
 import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 
@@ -76,31 +75,31 @@ class PogranichnikDef extends OperatorDef {
             yield delay(40);
             yield ctx.emit.hit({
               damageType: "physical",
-              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT1_DMG_MUL),
+              dmgMultiplier: ctx.byRank!(r => NA_HIT1_DMG_MUL[r] ?? 0),
               staggerOnHit: 0,
             });
             yield delay(40);
             yield ctx.emit.hit({
               damageType: "physical",
-              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT2_DMG_MUL),
+              dmgMultiplier: ctx.byRank!(r => NA_HIT2_DMG_MUL[r] ?? 0),
               staggerOnHit: 0,
             });
             yield delay(40);
             yield ctx.emit.hit({
               damageType: "physical",
-              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT3_DMG_MUL),
+              dmgMultiplier: ctx.byRank!(r => NA_HIT3_DMG_MUL[r] ?? 0),
               staggerOnHit: 0,
             });
             yield delay(45);
             yield ctx.emit.hit({
               damageType: "physical",
-              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT4_DMG_MUL),
+              dmgMultiplier: ctx.byRank!(r => NA_HIT4_DMG_MUL[r] ?? 0),
               staggerOnHit: 0,
             });
             yield delay(50);
             yield ctx.emit.hit({
               damageType: "physical",
-              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT5_DMG_MUL),
+              dmgMultiplier: ctx.byRank!(r => NA_HIT5_DMG_MUL[r] ?? 0),
               staggerOnHit: 18,
             });
           },
@@ -116,7 +115,7 @@ class PogranichnikDef extends OperatorDef {
             });
             yield ctx.emit.hit({
               damageType: "physical",
-              dmgMultiplier: pickSkillValueByRank(ctx, NS_DMG_MUL),
+              dmgMultiplier: ctx.byRank!(r => NS_DMG_MUL[r] ?? 0),
               staggerOnHit: 5,
             });
           },
@@ -129,7 +128,7 @@ class PogranichnikDef extends OperatorDef {
             yield delay(30);
             yield ctx.emit.hit({
               damageType: "physical",
-              dmgMultiplier: pickSkillValueByRank(ctx, CS_DMG_MUL),
+              dmgMultiplier: ctx.byRank!(r => CS_DMG_MUL[r] ?? 0),
               staggerOnHit: 9,
             });
           },
@@ -142,7 +141,7 @@ class PogranichnikDef extends OperatorDef {
             yield delay(45);
             yield ctx.emit.hit({
               damageType: "physical",
-              dmgMultiplier: pickSkillValueByRank(ctx, ULT_DMG_MUL),
+              dmgMultiplier: ctx.byRank!(r => ULT_DMG_MUL[r] ?? 0),
               staggerOnHit: 15,
             });
           },

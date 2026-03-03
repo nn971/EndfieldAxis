@@ -20,8 +20,15 @@ export const WeaponTypeName = {
 
 export type BaseWeaponSkillId =
   | "agilityboost"
+  | "strengthboost"
+  | "intellectboost"
+  | "willboost"
   | "physicaldmgboost"
-  | "attackboost";
+  | "artsdmgboost"
+  | "naturedmgboost"
+  | "cryodmgboost"
+  | "attackboost"
+  | "criticalrateboost";
 export type Size = "L" | "M" | "S";
 export type ThirdWeaponSkillCat = "combative" | "infliction";
 export type ThirdWeaponSkillId = string; // unique id for each weapon's 3rd skill
@@ -92,8 +99,15 @@ export class WeaponDef {
 
 export const BASE_WEAPON_SKILL_LABEL: Record<BaseWeaponSkillId, string> = {
   agilityboost: "Agility Boost",
+  strengthboost: "Strength Boost",
+  intellectboost: "Intellect Boost",
+  willboost: "Will Boost",
   physicaldmgboost: "Physical DMG Boost",
+  artsdmgboost: "Arts DMG Boost",
+  naturedmgboost: "Nature DMG Boost",
+  cryodmgboost: "Cryo DMG Boost",
   attackboost: "ATK Boost",
+  criticalrateboost: "Critical Rate Boost",
 };
 
 export const THIRD_WEAPON_SKILL_CAT_LABEL: Record<ThirdWeaponSkillCat, string> =

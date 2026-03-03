@@ -58,6 +58,25 @@ export abstract class EternalXiraniteSetDef extends GearsDef {
   registerSimPlugins(registry: SimRegistry): void {
     if (EternalXiraniteSetDef.registeredRegistries.has(registry)) return;
     EternalXiraniteSetDef.registeredRegistries.add(registry);
+
+    registry.registerGlobalDamageBonus({
+      id: "set.eternalxiranite.elementalDmgBonus",
+      fn: ({ read, sourceId, type, collector }) => {
+        if (!sourceId) return;
+
+        const build = read.getBuild(sourceId);
+        if (!build || !EternalXiraniteSetDef.hasRequiredPieces(build)) return;
+
+        const elementalTypes = ["heat", "electric", "cryo", "nature"] as const;
+        if (elementalTypes.includes(type as typeof elementalTypes[number])) {
+          collector.addValue(
+            "dmgIncRatio",
+            0.15,
+            "Eternal Xiranite 3-piece: Elemental DMG +15%"
+          );
+        }
+      },
+    });
   }
 }
 

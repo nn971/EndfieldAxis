@@ -94,6 +94,8 @@ export type SimOps = {
     drafts: readonly SimEventDraft[],
     opts?: { defaultRef?: string },
   ) => void;
+  /** Deterministic random number generator. Returns value in [0, 1). */
+  random: () => number;
   /** Pop the next event in chronological order. */
   popNextEvent: () => SimEvent | null;
   /** Advance simulation time to the given frame. */
@@ -943,11 +945,23 @@ export class SimWorld {
 
         case "spReturn": {
           this.resolvers.resolveSpReturn(ev);
+          const drafts = this.registry.runOnSpReturn({
+            read: this.read,
+            ev,
+            sourceId: ev.sourceId,
+          });
+          this.ops.scheduleDrafts(drafts);
           break;
         }
 
         case "spRecover": {
           this.resolvers.resolveSpRecover(ev);
+          const drafts = this.registry.runOnSpRecover({
+            read: this.read,
+            ev,
+            sourceId: ev.sourceId,
+          });
+          this.ops.scheduleDrafts(drafts);
           break;
         }
 

@@ -102,11 +102,26 @@ export type OnInflictionConsumedTriggerContext = {
 };
 export type OnInflictionConsumedTrigger = SimScript;
 
+export type OnSpRecoverTriggerContext = {
+  read: SimRead;
+  ev: Extract<SimEvent, { type: "spRecover" }>;
+  sourceId: SimEntityId;
+};
+export type OnSpRecoverTrigger = SimScript;
+
+export type OnSpReturnTriggerContext = {
+  read: SimRead;
+  ev: Extract<SimEvent, { type: "spReturn" }>;
+  sourceId: SimEntityId;
+};
+export type OnSpReturnTrigger = SimScript;
+
 type ListenerEntry<TFn> = {
   id: string;
   priority: number; // currently not in use. all priority are 0
   fn: TFn;
   when?: TriggerWhen;
+  cooldown?: number;
   match?: (ctx: TriggerContext) => boolean;
 };
 
@@ -117,7 +132,9 @@ type TriggerContext =
   | OnBuffApplyTriggerContext
   | OnBuffConsumedTriggerContext
   | OnInflictionApplyTriggerContext
-  | OnInflictionConsumedTriggerContext;
+  | OnInflictionConsumedTriggerContext
+  | OnSpRecoverTriggerContext
+  | OnSpReturnTriggerContext;
 
 type TriggerWhen = SimEventWhen;
 
@@ -125,9 +142,16 @@ type RegisterTriggerParams<TCtx extends TriggerContext> = {
   id: string;
   fn: SimScript;
   priority?: number;
+  cooldown?: number;
   when?: TriggerWhen;
   match?: (ctx: TCtx) => boolean;
 };
+
+function normalizeCooldown(cooldown: number | undefined): number | undefined {
+  const value = Math.floor(Number(cooldown));
+  if (!Number.isFinite(value) || value <= 0) return undefined;
+  return value;
+}
 
 function sortEntries<TFn>(
   arr: ListenerEntry<TFn>[],
@@ -140,6 +164,8 @@ function sortEntries<TFn>(
 }
 
 export class SimRegistry {
+  private readonly lastTriggeredFrameByKey = new Map<string, number>();
+
   private globalDamageBonus: ListenerEntry<GlobalDamageBonusListener>[] = [];
   private buffDamageBonus: Partial<
     Record<BuffId, ListenerEntry<BuffDamageBonusListener>[]>
@@ -154,6 +180,8 @@ export class SimRegistry {
   private onInflictionApply: ListenerEntry<OnInflictionApplyTrigger>[] = [];
   private onInflictionConsumed: ListenerEntry<OnInflictionConsumedTrigger>[] =
     [];
+  private onSpRecover: ListenerEntry<OnSpRecoverTrigger>[] = [];
+  private onSpReturn: ListenerEntry<OnSpReturnTrigger>[] = [];
 
   registerGlobalDamageBonus(params: {
     id: string;
@@ -188,6 +216,7 @@ export class SimRegistry {
       id: params.id,
       fn: params.fn,
       priority: params.priority ?? 0,
+      cooldown: normalizeCooldown(params.cooldown),
       when: params.when,
       match: params.match as ListenerEntry<AfterHitTrigger>["match"],
     });
@@ -200,6 +229,7 @@ export class SimRegistry {
       id: params.id,
       fn: params.fn,
       priority: params.priority ?? 0,
+      cooldown: normalizeCooldown(params.cooldown),
       when: params.when,
       match: params.match as ListenerEntry<OnCastTrigger>["match"],
     });
@@ -210,6 +240,7 @@ export class SimRegistry {
       id: params.id,
       fn: params.fn,
       priority: params.priority ?? 0,
+      cooldown: normalizeCooldown(params.cooldown),
       when: params.when,
       match: params.match as ListenerEntry<OnCastTrigger>["match"],
     });
@@ -222,6 +253,7 @@ export class SimRegistry {
       id: params.id,
       fn: params.fn,
       priority: params.priority ?? 0,
+      cooldown: normalizeCooldown(params.cooldown),
       when: params.when,
       match: params.match as ListenerEntry<OnStatusApplyTrigger>["match"],
     });
@@ -234,6 +266,7 @@ export class SimRegistry {
       id: params.id,
       fn: params.fn,
       priority: params.priority ?? 0,
+      cooldown: normalizeCooldown(params.cooldown),
       when: params.when,
       match: params.match as ListenerEntry<OnBuffApplyTrigger>["match"],
     });
@@ -246,6 +279,7 @@ export class SimRegistry {
       id: params.id,
       fn: params.fn,
       priority: params.priority ?? 0,
+      cooldown: normalizeCooldown(params.cooldown),
       when: params.when,
       match: params.match as ListenerEntry<OnBuffConsumedTrigger>["match"],
     });
@@ -258,6 +292,7 @@ export class SimRegistry {
       id: params.id,
       fn: params.fn,
       priority: params.priority ?? 0,
+      cooldown: normalizeCooldown(params.cooldown),
       when: params.when,
       match: params.match as ListenerEntry<OnInflictionApplyTrigger>["match"],
     });
@@ -270,9 +305,36 @@ export class SimRegistry {
       id: params.id,
       fn: params.fn,
       priority: params.priority ?? 0,
+      cooldown: normalizeCooldown(params.cooldown),
       when: params.when,
       match:
         params.match as ListenerEntry<OnInflictionConsumedTrigger>["match"],
+    });
+  }
+
+  registerOnSpRecover(
+    params: RegisterTriggerParams<OnSpRecoverTriggerContext>,
+  ): void {
+    this.onSpRecover.push({
+      id: params.id,
+      fn: params.fn,
+      priority: params.priority ?? 0,
+      cooldown: normalizeCooldown(params.cooldown),
+      when: params.when,
+      match: params.match as ListenerEntry<OnSpRecoverTrigger>["match"],
+    });
+  }
+
+  registerOnSpReturn(
+    params: RegisterTriggerParams<OnSpReturnTriggerContext>,
+  ): void {
+    this.onSpReturn.push({
+      id: params.id,
+      fn: params.fn,
+      priority: params.priority ?? 0,
+      cooldown: normalizeCooldown(params.cooldown),
+      when: params.when,
+      match: params.match as ListenerEntry<OnSpReturnTrigger>["match"],
     });
   }
 
@@ -286,6 +348,8 @@ export class SimRegistry {
     sortEntries(this.onBuffConsumed, "onBuffConsumed");
     sortEntries(this.onInflictionApply, "onInflictionApply");
     sortEntries(this.onInflictionConsumed, "onInflictionConsumed");
+    sortEntries(this.onSpRecover, "onSpRecover");
+    sortEntries(this.onSpReturn, "onSpReturn");
     for (const key of Object.keys(this.buffDamageBonus)) {
       sortEntries(this.buffDamageBonus[key as BuffId]!, "buffDamageBonus");
     }
@@ -307,42 +371,55 @@ export class SimRegistry {
   }
 
   runAfterHit(ctx: AfterHitTriggerContext): SimEventDraft[] {
-    return this.runTriggers(this.afterHit, ctx);
+    return this.runTriggers(this.afterHit, ctx, "afterHit");
   }
 
   runOnCastStart(ctx: OnCastTriggerContext): SimEventDraft[] {
-    return this.runTriggers(this.onCastStart, ctx);
+    return this.runTriggers(this.onCastStart, ctx, "onCastStart");
   }
 
   runOnCastEnd(ctx: OnCastTriggerContext): SimEventDraft[] {
-    return this.runTriggers(this.onCastEnd, ctx);
+    return this.runTriggers(this.onCastEnd, ctx, "onCastEnd");
   }
 
   runOnStatusApply(ctx: OnStatusApplyTriggerContext): SimEventDraft[] {
-    return this.runTriggers(this.onStatusApply, ctx);
+    return this.runTriggers(this.onStatusApply, ctx, "onStatusApply");
   }
 
   runOnBuffApply(ctx: OnBuffApplyTriggerContext): SimEventDraft[] {
-    return this.runTriggers(this.onBuffApply, ctx);
+    return this.runTriggers(this.onBuffApply, ctx, "onBuffApply");
   }
 
   runOnBuffConsumed(ctx: OnBuffConsumedTriggerContext): SimEventDraft[] {
-    return this.runTriggers(this.onBuffConsumed, ctx);
+    return this.runTriggers(this.onBuffConsumed, ctx, "onBuffConsumed");
   }
 
   runOnInflictionApply(ctx: OnInflictionApplyTriggerContext): SimEventDraft[] {
-    return this.runTriggers(this.onInflictionApply, ctx);
+    return this.runTriggers(this.onInflictionApply, ctx, "onInflictionApply");
   }
 
   runOnInflictionConsumed(
     ctx: OnInflictionConsumedTriggerContext,
   ): SimEventDraft[] {
-    return this.runTriggers(this.onInflictionConsumed, ctx);
+    return this.runTriggers(
+      this.onInflictionConsumed,
+      ctx,
+      "onInflictionConsumed",
+    );
+  }
+
+  runOnSpRecover(ctx: OnSpRecoverTriggerContext): SimEventDraft[] {
+    return this.runTriggers(this.onSpRecover, ctx, "onSpRecover");
+  }
+
+  runOnSpReturn(ctx: OnSpReturnTriggerContext): SimEventDraft[] {
+    return this.runTriggers(this.onSpReturn, ctx, "onSpReturn");
   }
 
   private runTriggers<TCtx extends TriggerContext>(
     entries: ListenerEntry<SimScript>[],
     ctx: TCtx,
+    bucket: PluginOrderingBucket,
   ): SimEventDraft[] {
     const out: SimEventDraft[] = [];
     for (const e of entries) {
@@ -350,15 +427,69 @@ export class SimRegistry {
         continue;
       }
 
-      out.push(
-        ...runSimScript({
-          script: e.fn,
-          baseFrame: ctx.ev.frame,
-          ctx: this.buildScriptContext(ctx),
-        }),
-      );
+      if (this.isCooldownBlocked(e, ctx, bucket)) {
+        continue;
+      }
+
+      const drafts = runSimScript({
+        script: e.fn,
+        baseFrame: ctx.ev.frame,
+        ctx: this.buildScriptContext(ctx),
+      });
+      if (drafts.length > 0) {
+        this.markCooldownTriggered(e, ctx, bucket);
+        out.push(...drafts);
+      }
     }
     return out;
+  }
+
+  private isCooldownBlocked<TCtx extends TriggerContext>(
+    entry: ListenerEntry<SimScript>,
+    ctx: TCtx,
+    bucket: PluginOrderingBucket,
+  ): boolean {
+    if (!entry.cooldown) return false;
+
+    const stateKey = this.getCooldownStateKey(entry, ctx, bucket);
+    const lastTriggeredFrame = this.lastTriggeredFrameByKey.get(stateKey);
+    if (lastTriggeredFrame === undefined) return false;
+    return ctx.ev.frame - lastTriggeredFrame < entry.cooldown;
+  }
+
+  private markCooldownTriggered<TCtx extends TriggerContext>(
+    entry: ListenerEntry<SimScript>,
+    ctx: TCtx,
+    bucket: PluginOrderingBucket,
+  ): void {
+    if (!entry.cooldown) return;
+    const stateKey = this.getCooldownStateKey(entry, ctx, bucket);
+    this.lastTriggeredFrameByKey.set(stateKey, ctx.ev.frame);
+  }
+
+  private getCooldownStateKey<TCtx extends TriggerContext>(
+    entry: ListenerEntry<SimScript>,
+    ctx: TCtx,
+    bucket: PluginOrderingBucket,
+  ): string {
+    const scope = this.getCooldownScope(ctx) ?? "global";
+    return JSON.stringify([bucket, entry.id, scope]);
+  }
+
+  private getCooldownScope(ctx: TriggerContext): string | null {
+    if ("sourceId" in ctx && ctx.sourceId) {
+      return `source:${ctx.sourceId}`;
+    }
+    if ("targetId" in ctx && ctx.targetId) {
+      return `target:${ctx.targetId}`;
+    }
+    if ("sourceId" in ctx.ev && ctx.ev.sourceId) {
+      return `source:${ctx.ev.sourceId}`;
+    }
+    if ("targetId" in ctx.ev && ctx.ev.targetId) {
+      return `target:${ctx.ev.targetId}`;
+    }
+    return null;
   }
 
   private buildScriptContext(
@@ -445,6 +576,9 @@ export class SimRegistry {
       ctx.ev.type === "inflictionExpire"
     ) {
       return ctx.ev.targetId;
+    }
+    if (ctx.ev.type === "spRecover" || ctx.ev.type === "spReturn") {
+      return ctx.ev.sourceId;
     }
     if ("targetId" in ctx && ctx.targetId) return ctx.targetId;
     return undefined;

@@ -55,6 +55,9 @@ function buildSimRenderCache(
 ): SimRenderCache {
   const bars: SimRenderBar[] = [];
   const markers: SimRenderMarker[] = [];
+  const enemyStaggerWindows: { startFrame: number; endFrame: number }[] = [];
+
+  const eventById = new Map(events.map(ev => [ev.id, ev]));
 
   type ActiveBar = SimRenderBar & { key: string };
   const activeByKey = new Map<string, ActiveBar>();
@@ -138,6 +141,18 @@ function buildSimRenderCache(
 
     if (ev.type === "inflictionExpire" || ev.type === "inflictionRemove") {
       closeBar(`infliction:${ev.targetId}:${ev.inflictionType}`, ev.frame);
+      continue;
+    }
+
+    if (ev.type === "staggerExpire") {
+      const startFrame =
+        typeof ev.ref === "string"
+          ? Math.max(0, eventById.get(ev.ref)?.frame ?? ev.frame)
+          : ev.frame;
+      enemyStaggerWindows.push({
+        startFrame,
+        endFrame: Math.max(startFrame + 1, ev.frame),
+      });
     }
   }
 
@@ -185,6 +200,7 @@ function buildSimRenderCache(
     teamSpRealSeries,
     teamSpTotalSeries,
     enemyStaggerSeries,
+    enemyStaggerWindows,
     teamSpCap,
     enemyStaggerCap: enemyStaggerCapMilli / 1000,
     ultimateEnergySeriesByOperatorId,

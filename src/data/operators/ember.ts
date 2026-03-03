@@ -1,5 +1,4 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
-import { pickSkillValueByRank } from "../../simulator/scripts";
 import { delay } from "../../simulator/scripts";
 import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 
@@ -73,25 +72,25 @@ class EmberDef extends OperatorDef {
             yield delay(45);
             yield ctx.emit.hit({
               damageType: "physical",
-              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT1_DMG_MUL),
+              dmgMultiplier: ctx.byRank!(r => NA_HIT1_DMG_MUL[r] ?? 0),
               staggerOnHit: 0,
             });
             yield delay(45);
             yield ctx.emit.hit({
               damageType: "physical",
-              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT2_DMG_MUL),
+              dmgMultiplier: ctx.byRank!(r => NA_HIT2_DMG_MUL[r] ?? 0),
               staggerOnHit: 0,
             });
             yield delay(50);
             yield ctx.emit.hit({
               damageType: "physical",
-              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT3_DMG_MUL),
+              dmgMultiplier: ctx.byRank!(r => NA_HIT3_DMG_MUL[r] ?? 0),
               staggerOnHit: 0,
             });
             yield delay(55);
             yield ctx.emit.hit({
               damageType: "physical",
-              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT4_DMG_MUL),
+              dmgMultiplier: ctx.byRank!(r => NA_HIT4_DMG_MUL[r] ?? 0),
               staggerOnHit: 20,
             });
           },
@@ -107,7 +106,7 @@ class EmberDef extends OperatorDef {
             });
             yield ctx.emit.hit({
               damageType: "heat",
-              dmgMultiplier: pickSkillValueByRank(ctx, NS_DMG_MUL),
+              dmgMultiplier: ctx.byRank!(r => NS_DMG_MUL[r] ?? 0),
               staggerOnHit: 10,
             });
           },
@@ -123,7 +122,7 @@ class EmberDef extends OperatorDef {
             });
             yield ctx.emit.hit({
               damageType: "physical",
-              dmgMultiplier: pickSkillValueByRank(ctx, CS_DMG_MUL),
+              dmgMultiplier: ctx.byRank!(r => CS_DMG_MUL[r] ?? 0),
               staggerOnHit: 10,
             });
             // TODO: Healing effect based on Will attribute
@@ -137,7 +136,7 @@ class EmberDef extends OperatorDef {
             yield delay(50);
             yield ctx.emit.hit({
               damageType: "heat",
-              dmgMultiplier: pickSkillValueByRank(ctx, ULT_DMG_MUL),
+              dmgMultiplier: ctx.byRank!(r => ULT_DMG_MUL[r] ?? 0),
               staggerOnHit: 25,
             });
             // TODO: Apply shield to all teammates based on Max HP

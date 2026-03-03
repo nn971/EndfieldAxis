@@ -21,7 +21,9 @@ export type PluginOrderingBucket =
   | "onBuffApply"
   | "onBuffConsumed"
   | "onInflictionApply"
-  | "onInflictionConsumed";
+  | "onInflictionConsumed"
+  | "onSpRecover"
+  | "onSpReturn";
 
 export type PluginOrderingConfig = Partial<
   Record<PluginOrderingBucket, PluginOrderingConstraint[]>

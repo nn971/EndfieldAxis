@@ -775,6 +775,16 @@ export default function AxisEditor({
                     key="enemy-stagger-series"
                     transform={`translate(0 ${laneTop + chartTopPadding})`}
                   >
+                    {simRenderCache.enemyStaggerWindows.map((window, idx) => (
+                      <rect
+                        key={`enemy-stagger-window-${idx}`}
+                        x={window.startFrame}
+                        y={0}
+                        width={Math.max(1, window.endFrame - window.startFrame)}
+                        height={chartHeight}
+                        fill="rgba(34, 197, 94, 0.18)"
+                      />
+                    ))}
                     <path d={areaPath} fill="rgba(251, 146, 60, 0.12)" />
                     <path
                       d={linePath}

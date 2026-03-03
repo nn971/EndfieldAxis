@@ -30,6 +30,10 @@ type EmitDraftByType = {
     Draft<Extract<SimEvent, { type: "inflictionApply" }>>,
     "sourceId" | "targetId"
   >;
+  inflictionRemove: WithOptional<
+    Draft<Extract<SimEvent, { type: "inflictionRemove" }>>,
+    "targetId"
+  >;
   spRecover: WithOptional<
     Draft<Extract<SimEvent, { type: "spRecover" }>>,
     "sourceId"
@@ -52,9 +56,17 @@ export type SimScriptEmit = {
   [K in keyof EmitDraftByType]: (draft: EmitDraftByType[K]) => SimScriptCommand;
 };
 
+export type ByRankSelector = (rankIndex: number) => number;
+
 export type SimScriptContext = {
   read: SimRead;
   emit: SimScriptEmit;
+  /**
+   * Select a value based on current skill rank (1-12).
+   * The selector receives a 0-based rank index (0-11).
+   * @example ctx.byRank(r => DAMAGE_TABLE[r] ?? 0)
+   */
+  byRank?: (selector: ByRankSelector) => number;
 
   sourceId?: string;
   targetId?: string;
@@ -140,6 +152,12 @@ function makeCtxEmit(
         targetId: draft.targetId ?? ctx.targetId,
         type: "inflictionApply",
       } as DistOmit<SimEventDraft, "frame" | "ref">),
+    inflictionRemove: draft =>
+      emitCommand({
+        ...draft,
+        targetId: draft.targetId ?? ctx.targetId,
+        type: "inflictionRemove",
+      } as DistOmit<SimEventDraft, "frame" | "ref">),
     spRecover: draft =>
       emitCommand({
         ...draft,
@@ -169,6 +187,15 @@ function makeCtxEmit(
   };
 }
 
+function makeCtxByRank(
+  ctx: Pick<SimScriptContext, "sourceBuild" | "skillType">,
+): (selector: ByRankSelector) => number {
+  return (selector: ByRankSelector) => {
+    const rank = getSkillRank(ctx, ctx.skillType);
+    return selector(rank - 1);
+  };
+}
+
 export const emit = {
   /** @deprecated Prefer ctx.emit.* from SimScriptContext */
   ...makeCtxEmit({ sourceId: undefined, targetId: undefined }),
@@ -187,6 +214,7 @@ export function runSimScript(params: {
       targetId: ctx.targetId,
       defaultHitStaggerOnHit: ctx.defaultHitStaggerOnHit,
     }),
+    byRank: makeCtxByRank(ctx),
   } satisfies SimScriptContext;
   const out: SimEventDraft[] = [];
   let frameCursor = baseFrame;
@@ -233,7 +261,7 @@ export function materializeDrafts(
   return out;
 }
 export function getSkillRank(
-  ctx: SimScriptContext,
+  ctx: Pick<SimScriptContext, "sourceBuild" | "skillType">,
   skillType: SkillType = ctx.skillType,
 ): number {
   const rank = Number(ctx.sourceBuild?.skillRanks?.[skillType] ?? 9);
@@ -241,17 +269,3 @@ export function getSkillRank(
   return Math.max(1, Math.min(12, Math.round(rank)));
 }
 /** Rank table format: [lv1..lv9, m1, m2, m3]. */
-
-export function pickSkillValueByRank(
-  ctx: SimScriptContext,
-  table: readonly number[],
-  skillType: SkillType = ctx.skillType,
-): number {
-  if (!Array.isArray(table) || table.length !== 12) {
-    throw new Error(
-      `pickSkillValueByRank requires a 12-value table, got length=${table?.length ?? 0}`,
-    );
-  }
-  const rank = getSkillRank(ctx, skillType);
-  return Number(table[rank - 1] ?? table[8]);
-}

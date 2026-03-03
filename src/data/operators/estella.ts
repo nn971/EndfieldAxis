@@ -1,5 +1,4 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
-import { pickSkillValueByRank } from "../../simulator/scripts";
 import { delay } from "../../simulator/scripts";
 import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 
@@ -22,7 +21,6 @@ const NA_HIT1_DMG_MUL = new Array(12).fill(0.5) as readonly number[];
 const NA_HIT2_DMG_MUL = new Array(12).fill(0.6) as readonly number[];
 const NA_HIT3_DMG_MUL = new Array(12).fill(0.7) as readonly number[];
 const NA_HIT4_DMG_MUL = new Array(12).fill(0.8) as readonly number[];
-const NA_HIT5_DMG_MUL = new Array(12).fill(0.9) as readonly number[];
 
 const CS_COOLDOWN_SECONDS = [
   18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 17,
@@ -35,8 +33,8 @@ class EstellaDef extends OperatorDef {
       name: "Estella",
       avatar: "ESTELLA.png",
       attributes: {
-        main: "strength",
-        sub: "agility",
+        main: "will",
+        sub: "strength",
       },
       stats: {
         level1: {
@@ -65,25 +63,25 @@ class EstellaDef extends OperatorDef {
             yield delay(50);
             yield ctx.emit.hit({
               damageType: "physical",
-              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT1_DMG_MUL),
+              dmgMultiplier: ctx.byRank!(r => NA_HIT1_DMG_MUL[r] ?? 0),
               staggerOnHit: 0,
             });
             yield delay(50);
             yield ctx.emit.hit({
               damageType: "physical",
-              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT2_DMG_MUL),
+              dmgMultiplier: ctx.byRank!(r => NA_HIT2_DMG_MUL[r] ?? 0),
               staggerOnHit: 0,
             });
             yield delay(50);
             yield ctx.emit.hit({
               damageType: "physical",
-              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT3_DMG_MUL),
+              dmgMultiplier: ctx.byRank!(r => NA_HIT3_DMG_MUL[r] ?? 0),
               staggerOnHit: 0,
             });
             yield delay(50);
             yield ctx.emit.hit({
               damageType: "physical",
-              dmgMultiplier: pickSkillValueByRank(ctx, NA_HIT4_DMG_MUL),
+              dmgMultiplier: ctx.byRank!(r => NA_HIT4_DMG_MUL[r] ?? 0),
               staggerOnHit: 17,
             });
           },
@@ -95,14 +93,14 @@ class EstellaDef extends OperatorDef {
 
           script: function* (ctx) {
             yield delay(26);
-            yield ctx.emit.hit({
-              damageType: "cryo",
-              dmgMultiplier: pickSkillValueByRank(ctx, NS_DMG_MUL),
-              staggerOnHit: 10,
-            });
             yield ctx.emit.inflictionApply({
               inflictionType: "cryo",
               inflictionStacks: 1,
+            });
+            yield ctx.emit.hit({
+              damageType: "cryo",
+              dmgMultiplier: ctx.byRank!(r => NS_DMG_MUL[r] ?? 0),
+              staggerOnHit: 10,
             });
           },
         },
@@ -122,19 +120,18 @@ class EstellaDef extends OperatorDef {
               (target as any)?.buffs?.["buff.solidification"],
             );
 
-            yield ctx.emit.hit({
-              damageType: "physical",
-              dmgMultiplier: isSolidified
-                ? pickSkillValueByRank(ctx, CS_DMG_MUL_SOLIDIFIED)
-                : pickSkillValueByRank(ctx, CS_DMG_MUL_NON_SOLIDIFIED),
-              staggerOnHit: 10,
-            });
-
             if (isSolidified) {
               yield ctx.emit.buffApply({
                 buffId: "buff.estella.combo.physicalSusceptibility",
               });
             }
+            yield ctx.emit.hit({
+              damageType: "physical",
+              dmgMultiplier: isSolidified
+                ? ctx.byRank!(r => CS_DMG_MUL_SOLIDIFIED[r] ?? 0)
+                : ctx.byRank!(r => CS_DMG_MUL_NON_SOLIDIFIED[r] ?? 0),
+              staggerOnHit: 10,
+            });
           },
         },
         ultimate: {
@@ -146,7 +143,7 @@ class EstellaDef extends OperatorDef {
             yield delay(55);
             yield ctx.emit.hit({
               damageType: "physical",
-              dmgMultiplier: pickSkillValueByRank(ctx, ULT_DMG_MUL),
+              dmgMultiplier: ctx.byRank!(r => ULT_DMG_MUL[r] ?? 0),
               staggerOnHit: 15,
             });
           },

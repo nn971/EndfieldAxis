@@ -35,7 +35,11 @@ export type RestStatBonusBucket =
   | "ultimateGainEfficiency"
   | "staggerEfficiency"
   | "physicalDmgIncRatio"
-  | "ultimateDmgIncRatio";
+  | "artsDmgIncRatio"
+  | "natureDmgIncRatio"
+  | "cryoDmgIncRatio"
+  | "ultimateDmgIncRatio"
+  | "criticalRate";
 
 /**
  * A single atom of build-static rest-stat bonus.

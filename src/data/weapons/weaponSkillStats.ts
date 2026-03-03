@@ -34,7 +34,37 @@ const PARAMS: Record<
     M: { A: 115, B: 30, C: 6 },
     S: { A: 86, B: 24, C: 5 },
   },
+  strengthboost: {
+    L: { A: 144, B: 44, C: 8 },
+    M: { A: 115, B: 30, C: 6 },
+    S: { A: 86, B: 24, C: 5 },
+  },
+  intellectboost: {
+    L: { A: 144, B: 44, C: 8 },
+    M: { A: 115, B: 30, C: 6 },
+    S: { A: 86, B: 24, C: 5 },
+  },
+  willboost: {
+    L: { A: 144, B: 44, C: 8 },
+    M: { A: 115, B: 30, C: 6 },
+    S: { A: 86, B: 24, C: 5 },
+  },
   physicaldmgboost: {
+    L: { A: 400, B: 104, C: 22 },
+    M: { A: 320, B: 84, C: 18 },
+    S: { A: 240, B: 63, C: 13 },
+  },
+  artsdmgboost: {
+    L: { A: 400, B: 104, C: 22 },
+    M: { A: 320, B: 84, C: 18 },
+    S: { A: 240, B: 63, C: 13 },
+  },
+  naturedmgboost: {
+    L: { A: 400, B: 104, C: 22 },
+    M: { A: 320, B: 84, C: 18 },
+    S: { A: 240, B: 63, C: 13 },
+  },
+  cryodmgboost: {
     L: { A: 400, B: 104, C: 22 },
     M: { A: 320, B: 84, C: 18 },
     S: { A: 240, B: 63, C: 13 },
@@ -43,6 +73,11 @@ const PARAMS: Record<
     L: { A: 360, B: 90, C: 20 },
     M: { A: 288, B: 72, C: 16 },
     S: { A: 216, B: 54, C: 12 },
+  },
+  criticalrateboost: {
+    L: { A: 225, B: 56, C: 12 },
+    M: { A: 180, B: 45, C: 10 },
+    S: { A: 135, B: 34, C: 8 },
   },
 };
 
@@ -103,6 +138,69 @@ export function getWeaponSkillRestBonus(
           bucket: "physicalDmgIncRatio",
           addValue,
           log: `Weapon ${weaponId} ${skill} physicaldmgboost (rank ${r})`,
+        };
+      }
+      case "strengthboost": {
+        const addValue = evalSkillBoostValues("strengthboost", s, r);
+        return {
+          source: "weapon",
+          bucket: "strength",
+          addValue,
+          log: `Weapon ${weaponId} ${skill} strengthboost (rank ${r})`,
+        };
+      }
+      case "intellectboost": {
+        const addValue = evalSkillBoostValues("intellectboost", s, r);
+        return {
+          source: "weapon",
+          bucket: "intellect",
+          addValue,
+          log: `Weapon ${weaponId} ${skill} intellectboost (rank ${r})`,
+        };
+      }
+      case "willboost": {
+        const addValue = evalSkillBoostValues("willboost", s, r);
+        return {
+          source: "weapon",
+          bucket: "will",
+          addValue,
+          log: `Weapon ${weaponId} ${skill} willboost (rank ${r})`,
+        };
+      }
+      case "artsdmgboost": {
+        const addValue = evalSkillBoostValues("artsdmgboost", s, r, true);
+        return {
+          source: "weapon",
+          bucket: "artsDmgIncRatio",
+          addValue,
+          log: `Weapon ${weaponId} ${skill} artsdmgboost (rank ${r})`,
+        };
+      }
+      case "naturedmgboost": {
+        const addValue = evalSkillBoostValues("naturedmgboost", s, r, true);
+        return {
+          source: "weapon",
+          bucket: "natureDmgIncRatio",
+          addValue,
+          log: `Weapon ${weaponId} ${skill} naturedmgboost (rank ${r})`,
+        };
+      }
+      case "cryodmgboost": {
+        const addValue = evalSkillBoostValues("cryodmgboost", s, r, true);
+        return {
+          source: "weapon",
+          bucket: "cryoDmgIncRatio",
+          addValue,
+          log: `Weapon ${weaponId} ${skill} cryodmgboost (rank ${r})`,
+        };
+      }
+      case "criticalrateboost": {
+        const addValue = evalSkillBoostValues("criticalrateboost", s, r, true);
+        return {
+          source: "weapon",
+          bucket: "criticalRate",
+          addValue,
+          log: `Weapon ${weaponId} ${skill} criticalrateboost (rank ${r})`,
         };
       }
       default:
