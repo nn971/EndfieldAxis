@@ -1,6 +1,6 @@
-import { GearsDef } from "../GearsDef";
+import { Type50YinglungSetDef } from "../abstractSet/Type50YinglungSetDef";
 
-class Type50YinglungHeavyArmorDef extends GearsDef {
+class Type50YinglungHeavyArmorDef extends Type50YinglungSetDef {
   constructor() {
     super({
       id: "item_equip_t4_suit_atk02_body_01",

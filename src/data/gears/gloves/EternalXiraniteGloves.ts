@@ -1,22 +1,22 @@
-import { GearsDef } from "../GearsDef";
+import { EternalXiraniteSetDef } from "../abstractSet/EternalXiraniteSetDef";
 
-class EternalXiraniteGlovesDef extends GearsDef {
+class EternalXiraniteGlovesDef extends EternalXiraniteSetDef {
   constructor() {
     super({
-      id: "eternalxiranitegloves",
+      id: "item_equip_t4_suit_usp02_hand_01",
       type: "gloves",
       name: "Eternal Xiranite Gloves",
-      icon: "ETERNALXIRANITEGLOVES.png",
-      defend: 56,
+      icon: "item_equip_t4_suit_usp02_hand_01.png",
+      defend: 42,
       bonusBuckets: {
-        s1: "will",
-        s2: "intellect",
-        s3: "agility",
+        s1: "intellect",
+        s2: "strength",
+        s3: "ultimateGainEfficiency",
       },
       bonusValuesByRank: {
-        s1: [0, 0, 0, 0],
-        s2: [0, 0, 0, 0],
-        s3: [0, 0, 0, 0],
+        s1: [65, 71, 78, 84],
+        s2: [43, 47, 51, 55],
+        s3: [20.5, 22.6, 24.6, 26.7],
       },
     });
   }

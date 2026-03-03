@@ -1,6 +1,6 @@
-import { GearsDef } from "../GearsDef";
+import { AethertechSetDef } from "../abstractSet/AethertechSetDef";
 
-class AethertechPlatingDef extends GearsDef {
+class AethertechPlatingDef extends AethertechSetDef {
   constructor() {
     super({
       id: "item_equip_t4_suit_poise01_body_01",

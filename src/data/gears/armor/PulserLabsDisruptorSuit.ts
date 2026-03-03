@@ -1,6 +1,6 @@
-import { GearsDef } from "../GearsDef";
+import { PulserLabsSetDef } from "../abstractSet/PulserLabsSetDef";
 
-class PulserLabsDisruptorSuitDef extends GearsDef {
+class PulserLabsDisruptorSuitDef extends PulserLabsSetDef {
   constructor() {
     super({
       id: "item_equip_t4_suit_pulse_cryst01_body_01",

@@ -1,6 +1,6 @@
-import { GearsDef } from "../GearsDef";
+import { HotWorkSetDef } from "../abstractSet/HotWorkSetDef";
 
-class HotWorkExoskeletonDef extends GearsDef {
+class HotWorkExoskeletonDef extends HotWorkSetDef {
   constructor() {
     super({
       id: "item_equip_t4_suit_fire_natr01_body_01",

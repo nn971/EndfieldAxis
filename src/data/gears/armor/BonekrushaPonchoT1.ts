@@ -1,6 +1,6 @@
-import { GearsDef } from "../GearsDef";
+import { BonekrushaSetDef } from "../abstractSet/BonekrushaSetDef";
 
-class BonekrushaPonchoT1Def extends GearsDef {
+class BonekrushaPonchoT1Def extends BonekrushaSetDef {
   constructor() {
     super({
       id: "item_equip_t4_suit_attri01_body_04",

@@ -1,6 +1,6 @@
-import { GearsDef } from "../GearsDef";
+import { LYNXSetDef } from "../abstractSet/LYNXSetDef";
 
-class LYNXHeavyArmorDef extends GearsDef {
+class LYNXHeavyArmorDef extends LYNXSetDef {
   constructor() {
     super({
       id: "item_equip_t4_suit_heal01_body_01",

@@ -1,6 +1,6 @@
-import { GearsDef } from "../GearsDef";
+import { TideSurgeSetDef } from "../abstractSet/TideSurgeSetDef";
 
-class TideFallLightArmorDef extends GearsDef {
+class TideFallLightArmorDef extends TideSurgeSetDef {
   constructor() {
     super({
       id: "item_equip_t4_suit_burst01_body_01",

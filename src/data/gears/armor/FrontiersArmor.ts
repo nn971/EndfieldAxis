@@ -1,6 +1,6 @@
-import { GearsDef } from "../GearsDef";
+import { FrontiersSetDef } from "../abstractSet/FrontiersSetDef";
 
-class FrontiersArmorDef extends GearsDef {
+class FrontiersArmorDef extends FrontiersSetDef {
   constructor() {
     super({
       id: "item_equip_t4_suit_atb01_body_01",

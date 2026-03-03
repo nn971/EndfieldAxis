@@ -1,6 +1,6 @@
-import { GearsDef } from "../GearsDef";
+import { EternalXiraniteSetDef } from "../abstractSet/EternalXiraniteSetDef";
 
-class EternalXiraniteArmorDef extends GearsDef {
+class EternalXiraniteArmorDef extends EternalXiraniteSetDef {
   constructor() {
     super({
       id: "eternalxiranitearmor",
@@ -11,12 +11,12 @@ class EternalXiraniteArmorDef extends GearsDef {
       bonusBuckets: {
         s1: "will",
         s2: "intellect",
-        s3: "agility",
+        s3: "artsIntensity",
       },
       bonusValuesByRank: {
-        s1: [0, 0, 0, 0],
-        s2: [0, 0, 0, 0],
-        s3: [0, 0, 0, 0],
+        s1: [87, 95, 104, 113],
+        s2: [58, 63, 69, 75],
+        s3: [20, 22, 24, 26],
       },
     });
   }

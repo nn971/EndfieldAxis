@@ -1,6 +1,6 @@
-import { GearsDef } from "../GearsDef";
+import { MISecuritySetDef } from "../abstractSet/MISecuritySetDef";
 
-class MISecurityOverallsT1Def extends GearsDef {
+class MISecurityOverallsT1Def extends MISecuritySetDef {
   constructor() {
     super({
       id: "item_equip_t4_suit_criti01_body_03",
