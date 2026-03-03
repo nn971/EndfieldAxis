@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { OperatorBuild } from "../../types/operator";
 import PreviewSlider from "../../shared/components/PreviewSlider";
 import weaponsData from "../../data/weapons";
@@ -12,7 +12,7 @@ import {
 } from "../../data/weapons/WeaponDef";
 import operatorsData from "../../data/operators";
 import { OperatorId } from "../../data/operators/OperatorDef";
-import gearsData from "../../data/gears";
+import gearsData, { gearsSetData } from "../../data/gears";
 import { GearsId, GearsType, GearsTypeName } from "../../data/gears/GearsDef";
 import {
   BASE_WEAPON_SKILL_LABEL,
@@ -24,6 +24,17 @@ type TabProps = {
   build: OperatorBuild;
   onCommit: (operatorId: OperatorId, patch: Partial<OperatorBuild>) => void;
 };
+
+const gearSetNamesById = Object.values(gearsSetData).reduce(
+  (acc, set) => {
+    for (const gearId of set.gearIds) {
+      if (!acc[gearId]) acc[gearId] = [];
+      acc[gearId].push(set.name);
+    }
+    return acc;
+  },
+  {} as Record<GearsId, string[]>,
+);
 
 export function OperatorBuildTab({ operatorId, build, onCommit }: TabProps) {
   const setSkillRank = (
@@ -291,65 +302,72 @@ function WeaponPicker({
   onClose,
 }: WeaponPickerProps) {
   return (
-    <div className="fixed inset-0 bg-black/60 grid place-items-center z-50">
-      <div className="w-[520px] max-w-[90vw] rounded-lg border border-zinc-700 bg-zinc-900 p-3">
-        <div className="flex items-center justify-between px-2 py-1">
-          <div className="font-semibold">Select weapon</div>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-3 backdrop-blur-sm">
+      <div className="w-[560px] max-w-[95vw] rounded-xl border border-zinc-700/90 bg-zinc-900/95 p-3 shadow-2xl shadow-black/60">
+        <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2">
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-zinc-500">
+              Weapon Picker
+            </div>
+            <div className="font-semibold text-zinc-100">Select weapon</div>
+          </div>
           <button
-            className="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700"
+            className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-300 transition-colors hover:border-zinc-500 hover:bg-zinc-800"
             onClick={onClose}
           >
             Close
           </button>
         </div>
 
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <button
-            className={
-              "flex items-center gap-3 p-2 rounded border hover:bg-zinc-800/50 " +
-              (currentId == null
-                ? "border-zinc-500 bg-zinc-800/30 "
-                : "border-zinc-800 hover:border-zinc-600 ")
-            }
-            onClick={onClear}
-          >
-            <div className="w-10 h-10 rounded bg-zinc-800 overflow-hidden shrink-0 grid place-items-center text-xs text-zinc-300">
-              —
-            </div>
-            <div className="text-left">
-              <div className="text-sm">(none)</div>
-              <div className="text-xs text-zinc-500">unequip</div>
-            </div>
-          </button>
+        <div className="mt-3 max-h-[min(70vh,34rem)] overflow-y-auto pr-1 [scrollbar-color:rgb(82_82_91)_transparent] [scrollbar-width:thin]">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <button
+              className={
+                "flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950/40 p-2 text-left transition-colors hover:border-zinc-600 hover:bg-zinc-800/50 " +
+                (currentId == null
+                  ? "border-emerald-500/80 bg-emerald-900/20 "
+                  : "")
+              }
+              onClick={onClear}
+            >
+              <div className="w-10 h-10 rounded bg-zinc-800 overflow-hidden shrink-0 grid place-items-center text-xs text-zinc-300">
+                —
+              </div>
+              <div className="text-left">
+                <div className="text-sm">(none)</div>
+                <div className="text-xs text-zinc-500">unequip</div>
+              </div>
+            </button>
 
-          {Object.values(weaponsData).map(w => {
-            if (w.type != weaponType) return null;
-            const active = w.id === currentId;
-            return (
-              <button
-                key={w.id}
-                className={
-                  "flex items-center gap-3 p-2 rounded border hover:bg-zinc-800/50 " +
-                  (active
-                    ? "border-zinc-500 bg-zinc-800/30 "
-                    : "border-zinc-800 hover:border-zinc-600 ")
-                }
-                onClick={() => onPick(w.id)}
-              >
-                <div className="w-10 h-10 rounded bg-zinc-800 overflow-hidden shrink-0">
-                  <img
-                    className="w-full h-full object-cover"
-                    src={placeholderUrl}
-                    alt={w.name}
-                  />
-                </div>
-                <div className="text-left">
-                  <div className="text-sm">{w.name}</div>
-                  <div className="text-xs text-zinc-500">{w.id}</div>
-                </div>
-              </button>
-            );
-          })}
+            {Object.values(weaponsData).map(w => {
+              if (w.type != weaponType) return null;
+              const active = w.id === currentId;
+              return (
+                <button
+                  key={w.id}
+                  className={
+                    "flex items-center gap-3 rounded-lg border p-2 text-left transition-colors " +
+                    (active
+                      ? "border-emerald-500/80 bg-emerald-900/20 "
+                      : "border-zinc-800 bg-zinc-950/40 hover:border-zinc-600 hover:bg-zinc-800/50 ")
+                  }
+                  onClick={() => onPick(w.id)}
+                >
+                  <div className="w-10 h-10 rounded bg-zinc-800 overflow-hidden shrink-0">
+                    <img
+                      className="w-full h-full object-cover"
+                      src={placeholderUrl}
+                      alt={w.name}
+                    />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-sm">{w.name}</div>
+                    <div className="text-xs text-zinc-500">{w.id}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
@@ -580,66 +598,124 @@ function GearPicker({
   onClear,
   onClose,
 }: GearPickerProps) {
+  const gearEntries = useMemo(
+    () =>
+      Object.values(gearsData)
+        .filter(g => g.type === type)
+        .map(gear => {
+          const sortedSetNames = [...(gearSetNamesById[gear.id] ?? [])].sort(
+            (a, b) => a.localeCompare(b),
+          );
+
+          return {
+            gear,
+            setLabel: sortedSetNames.length ? sortedSetNames.join(", ") : null,
+            primarySetName: sortedSetNames[0] ?? "No Set",
+          };
+        })
+        .sort((a, b) => {
+          const aHasSet = a.setLabel != null;
+          const bHasSet = b.setLabel != null;
+          if (aHasSet !== bHasSet) return aHasSet ? -1 : 1;
+
+          const setCmp = a.primarySetName.localeCompare(b.primarySetName);
+          if (setCmp !== 0) return setCmp;
+
+          const nameCmp = a.gear.name.localeCompare(b.gear.name);
+          if (nameCmp !== 0) return nameCmp;
+
+          return a.gear.id.localeCompare(b.gear.id);
+        }),
+    [type],
+  );
+
   return (
-    <div className="fixed inset-0 bg-black/60 grid place-items-center z-50">
-      <div className="w-[520px] max-w-[90vw] rounded-lg border border-zinc-700 bg-zinc-900 p-3">
-        <div className="flex items-center justify-between px-2 py-1">
-          <div className="font-semibold">Select {GearsTypeName[type]}</div>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-3 backdrop-blur-sm">
+      <div className="w-[560px] max-w-[95vw] rounded-xl border border-zinc-700/90 bg-zinc-900/95 p-3 shadow-2xl shadow-black/60">
+        <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2">
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-zinc-500">
+              Gear Picker
+            </div>
+            <div className="font-semibold text-zinc-100">
+              Select {GearsTypeName[type]}
+            </div>
+          </div>
           <button
-            className="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700"
+            className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-300 transition-colors hover:border-zinc-500 hover:bg-zinc-800"
             onClick={onClose}
           >
             Close
           </button>
         </div>
 
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <button
-            className={
-              "flex items-center gap-3 p-2 rounded border hover:bg-zinc-800/50 " +
-              (currentId == null
-                ? "border-zinc-500 bg-zinc-800/30 "
-                : "border-zinc-800 hover:border-zinc-600 ")
-            }
-            onClick={onClear}
-          >
-            <div className="w-10 h-10 rounded bg-zinc-800 overflow-hidden shrink-0 grid place-items-center text-xs text-zinc-300">
-              —
-            </div>
-            <div className="text-left">
-              <div className="text-sm">(none)</div>
-              <div className="text-xs text-zinc-500">unequip</div>
-            </div>
-          </button>
+        <div className="mt-3 max-h-[min(70vh,34rem)] overflow-y-auto pr-1 [scrollbar-color:rgb(82_82_91)_transparent] [scrollbar-width:thin]">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <button
+              className={
+                "flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950/40 p-2 text-left transition-colors hover:border-zinc-600 hover:bg-zinc-800/50 " +
+                (currentId == null
+                  ? "border-emerald-500/80 bg-emerald-900/20 "
+                  : "")
+              }
+              onClick={onClear}
+            >
+              <div className="w-10 h-10 rounded bg-zinc-800 overflow-hidden shrink-0 grid place-items-center text-xs text-zinc-300">
+                —
+              </div>
+              <div className="text-left">
+                <div className="text-sm">(none)</div>
+                <div className="text-xs text-zinc-500">unequip</div>
+              </div>
+            </button>
 
-          {Object.values(gearsData).map(g => {
-            if (g.type !== type) return null;
-            const active = g.id === currentId;
-            return (
-              <button
-                key={g.id}
-                className={
-                  "flex items-center gap-3 p-2 rounded border hover:bg-zinc-800/50 " +
-                  (active
-                    ? "border-zinc-500 bg-zinc-800/30 "
-                    : "border-zinc-800 hover:border-zinc-600 ")
-                }
-                onClick={() => onPick(g.id)}
-              >
-                <div className="w-10 h-10 rounded bg-zinc-800 overflow-hidden shrink-0">
-                  <img
-                    className="w-full h-full object-cover"
-                    src={placeholderUrl}
-                    alt={g.name}
-                  />
-                </div>
-                <div className="text-left">
-                  <div className="text-sm">{g.name}</div>
-                  <div className="text-xs text-zinc-500">{g.id}</div>
-                </div>
-              </button>
-            );
-          })}
+            {gearEntries.map((entry, index) => {
+              const { gear } = entry;
+              const active = gear.id === currentId;
+              const prevGroup = gearEntries[index - 1]?.primarySetName;
+              const showGroupHeader =
+                index === 0 || entry.primarySetName !== prevGroup;
+
+              return (
+                <Fragment key={gear.id}>
+                  {showGroupHeader && (
+                    <div className="col-span-1 mt-1 rounded bg-zinc-950/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 sm:col-span-2">
+                      {entry.primarySetName}
+                    </div>
+                  )}
+
+                  <button
+                    className={
+                      "flex items-center gap-3 rounded-lg border p-2 text-left transition-colors " +
+                      (active
+                        ? "border-emerald-500/80 bg-emerald-900/20 "
+                        : "border-zinc-800 bg-zinc-950/40 hover:border-zinc-600 hover:bg-zinc-800/50 ")
+                    }
+                    onClick={() => onPick(gear.id)}
+                  >
+                    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md border border-zinc-700 bg-zinc-800">
+                      <img
+                        className="h-full w-full object-cover"
+                        src={placeholderUrl}
+                        alt={gear.name}
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium text-zinc-100">
+                        {gear.name}
+                      </div>
+                      <div className="truncate text-[11px] text-zinc-500">
+                        {gear.id}
+                      </div>
+                      <div className="truncate text-[10px] text-zinc-400">
+                        {entry.setLabel ?? "No set bonus"}
+                      </div>
+                    </div>
+                  </button>
+                </Fragment>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

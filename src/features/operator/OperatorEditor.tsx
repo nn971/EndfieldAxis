@@ -146,67 +146,88 @@ function OperatorPicker({
   onPick,
   onClose,
 }: OperatorPickerProps) {
+  const operatorEntries = useMemo(
+    () =>
+      Object.values(operatorsData).sort((a, b) => {
+        const nameCmp = a.name.localeCompare(b.name);
+        if (nameCmp !== 0) return nameCmp;
+        return a.id.localeCompare(b.id);
+      }),
+    [],
+  );
+
   return (
-    <div className="fixed inset-0 bg-black/60 grid place-items-center z-50">
-      <div className="w-[520px] max-w-[90vw] rounded-lg border border-zinc-700 bg-zinc-900 p-3">
-        <div className="flex items-center justify-between px-2 py-1">
-          <div className="font-semibold">Select operator</div>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-3 backdrop-blur-sm">
+      <div className="w-[560px] max-w-[95vw] rounded-xl border border-zinc-700/90 bg-zinc-900/95 p-3 shadow-2xl shadow-black/60">
+        <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2">
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-zinc-500">
+              Operator Picker
+            </div>
+            <div className="font-semibold text-zinc-100">Select operator</div>
+          </div>
           <button
-            className="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700"
+            className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-300 transition-colors hover:border-zinc-500 hover:bg-zinc-800"
             onClick={onClose}
           >
             Close
           </button>
         </div>
 
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          {Object.values(operatorsData).map(op => {
-            const url = getAvatarUrl(op.avatar);
-            const active = op.id === currentId;
+        <div className="mt-3 max-h-[min(70vh,34rem)] overflow-y-auto pr-1 [scrollbar-color:rgb(82_82_91)_transparent] [scrollbar-width:thin]">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {operatorEntries.map(op => {
+              const url = getAvatarUrl(op.avatar);
+              const active = op.id === currentId;
 
-            const usedLane = teamOperatorIds.findIndex(id => id === op.id);
-            const disabled = usedLane !== -1 && op.id !== currentId;
+              const usedLane = teamOperatorIds.findIndex(id => id === op.id);
+              const disabled = usedLane !== -1 && op.id !== currentId;
 
-            return (
-              <button
-                key={op.id}
-                disabled={disabled}
-                className={
-                  "flex items-center gap-3 p-2 rounded border hover:bg-zinc-800/50 " +
-                  (active
-                    ? "border-zinc-500 bg-zinc-800/30 "
-                    : "border-zinc-800 hover:border-zinc-600 ") +
-                  (disabled
-                    ? "opacity-40 cursor-not-allowed border-zinc-800"
-                    : "hover:bg-zinc-800/50")
-                }
-                onClick={() => {
-                  if (disabled) return;
-                  onPick(op.id);
-                }}
-              >
-                <div className="w-10 h-10 rounded bg-zinc-800 overflow-hidden shrink-0">
-                  {url ? (
-                    <img
-                      className="w-full h-full object-cover"
-                      src={url}
-                      alt={op.name}
-                    />
-                  ) : null}
-                </div>
-                <div className="text-left">
-                  <div className="text-sm">{op.name}</div>
-                  <div className="text-xs text-zinc-500">{op.id}</div>
-                </div>
-
-                {disabled && (
-                  <div className="text-[10px] text-zinc-400">
-                    in lane {usedLane + 1}
+              return (
+                <button
+                  key={op.id}
+                  disabled={disabled}
+                  className={
+                    "group flex items-center gap-3 rounded-lg border p-2 text-left transition-colors " +
+                    (active
+                      ? "border-emerald-500/80 bg-emerald-900/20 "
+                      : "border-zinc-800 bg-zinc-950/40 hover:border-zinc-600 hover:bg-zinc-800/50 ") +
+                    (disabled
+                      ? "cursor-not-allowed border-zinc-800 opacity-40"
+                      : "")
+                  }
+                  onClick={() => {
+                    if (disabled) return;
+                    onPick(op.id);
+                  }}
+                >
+                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md border border-zinc-700 bg-zinc-800">
+                    {url ? (
+                      <img
+                        className="h-full w-full object-cover"
+                        src={url}
+                        alt={op.name}
+                      />
+                    ) : null}
                   </div>
-                )}
-              </button>
-            );
-          })}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium text-zinc-100">
+                      {op.name}
+                    </div>
+                    <div className="truncate text-[11px] text-zinc-500">
+                      {op.id}
+                    </div>
+                  </div>
+
+                  {disabled && (
+                    <div className="rounded bg-zinc-900/90 px-1.5 py-0.5 text-[10px] text-zinc-400">
+                      in lane {usedLane + 1}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
