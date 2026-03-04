@@ -3,6 +3,7 @@ import {
   type SolutionState,
   type SkillBox,
 } from "../../types/editor";
+import { makeEmptySimDamageCache } from "../../types/simDamage";
 
 // Bump this when you change the serialized shape.
 export const CURRENT_SOLUTION_VERSION = 2;
@@ -45,6 +46,7 @@ function stripRuntimeFields(sol: SolutionState): SolutionState {
   return {
     ...sol,
     simRenderCache: makeEmptySimRenderCache(),
+    simDamageCache: makeEmptySimDamageCache(),
   };
 }
 
@@ -93,6 +95,8 @@ function migrateToCurrent(
       ...raw,
       version: CURRENT_SOLUTION_VERSION,
       simRenderCache: makeEmptySimRenderCache(),
+      simDamageCache: makeEmptySimDamageCache(),
+      damageWatches: [],
     };
     return { ok: true, solution: candidate as SolutionState };
   }
@@ -110,6 +114,8 @@ function migrateToCurrent(
       ...rawAny,
       version: CURRENT_SOLUTION_VERSION,
       simRenderCache: makeEmptySimRenderCache(),
+      simDamageCache: makeEmptySimDamageCache(),
+      damageWatches: [],
     };
     if (!hasValidControlled && teamOperatorIds.length > 0) {
       migrated.controlledOperatorId = teamOperatorIds[0];
@@ -120,9 +126,14 @@ function migrateToCurrent(
   }
 
   if (version === CURRENT_SOLUTION_VERSION) {
+    const rawAny: any = raw as any;
     const next = {
       ...(raw as unknown as SolutionState),
       simRenderCache: makeEmptySimRenderCache(),
+      simDamageCache: makeEmptySimDamageCache(),
+      damageWatches: Array.isArray(rawAny.damageWatches)
+        ? rawAny.damageWatches
+        : [],
     };
     return { ok: true, solution: next };
   }

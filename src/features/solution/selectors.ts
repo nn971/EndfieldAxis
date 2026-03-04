@@ -10,3 +10,5 @@ export const selectSkillBoxes = (s: RootState) => s.solution.skillBoxes;
 export const selectBuildByOperatorId = (s: RootState) =>
   s.solution.buildByOperatorId;
 export const selectSimRenderCache = (s: RootState) => s.solution.simRenderCache;
+export const selectSimDamageCache = (s: RootState) => s.solution.simDamageCache;
+export const selectDamageWatches = (s: RootState) => s.solution.damageWatches;

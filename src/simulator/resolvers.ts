@@ -534,6 +534,8 @@ export function resolveHit(
     ev,
     meta: {
       note: `source=${source.name} target=${target.name}`,
+      castStartEventId: parentCastStart?.id ?? null,
+      castSkillType: parentCastStart?.skillType ?? null,
       hitEvent: ev,
     },
   });

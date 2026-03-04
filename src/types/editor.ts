@@ -1,5 +1,6 @@
 import type { SkillType } from "../data/operators/OperatorDef";
-import type { OperatorBuild } from "./operator";
+import type { OperatorBuild, DamageType } from "./operator";
+import type { SimDamageCache } from "./simDamage";
 
 export type SimRenderBarType = "buff" | "infliction";
 export type SimRenderMarkerType = "status" | "buffRefresh";
@@ -71,6 +72,18 @@ export interface SkillBox {
   durationFrames: number;
 }
 
+export type DamageWatchFilter = {
+  sourceId: string | null;
+  skillType: SkillType | null;
+  damageType: DamageType | null;
+};
+
+export type DamageWatchEntry = {
+  id: string;
+  name: string;
+  filter: DamageWatchFilter;
+};
+
 export interface SolutionState {
   /**
    * Serialized solution schema version. Use this for migrations later.
@@ -84,4 +97,6 @@ export interface SolutionState {
   skillBoxes: SkillBox[];
   buildByOperatorId: Record<string, OperatorBuild>;
   simRenderCache: SimRenderCache;
+  simDamageCache: SimDamageCache;
+  damageWatches: DamageWatchEntry[];
 }

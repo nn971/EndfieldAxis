@@ -37,10 +37,18 @@ function applyRestStatAddValue(
   snapshot: RestStatSnapshot,
   bucket: RestBonusEntry["bucket"],
   addValue: number,
+  secondaryAttribute?: OperatorAttributeType,
 ): void {
   // Attributes
   if (bucket in snapshot.attributes) {
     snapshot.attributes[bucket as OperatorAttributeType] += addValue; // Only one of these two is nonzero
+    return;
+  }
+
+  if (bucket === "secondaryAttribute") {
+    if (secondaryAttribute) {
+      snapshot.attributes[secondaryAttribute] += addValue;
+    }
     return;
   }
 
@@ -180,6 +188,25 @@ export function computeRestStat(build: OperatorBuild): RestStatSnapshot {
     });
   }
 
+  // ---- potential ----
+  const potentialAttributeBonus = opDef.getPotentialAttributeBonus(
+    build.potentialRank,
+  );
+  for (const attr of Object.keys(
+    potentialAttributeBonus,
+  ) as OperatorAttributeType[]) {
+    const addValue = potentialAttributeBonus[attr] ?? 0;
+    if (!addValue) continue;
+
+    snapshot.attributes[attr] += addValue;
+    snapshot.log.push({
+      source: "potential",
+      bucket: attr,
+      addValue,
+      log: `Potential rank ${build.potentialRank} (+${addValue} ${attr})`,
+    });
+  }
+
   // Collect weapon-skill and gear rest-stat atoms first, then apply them in one pass.
   const weaponAndGearBonuses: RestBonusEntry[] = [];
 
@@ -240,7 +267,7 @@ export function computeRestStat(build: OperatorBuild): RestStatSnapshot {
 
   for (const e of weaponAndGearBonuses) {
     if (!e.addValue) continue;
-    applyRestStatAddValue(snapshot, e.bucket, e.addValue);
+    applyRestStatAddValue(snapshot, e.bucket, e.addValue, opDef.attributes.sub);
     snapshot.log.push(e);
   }
 

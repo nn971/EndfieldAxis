@@ -1,11 +1,16 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import operatorsData from "../../data/operators";
 import {
+  type DamageWatchEntry,
   makeEmptySimRenderCache,
   type SimRenderCache,
   type SkillBox,
   type SolutionState,
 } from "../../types/editor";
+import {
+  makeEmptySimDamageCache,
+  type SimDamageCache,
+} from "../../types/simDamage";
 import type { OperatorId, SkillType } from "../../data/operators/OperatorDef";
 import type { OperatorBuild, RestStatSnapshot } from "../../types/operator";
 import { statUpdater } from "./statUpdater";
@@ -114,6 +119,8 @@ function initState(): SolutionState {
     skillBoxes: initialSkillBoxes,
     buildByOperatorId,
     simRenderCache: makeEmptySimRenderCache(),
+    simDamageCache: makeEmptySimDamageCache(),
+    damageWatches: [],
   };
 }
 
@@ -135,6 +142,8 @@ export const solutionSlice = createSlice({
           action.payload.teamOperatorIds[0] ??
           "",
       };
+      next.simDamageCache ??= makeEmptySimDamageCache();
+      next.damageWatches ??= [];
       for (const [opId, build] of Object.entries(
         next.buildByOperatorId ?? {},
       )) {
@@ -153,6 +162,39 @@ export const solutionSlice = createSlice({
     },
     simRenderCacheReplaced(state, action: PayloadAction<SimRenderCache>) {
       state.simRenderCache = action.payload;
+    },
+    simDamageCacheReplaced(state, action: PayloadAction<SimDamageCache>) {
+      state.simDamageCache = action.payload;
+    },
+    damageWatchAdded(state) {
+      const id = makeId("dw_");
+      const defaultSourceId = state.controlledOperatorId || null;
+      state.damageWatches.push({
+        id,
+        name: `Watch ${state.damageWatches.length + 1}`,
+        filter: {
+          sourceId: defaultSourceId,
+          skillType: null,
+          damageType: null,
+        },
+      });
+    },
+    damageWatchPatched(
+      state,
+      action: PayloadAction<{
+        id: string;
+        patch: Partial<Omit<DamageWatchEntry, "id">>;
+      }>,
+    ) {
+      const { id, patch } = action.payload;
+      const watch = state.damageWatches.find(w => w.id === id);
+      if (!watch) return;
+      Object.assign(watch, patch);
+    },
+    damageWatchDeleted(state, action: PayloadAction<{ id: string }>) {
+      const { id } = action.payload;
+      const idx = state.damageWatches.findIndex(w => w.id === id);
+      if (idx >= 0) state.damageWatches.splice(idx, 1);
     },
     laneReordered(state, action: PayloadAction<{ from: number; to: number }>) {
       const { from, to } = action.payload;
@@ -250,6 +292,10 @@ export const {
   skillBoxAdded,
   skillBoxDeleted,
   simRenderCacheReplaced,
+  simDamageCacheReplaced,
+  damageWatchAdded,
+  damageWatchPatched,
+  damageWatchDeleted,
   controlledOperatorSet,
 } = solutionSlice.actions;
 

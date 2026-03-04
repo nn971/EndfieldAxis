@@ -1,6 +1,10 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
 import { delay } from "../../simulator/scripts";
-import { OperatorDef, OperatorDefInit } from "./OperatorDef";
+import {
+  OperatorDef,
+  OperatorDefInit,
+  type OperatorAttributeBonus,
+} from "./OperatorDef";
 
 const NS_DMG_MUL = [
   1.56, 1.71, 1.87, 2.02, 2.18, 2.34, 2.49, 2.65, 2.8, 3.0, 3.23, 3.5,
@@ -176,6 +180,17 @@ class EstellaDef extends OperatorDef {
 
   override getComboUltimateEnergyGainOnHit(): number {
     return 9;
+  }
+
+  override getPotentialAttributeBonus(potentialRank?: number): OperatorAttributeBonus {
+    if (!potentialRank || potentialRank < 4) {
+      return {};
+    }
+
+    return {
+      will: 10,
+      strength: 10,
+    };
   }
 
   override registerSimPlugins(registry: SimRegistry): void {

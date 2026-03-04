@@ -1,6 +1,6 @@
 // Simulator types are intentionally not imported here to avoid type-level cycles.
 
-import { WeaponId, WeaponSkillId } from "../data/weapons/WeaponDef";
+import { WeaponId } from "../data/weapons/WeaponDef";
 import type { GearsId } from "../data/gears/GearsDef";
 import {
   OperatorAttributeType,
@@ -28,6 +28,7 @@ export const DAMAGE_TYPE_LIST = [
 export type RestStatBonusBucket =
   | "baseAtk" // only used for add operatorAtk and weaponAtk
   | OperatorAttributeType
+  | "secondaryAttribute"
   | "atkIncRatio"
   | "atkIncFlat"
   | "artsIntensity"

@@ -1,11 +1,12 @@
 import { serializeSolution } from "../solution/solutionSL";
+import type { SkillType } from "../../data/operators/OperatorDef";
 import type { SolutionState } from "../../types/editor";
-import { DAMAGE_BUCKETS, type DamageBucket } from "../../simulator/damage/damageBonuses";
+import { DAMAGE_BUCKETS } from "../../simulator/damage/damageBonuses";
 import type { SimEventType } from "../../types/simulator/simulator";
+import type { SimHitDamageSnapshot } from "../../types/simDamage";
 import {
   toEventTypeSequence,
   type RunSolutionSimResult,
-  type SimHitDamageSnapshot,
 } from "../sim/runSolutionSim";
 
 export const CURRENT_SIM_TEST_CASE_VERSION = 2;
@@ -49,6 +50,16 @@ function numberEq(a: number, b: number): boolean {
   return Math.abs(a - b) <= NUMBER_EPSILON;
 }
 
+function isSkillTypeOrNull(v: unknown): v is SkillType | null {
+  return (
+    v === null ||
+    v === "normalAttack" ||
+    v === "normalSkill" ||
+    v === "comboSkill" ||
+    v === "ultimate"
+  );
+}
+
 function normalizeSolution(solution: SolutionState): SolutionState {
   return JSON.parse(serializeSolution(solution)) as SolutionState;
 }
@@ -60,6 +71,9 @@ function validateHitDamageSnapshot(
   if (
     !isFiniteNumber(v.frame) ||
     !isFiniteNumber(v.seq) ||
+    typeof v.hitEventId !== "string" ||
+    !(typeof v.castStartEventId === "string" || v.castStartEventId === null) ||
+    !isSkillTypeOrNull(v.castSkillType) ||
     typeof v.sourceId !== "string" ||
     typeof v.targetId !== "string" ||
     typeof v.damageType !== "string" ||

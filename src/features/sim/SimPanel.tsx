@@ -2,13 +2,14 @@ import { useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { summarizeLog } from "../../simulator/log";
 import { makeEmptySimRenderCache } from "../../types/editor";
+import { makeEmptySimDamageCache } from "../../types/simDamage";
 import {
   selectBuildByOperatorId,
   selectControlledOperatorId,
   selectSkillBoxes,
   selectTeamOperatorIds,
 } from "../solution/selectors";
-import { simRenderCacheReplaced } from "../solution/solutionSlice";
+import { simDamageCacheReplaced, simRenderCacheReplaced } from "../solution/solutionSlice";
 import { runSolutionSim } from "./runSolutionSim";
 
 export default function SimPanel() {
@@ -28,6 +29,12 @@ export default function SimPanel() {
     });
 
     dispatch(simRenderCacheReplaced(result.simRenderCache));
+    dispatch(
+      simDamageCacheReplaced({
+        totalDamage: result.totalDamage,
+        hitDamageSnapshots: result.hitDamageSnapshots,
+      }),
+    );
 
     const finalWorldDescription = JSON.stringify(result.env, null, 2);
     setLogText(
@@ -63,6 +70,7 @@ export default function SimPanel() {
             onClick={() => {
               setLogText("");
               dispatch(simRenderCacheReplaced(makeEmptySimRenderCache()));
+              dispatch(simDamageCacheReplaced(makeEmptySimDamageCache()));
             }}
           >
             Clear

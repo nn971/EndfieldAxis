@@ -79,6 +79,11 @@ const PARAMS: Record<
     M: { A: 180, B: 45, C: 10 },
     S: { A: 135, B: 34, C: 8 },
   },
+  ultimategainefficiencyboost: {
+    L: { A: 225, B: 56, C: 12 },
+    M: { A: 180, B: 45, C: 10 },
+    S: { A: 135, B: 34, C: 8 },
+  },
 };
 
 function evalSkillBoostValues(
@@ -201,6 +206,20 @@ export function getWeaponSkillRestBonus(
           bucket: "criticalRate",
           addValue,
           log: `Weapon ${weaponId} ${skill} criticalrateboost (rank ${r})`,
+        };
+      }
+      case "ultimategainefficiencyboost": {
+        const addValue = evalSkillBoostValues(
+          "ultimategainefficiencyboost",
+          s,
+          r,
+          true,
+        );
+        return {
+          source: "weapon",
+          bucket: "ultimateGainEfficiency",
+          addValue,
+          log: `Weapon ${weaponId} ${skill} ultimategainefficiencyboost (rank ${r})`,
         };
       }
       default:

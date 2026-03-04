@@ -31,6 +31,10 @@ export type OperatorStatSnapshot = {
   will: number;
 };
 
+export type OperatorAttributeBonus = Partial<
+  Record<OperatorAttributeType, number>
+>;
+
 export type SkillType =
   | "normalAttack"
   | "normalSkill"
@@ -107,6 +111,10 @@ export abstract class OperatorDef {
 
   getComboUltimateEnergyGainOnHit(): number {
     return 6.5;
+  }
+
+  getPotentialAttributeBonus(_potentialRank?: number): OperatorAttributeBonus {
+    return {};
   }
 
   /**

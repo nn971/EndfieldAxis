@@ -1,6 +1,6 @@
 import operatorsData from "../../data/operators";
 import { createDefaultDamageModel } from "../../simulator/damage/damageModel";
-import { SkillType } from "../../data/operators/OperatorDef";
+import type { SkillType } from "../../data/operators/OperatorDef";
 import { loadSimRegistry } from "../../simulator/listeners/registry";
 import type { SimLog } from "../../simulator/log";
 import { SimWorld, type SimResourceSample } from "../../simulator/simulator";
@@ -23,19 +23,14 @@ import type {
   SkillBox,
   SolutionState,
 } from "../../types/editor";
-import type { OperatorBuild } from "../../types/operator";
+import type { DamageType } from "../../types/operator";
+import {
+  makeEmptySimDamageCache,
+  type SimDamageCache,
+  type SimHitDamageSnapshot,
+} from "../../types/simDamage";
 import { DAMAGE_BUCKETS, type DamageBucket } from "../../simulator/damage/damageBonuses";
 import { DEFAULT_STAGGER_CAP_MILLI } from "../../types/simulator/stagger";
-
-export type SimHitDamageSnapshot = {
-  frame: number;
-  seq: number;
-  sourceId: string;
-  targetId: string;
-  damageType: string;
-  amount: number;
-  buckets: Record<DamageBucket, number>;
-};
 
 export type RunSolutionSimResult = {
   env: SimEnv;
@@ -43,8 +38,21 @@ export type RunSolutionSimResult = {
   processedEvents: SimEvent[];
   resourceSamples: SimResourceSample[];
   simRenderCache: SimRenderCache;
+  totalDamage: number;
   hitDamageSnapshots: SimHitDamageSnapshot[];
 };
+
+function toSkillTypeOrNull(v: unknown): SkillType | null {
+  if (
+    v === "normalAttack" ||
+    v === "normalSkill" ||
+    v === "comboSkill" ||
+    v === "ultimate"
+  ) {
+    return v;
+  }
+  return null;
+}
 
 function buildSimRenderCache(
   events: SimEvent[],
@@ -308,19 +316,34 @@ function extractHitDamageSnapshots(log: SimLog): SimHitDamageSnapshot[] {
 
   for (const entry of log) {
     if (entry.cat !== "dmg") continue;
+    const meta =
+      typeof entry.ctx.meta === "object" && entry.ctx.meta !== null
+        ? (entry.ctx.meta as {
+            hitEvent?: { id?: unknown; seq?: unknown };
+            castStartEventId?: unknown;
+            castSkillType?: unknown;
+          })
+        : undefined;
+    const hitEvent =
+      typeof meta?.hitEvent === "object" && meta.hitEvent !== null
+        ? meta.hitEvent
+        : undefined;
     const sourceId = entry.ctx.source.id;
     const targetId = entry.ctx.target.id;
     const buckets = Object.fromEntries(
       DAMAGE_BUCKETS.map(bucket => [bucket, Number(entry.ctx.bonuses[bucket] ?? 0)]),
     ) as Record<DamageBucket, number>;
-    const hitSeq = Number((entry.ctx.meta as { hitEvent?: { seq?: number } })?.hitEvent?.seq ?? -1);
+    const hitSeq = Number(hitEvent?.seq ?? -1);
 
     snapshots.push({
       frame: entry.frame,
       seq: hitSeq,
+      hitEventId: typeof hitEvent?.id === "string" ? hitEvent.id : "",
+      castStartEventId: typeof meta?.castStartEventId === "string" ? meta.castStartEventId : null,
+      castSkillType: toSkillTypeOrNull(meta?.castSkillType),
       sourceId,
       targetId,
-      damageType: entry.ctx.type,
+      damageType: entry.ctx.type as DamageType,
       amount: entry.amount,
       buckets,
     });
@@ -408,6 +431,13 @@ export function runSolutionSim(
     Number(world.env.entitiesById[targetId]?.stagger?.capMilli ?? 0),
     ultimateEnergyMaxByOperatorId,
   );
+  const hitDamageSnapshots = extractHitDamageSnapshots(world.log);
+  const totalDamage = hitDamageSnapshots.reduce((sum, snapshot) => sum + snapshot.amount, 0);
+  const simDamageCache: SimDamageCache = {
+    ...makeEmptySimDamageCache(),
+    totalDamage,
+    hitDamageSnapshots,
+  };
 
   return {
     env: world.env,
@@ -415,7 +445,8 @@ export function runSolutionSim(
     processedEvents: world.processedEvents,
     resourceSamples: world.resourceSamples,
     simRenderCache,
-    hitDamageSnapshots: extractHitDamageSnapshots(world.log),
+    totalDamage: simDamageCache.totalDamage,
+    hitDamageSnapshots: simDamageCache.hitDamageSnapshots,
   };
 }
 

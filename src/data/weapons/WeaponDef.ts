@@ -28,7 +28,8 @@ export type BaseWeaponSkillId =
   | "naturedmgboost"
   | "cryodmgboost"
   | "attackboost"
-  | "criticalrateboost";
+  | "criticalrateboost"
+  | "ultimategainefficiencyboost";
 export type Size = "L" | "M" | "S";
 export type ThirdWeaponSkillCat = "combative" | "infliction";
 export type ThirdWeaponSkillId = string; // unique id for each weapon's 3rd skill
@@ -108,6 +109,7 @@ export const BASE_WEAPON_SKILL_LABEL: Record<BaseWeaponSkillId, string> = {
   cryodmgboost: "Cryo DMG Boost",
   attackboost: "ATK Boost",
   criticalrateboost: "Critical Rate Boost",
+  ultimategainefficiencyboost: "Ultimate Gain Efficiency Boost",
 };
 
 export const THIRD_WEAPON_SKILL_CAT_LABEL: Record<ThirdWeaponSkillCat, string> =

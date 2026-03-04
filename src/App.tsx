@@ -21,6 +21,7 @@ import {
 } from "./features/solution/selectors";
 import SolutionSLPanel from "./features/solution/SolutionSLPanel";
 import TestPanel from "./features/dev/testPanel";
+import DamageStatisticPanel from "./features/sim/DamageStatisticPanel";
 
 function remapSelectedLane(
   selectedLane: number | null,
@@ -53,9 +54,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <div className="mx-auto max-w-6xl p-4">
-        <div className="flex gap-4">
-          <div className="w-[300px] shrink-0">
+      <div className="mx-auto max-w-7xl p-4">
+        <div className="flex flex-col gap-4 lg:flex-row">
+          <div className="w-full lg:w-[300px] lg:shrink-0">
             <OperatorEditor
               laneIndex={selectedLane}
               operatorId={operatorId}
@@ -75,7 +76,7 @@ export default function App() {
             />
           </div>
 
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             <AxisEditor
               teamOperatorIds={teamOperatorIds}
               controlledOperatorId={controlledOperatorId}
@@ -96,6 +97,10 @@ export default function App() {
             <SimPanel />
             <SolutionSLPanel />
             <TestPanel />
+          </div>
+
+          <div className="w-full lg:w-[320px] lg:shrink-0 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-auto">
+            <DamageStatisticPanel />
           </div>
         </div>
       </div>
