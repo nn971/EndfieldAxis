@@ -83,6 +83,7 @@ export type SimRead = {
   getBuild(entityId: SimEntityId): OperatorBuild | undefined;
   /** Lookup an event by id (useful for provenance via SimEventBase.ref). */
   getEvent(id: string | null): SimEvent | undefined;
+  random(): number;
 };
 
 export type SimOps = {
@@ -94,7 +95,6 @@ export type SimOps = {
     drafts: readonly SimEventDraft[],
     opts?: { defaultRef?: string },
   ) => void;
-  /** Deterministic random number generator. Returns value in [0, 1). */
   random: () => number;
   /** Pop the next event in chronological order. */
   popNextEvent: () => SimEvent | null;
@@ -172,6 +172,7 @@ type SimWorldInit = {
   entities: SimEntity[];
   buildByOperatorId: Record<string, OperatorBuild>;
   nowInFrames?: number;
+  seed?: number;
   futureEvents?: SimEvent[];
   registry: SimRegistry;
   damageModel?: DamageModel;
@@ -231,6 +232,8 @@ export class SimWorld {
   private readonly blockedCastStartIds = new Set<string>();
   public readonly controlledOperatorId?: string;
 
+  private rngState: number;
+
   public readonly read: SimRead;
   public readonly ops: SimOps;
   private readonly resolvers: SimResolvers;
@@ -238,6 +241,7 @@ export class SimWorld {
   constructor(init: SimWorldInit) {
     this.controlledOperatorId = init.controlledOperatorId;
     this.buildByOperatorId = init.buildByOperatorId;
+    this.rngState = init.seed ?? 12345;
     const entitiesById: Record<string, SimEntity> = {};
     for (const e of init.entities) {
       entitiesById[e.id] = e;
@@ -298,12 +302,14 @@ export class SimWorld {
       getBuild: (entityId: SimEntityId) => self.buildByOperatorId?.[entityId],
       getEvent: (id: string | null) =>
         id ? self.eventById.get(id) : undefined,
+      random: () => self.random(),
     };
 
     this.ops = {
       nextSeq: () => this.nextSeq(),
       schedule: (ev: SimEvent) => this.schedule(ev),
       scheduleDrafts: (drafts, opts) => this.scheduleDrafts(drafts, opts),
+      random: () => this.random(),
       popNextEvent: () => this.popNextEvent(),
       advanceToFrame: (frame: number) => this.advanceToFrame(frame),
       log: (cat, message, ctx, breakdown, amount) =>
@@ -417,6 +423,13 @@ export class SimWorld {
     return this.queue.shift() ?? null;
   }
 
+  private random(): number {
+    let t = (this.rngState += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+
   private advanceToFrame(frame: number): void {
     const delta = Math.max(0, frame - this.nowInFrames);
     this.nowInFrames = frame;
@@ -457,14 +470,16 @@ export class SimWorld {
 
   private getComboCooldownFrames(operatorId: SimEntityId): number {
     const opDef = operatorsData[operatorId];
-    const cooldownTable = opDef?.getComboCooldownSecondsByRank() ?? null;
+    const build = this.read.getBuild(operatorId);
+    const potentialRank = Number(build?.potentialRank ?? 0);
+    const cooldownTable = opDef?.getComboCooldownSecondsByRank?.(potentialRank) ?? null;
     if (!cooldownTable || cooldownTable.length === 0) return 0;
 
-    const build = this.read.getBuild(operatorId);
     const rank = Math.max(
       1,
       Math.floor(Number(build?.skillRanks?.comboSkill ?? 9)),
     );
+
     const cooldownSec = Number(
       cooldownTable[Math.min(cooldownTable.length - 1, rank - 1)] ?? 0,
     );
@@ -477,7 +492,9 @@ export class SimWorld {
 
   private getUltimateEnergyCost(operatorId: SimEntityId): number {
     const opDef = operatorsData[operatorId];
-    const raw = Number(opDef?.getUltimateEnergyCost?.() ?? 100);
+    const build = this.buildByOperatorId?.[operatorId];
+    const potentialRank = Number(build?.potentialRank ?? 0);
+    const raw = Number(opDef?.getUltimateEnergyCost?.(potentialRank) ?? 100);
     return Number.isFinite(raw) ? Math.max(1, raw) : 100;
   }
 
@@ -611,7 +628,6 @@ export class SimWorld {
       spent: number;
       realSpent: number;
       fakeSpent: number;
-      lastHitEventId: string | null;
     }
   >();
 

@@ -62,6 +62,7 @@ export const DEFAULT_INFLICTION_DURATION_FRAMES = 1800;
 export const ARTS_BURST_DELAY_FRAMES = 12;
 export const ARTS_BURST_BASE_MUL = 1.6;
 export const ARTS_BURST_PER_STACK_MUL = 0;
+export const NORMAL_SKILL_TEAM_ULTIMATE_GAIN = 6.5;
 
 export const COMBO_AVAILABLE_WINDOW_FRAMES = 300;
 
@@ -429,7 +430,6 @@ export function resolveCastStart(
       spent: spendRes.spent,
       realSpent: spendRes.realSpent,
       fakeSpent: spendRes.fakeSpent,
-      lastHitEventId: self.findLastHitEventIdForCast(ev.id),
     });
     if (!spendRes.isLegal) {
       self.ops.log(
@@ -568,25 +568,30 @@ export function resolveHit(
   }
 
   if (parentCastStart?.skillType === "normalSkill") {
-    const castState = self.normalSkillCastById.get(parentCastStart.id);
-    if (castState && castState.lastHitEventId === ev.id) {
-      const ratio = Math.max(0, Math.min(1, castState.realSpent / 100));
-      const baseGain = 6.5 * ratio;
-      const efficiency = getUltimateGainEfficiency(
-        self.read,
-        parentCastStart.sourceId,
-      );
-      const gain = baseGain * (1 + efficiency);
-      const gained = self.ops.gainUltimateEnergy(
-        parentCastStart.sourceId,
-        gain,
-      );
-      if (gained > 0) {
-        const owner = self.read.getEntity(parentCastStart.sourceId);
-        self.ops.log(
-          "act",
-          `"${owner?.name}" gained ${gained.toFixed(2)} ultimate energy from normal skill hit`,
-        );
+    const lastHitEventId = self.findLastHitEventIdForCast(parentCastStart.id);
+    if (lastHitEventId === ev.id) {
+      const castState = self.normalSkillCastById.get(parentCastStart.id);
+      self.normalSkillCastById.delete(parentCastStart.id);
+
+      const spent = Math.max(0, Number(castState?.spent ?? 0));
+      const realSpent = Math.max(0, Number(castState?.realSpent ?? 0));
+      const realSpRatio = spent > 0 ? Math.min(1, realSpent / spent) : 0;
+      const gainPerOperator = NORMAL_SKILL_TEAM_ULTIMATE_GAIN * realSpRatio;
+      if (gainPerOperator > 0) {
+        const operatorIds = Object.keys(self.env.resources.ultimateByOperatorId)
+          .sort((a, b) => a.localeCompare(b));
+        let totalGained = 0;
+
+        for (const operatorId of operatorIds) {
+          totalGained += self.ops.gainUltimateEnergy(operatorId, gainPerOperator);
+        }
+
+        if (totalGained > 0) {
+          self.ops.log(
+            "act",
+            `team gained ${totalGained.toFixed(2)} ultimate energy from normal skill final hit (real SP ratio ${(realSpRatio * 100).toFixed(1)}%)`,
+          );
+        }
       }
     }
   }

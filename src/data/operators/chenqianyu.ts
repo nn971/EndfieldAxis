@@ -14,6 +14,10 @@ const CS_COOLDOWN_SECONDS = [
   16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 15,
 ] as const;
 
+const CS_COOLDOWN_SECONDS_P5 = [
+  13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 12,
+] as const;
+
 const ULT_SLASH_DMG_MUL = [
   0.36, 0.4, 0.43, 0.47, 0.5, 0.54, 0.58, 0.61, 0.65, 0.69, 0.75, 0.81,
 ] as const;
@@ -102,9 +106,15 @@ class ChenQianyuDef extends OperatorDef {
             yield ctx.emit.statusApply({
               statusType: "lift",
             });
+            const potentialRank = Number(
+              ctx.read.getBuild(ctx.sourceId!)?.potentialRank ?? 0,
+            );
+            const baseMultiplier = ctx.byRank!(r => NS_DMG_MUL[r] ?? 0);
+            const finalMultiplier =
+              potentialRank >= 3 ? baseMultiplier * 1.1 : baseMultiplier;
             yield ctx.emit.hit({
               damageType: "physical",
-              dmgMultiplier: ctx.byRank!(r => NS_DMG_MUL[r] ?? 0),
+              dmgMultiplier: finalMultiplier,
               staggerOnHit: 10,
             });
           },
@@ -118,9 +128,15 @@ class ChenQianyuDef extends OperatorDef {
             yield ctx.emit.statusApply({
               statusType: "lift",
             });
+            const potentialRank = Number(
+              ctx.read.getBuild(ctx.sourceId!)?.potentialRank ?? 0,
+            );
+            const baseMultiplier = ctx.byRank!(r => CS_DMG_MUL[r] ?? 0);
+            const finalMultiplier =
+              potentialRank >= 3 ? baseMultiplier * 1.1 : baseMultiplier;
             yield ctx.emit.hit({
               damageType: "physical",
-              dmgMultiplier: ctx.byRank!(r => CS_DMG_MUL[r] ?? 0),
+              dmgMultiplier: finalMultiplier,
             });
           },
         },
@@ -129,12 +145,20 @@ class ChenQianyuDef extends OperatorDef {
           durationFrames: 224,
           icon: "CHENQIANYU_ULT.png",
           script: function* (ctx) {
-            const slash = ctx.byRank!(r => ULT_SLASH_DMG_MUL[r] ?? 0);
+            const potentialRank = Number(
+              ctx.read.getBuild(ctx.sourceId!)?.potentialRank ?? 0,
+            );
+            const slashMultiplierBase = ctx.byRank!(r => ULT_SLASH_DMG_MUL[r] ?? 0);
+            const slashMultiplier =
+              potentialRank >= 3 ? slashMultiplierBase * 1.1 : slashMultiplierBase;
+            const finalMultiplierBase = ctx.byRank!(r => ULT_FINAL_DMG_MUL[r] ?? 0);
+            const finalMultiplier =
+              potentialRank >= 3 ? finalMultiplierBase * 1.1 : finalMultiplierBase;
             yield delay(32);
             for (let i = 0; i < 7; i += 1) {
               yield ctx.emit.hit({
                 damageType: "physical",
-                dmgMultiplier: slash,
+                dmgMultiplier: slashMultiplier,
                 staggerOnHit: i === 0 ? 15 : 0,
               });
               if (i < 6) {
@@ -144,7 +168,7 @@ class ChenQianyuDef extends OperatorDef {
             yield delay(29);
             yield ctx.emit.hit({
               damageType: "physical",
-              dmgMultiplier: ctx.byRank!(r => ULT_FINAL_DMG_MUL[r] ?? 0),
+              dmgMultiplier: finalMultiplier,
               staggerOnHit: 20,
             });
           },
@@ -153,12 +177,19 @@ class ChenQianyuDef extends OperatorDef {
     } satisfies OperatorDefInit);
   }
 
-  override getComboCooldownSecondsByRank(): readonly number[] | null {
+  override getComboCooldownSecondsByRank(potentialRank?: number): readonly number[] | null {
+    if (potentialRank && potentialRank >= 5) {
+      return CS_COOLDOWN_SECONDS_P5;
+    }
     return CS_COOLDOWN_SECONDS;
   }
 
-  override getUltimateEnergyCost(): number {
-    return 100;
+  override getUltimateEnergyCost(potentialRank?: number): number {
+    const baseCost = 100;
+    if (potentialRank && potentialRank >= 4) {
+      return Math.floor(baseCost * 0.85);
+    }
+    return baseCost;
   }
 
   override getComboUltimateEnergyGainOnHit(): number {
@@ -211,6 +242,22 @@ class ChenQianyuDef extends OperatorDef {
     });
 
     registry.registerGlobalDamageBonus({
+      id: "operator.chenqianyu.potential2.physicalDmgInc",
+      fn: ({ read, sourceId, collector }) => {
+        if (sourceId !== selfId) return;
+
+        const potentialRank = Number(read.getBuild(selfId)?.potentialRank ?? 0);
+        if (potentialRank < 2) return;
+
+        collector.addValue(
+          "dmgIncRatio",
+          0.08,
+          "operator.chenqianyu.potential2.physicalDmgInc(+8%)",
+        );
+      },
+    });
+
+    registry.registerGlobalDamageBonus({
       id: "operator.chenqianyu.potential3.skillDmgInc",
       fn: ({ read, ev, sourceId, collector }) => {
         if (sourceId !== selfId) return;
@@ -229,6 +276,28 @@ class ChenQianyuDef extends OperatorDef {
           "dmgIncRatio",
           0.1,
           "operator.chenqianyu.potential3.skillDmgInc(+10%)",
+        );
+      },
+    });
+
+    registry.registerGlobalDamageBonus({
+      id: "operator.chenqianyu.potential1.lowHpDmgInc",
+      fn: ({ read, sourceId, targetId, collector }) => {
+        if (sourceId !== selfId) return;
+
+        const potentialRank = Number(read.getBuild(selfId)?.potentialRank ?? 0);
+        if (potentialRank < 1) return;
+
+        const target = read.getEntity(targetId);
+        if (!target) return;
+
+        const targetHpPercent = (target as any).hp / ((target as any).maxHp ?? 1);
+        if (targetHpPercent >= 0.5) return;
+
+        collector.addValue(
+          "dmgIncRatio",
+          0.2,
+          "operator.chenqianyu.potential1.lowHpDmgInc(+20%)",
         );
       },
     });

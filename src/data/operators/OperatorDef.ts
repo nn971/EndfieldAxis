@@ -97,11 +97,11 @@ export abstract class OperatorDef {
     this.skills = init.skills;
   }
 
-  getComboCooldownSecondsByRank(): readonly number[] | null {
+  getComboCooldownSecondsByRank(potentialRank?: number): readonly number[] | null {
     return null;
   }
 
-  getUltimateEnergyCost(): number {
+  getUltimateEnergyCost(potentialRank?: number): number {
     return 100;
   }
 

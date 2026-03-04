@@ -134,7 +134,10 @@ class AleshDef extends OperatorDef {
           icon: "ALESH_CS.png",
           script: function* (ctx) {
             yield delay(36);
-            const isRareFin = Math.random() < RARE_FIN_CHANCE;
+            const potentialRank = Number(
+              ctx.read.getBuild(ctx.sourceId!)?.potentialRank ?? 0,
+            );
+            const isRareFin = ctx.read.random() < RARE_FIN_CHANCE;
             yield ctx.emit.hit({
               damageType: "physical",
               dmgMultiplier: isRareFin
@@ -142,6 +145,18 @@ class AleshDef extends OperatorDef {
                 : ctx.byRank!(r => CS_DMG_MUL[r] ?? 0),
               staggerOnHit: 10,
             });
+            if (isRareFin && potentialRank >= 3) {
+              for (const entityId of Object.keys(ctx.read.env.entitiesById)) {
+                const entity = ctx.read.getEntity(entityId);
+                if (entity?.type === "operator") {
+                  yield ctx.emit.buffApply({
+                    sourceId: ctx.sourceId!,
+                    targetId: entityId,
+                    buffId: "buff.alesh.rareFin.teamAtk",
+                  });
+                }
+              }
+            }
           },
         },
         ultimate: {
@@ -150,9 +165,22 @@ class AleshDef extends OperatorDef {
           icon: "ALESH_ULT.png",
           script: function* (ctx) {
             yield delay(180);
+            const potentialRank = Number(
+              ctx.read.getBuild(ctx.sourceId!)?.potentialRank ?? 0,
+            );
+            let dmgMultiplier = ctx.byRank!(r => ULT_DMG_MUL[r] ?? 0);
+            if (potentialRank >= 5) {
+              const target = ctx.read.getEntity(ctx.targetId ?? null);
+              const targetHpPercent =
+                ((target as any)?.hp ?? 0) /
+                ((target as any)?.maxHp ?? 1);
+              if (targetHpPercent < 0.5) {
+                dmgMultiplier *= 1.5;
+              }
+            }
             yield ctx.emit.hit({
               damageType: "cryo",
-              dmgMultiplier: ctx.byRank!(r => ULT_DMG_MUL[r] ?? 0),
+              dmgMultiplier,
               staggerOnHit: 20,
             });
             yield ctx.emit.inflictionApply({
@@ -165,12 +193,16 @@ class AleshDef extends OperatorDef {
     } satisfies OperatorDefInit);
   }
 
-  override getComboCooldownSecondsByRank(): readonly number[] | null {
+  override getComboCooldownSecondsByRank(_potentialRank?: number): readonly number[] | null {
     return CS_COOLDOWN_SECONDS;
   }
 
-  override getUltimateEnergyCost(): number {
-    return 100;
+  override getUltimateEnergyCost(potentialRank?: number): number {
+    const baseCost = 100;
+    if (potentialRank && potentialRank >= 4) {
+      return Math.floor(baseCost * 0.85);
+    }
+    return baseCost;
   }
 
   override getComboUltimateEnergyGainOnHit(): number {
@@ -210,6 +242,24 @@ class AleshDef extends OperatorDef {
         yield emit.spRecover({
           sourceId: selfId,
           amount: baseEnergy,
+        });
+      },
+    });
+
+    registry.registerOnBuffApply({
+      id: "operator.alesh.potential1.nsSpRecovery",
+      when: { buffId: "buff.solidification" },
+      cooldown: 60,
+      fn: function* ({ read, ev, emit, sourceId }) {
+        if (ev?.type !== "buffApply") return;
+        const build = read.getBuild(selfId);
+        if (!build || build.potentialRank < 1) return;
+        if (!read.env.entitiesById[selfId]) return;
+        if (sourceId !== selfId) return;
+
+        yield emit.spRecover({
+          sourceId: selfId,
+          amount: 10,
         });
       },
     });

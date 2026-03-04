@@ -90,16 +90,21 @@ class EstellaDef extends OperatorDef {
           name: "Onomatopoeia",
           durationFrames: 52,
           icon: "ESTELLA_NS.png",
-
           script: function* (ctx) {
             yield delay(26);
             yield ctx.emit.inflictionApply({
               inflictionType: "cryo",
               inflictionStacks: 1,
             });
+            const potentialRank = Number(
+              ctx.read.getBuild(ctx.sourceId!)?.potentialRank ?? 0,
+            );
+            const dmgMultiplier = ctx.byRank!(r => NS_DMG_MUL[r] ?? 0);
+            const finalMultiplier =
+              potentialRank >= 3 ? dmgMultiplier * 1.4 : dmgMultiplier;
             yield ctx.emit.hit({
               damageType: "cryo",
-              dmgMultiplier: ctx.byRank!(r => NS_DMG_MUL[r] ?? 0),
+              dmgMultiplier: finalMultiplier,
               staggerOnHit: 10,
             });
           },
@@ -108,7 +113,6 @@ class EstellaDef extends OperatorDef {
           name: "Distortion",
           durationFrames: 52,
           icon: "ESTELLA_CS.png",
-
           script: function* (ctx) {
             yield delay(34);
             yield ctx.emit.statusApply({
@@ -121,8 +125,15 @@ class EstellaDef extends OperatorDef {
             );
 
             if (isSolidified) {
+              const potentialRank = Number(
+                ctx.read.getBuild(ctx.sourceId!)?.potentialRank ?? 0,
+              );
+              const buffId =
+                potentialRank >= 1
+                  ? "buff.estella.combo.physicalSusceptibility.p1"
+                  : "buff.estella.combo.physicalSusceptibility";
               yield ctx.emit.buffApply({
-                buffId: "buff.estella.combo.physicalSusceptibility",
+                buffId,
               });
             }
             yield ctx.emit.hit({
@@ -138,7 +149,6 @@ class EstellaDef extends OperatorDef {
           name: "Tremolo",
           durationFrames: 110,
           icon: "ESTELLA_ULT.png",
-
           script: function* (ctx) {
             yield delay(55);
             yield ctx.emit.hit({
@@ -152,12 +162,16 @@ class EstellaDef extends OperatorDef {
     } satisfies OperatorDefInit);
   }
 
-  override getComboCooldownSecondsByRank(): readonly number[] | null {
+  override getComboCooldownSecondsByRank(_potentialRank?: number): readonly number[] | null {
     return CS_COOLDOWN_SECONDS;
   }
 
-  override getUltimateEnergyCost(): number {
-    return 130;
+  override getUltimateEnergyCost(potentialRank?: number): number {
+    const baseCost = 130;
+    if (potentialRank && potentialRank >= 2) {
+      return Math.floor(baseCost * 0.9);
+    }
+    return baseCost;
   }
 
   override getComboUltimateEnergyGainOnHit(): number {
@@ -177,6 +191,23 @@ class EstellaDef extends OperatorDef {
         yield emit.comboTriggered({
           sourceId: selfId,
           targetId: ev.targetId,
+        });
+      },
+    });
+
+    registry.registerOnBuffApply({
+      id: "operator.estella.potential5.energyOnSolidification",
+      when: { buffId: "buff.solidification" },
+      cooldown: 60,
+      fn: function* ({ read, ev, emit }) {
+        if (ev?.type !== "buffApply") return;
+        const build = read.getBuild(selfId);
+        if (!build || build.potentialRank < 5) return;
+        if (!read.env.entitiesById[selfId]) return;
+
+        yield emit.spRecover({
+          sourceId: selfId,
+          amount: 5,
         });
       },
     });
