@@ -70,7 +70,8 @@ class OBJRazorhornDef extends WeaponDef {
     registry.registerOnBuffConsumed({
       id: "weapon.objrazorhorn.onSolidificationConsumed",
       when: { buffId: "buff.solidification" },
-      fn: function* ({ read, ev, emit, sourceId }) {
+      fn: function* (ctx) {
+        const { read, ev, emit, sourceId } = ctx;
         if (ev?.type !== "buffRemove") return;
         if (!sourceId) return;
 

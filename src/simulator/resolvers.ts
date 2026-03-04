@@ -370,7 +370,8 @@ function normalizeBuffDurationFrames(params: {
     }
   }
 
-  const durationFrames = durationFramesOverride ?? buffsData[buffId]?.durationFrames;
+  const durationFrames =
+    durationFramesOverride ?? buffsData[buffId]?.durationFrames;
   if (durationFrames === undefined) {
     console.warn(
       `No duration defined for buffId=${buffId}, defaulting to non-expiring`,
@@ -568,6 +569,7 @@ export function resolveCastStart(
 
   const spawned = self.registry.runOnCastStart({
     read: self.read,
+    ops: self.ops,
     ev: ev,
     sourceId: ev.sourceId,
     targetId: ev.targetId,
@@ -592,6 +594,7 @@ export function resolveCastEnd(
 
   const spawned = self.registry.runOnCastEnd({
     read: self.read,
+    ops: self.ops,
     ev: ev,
     sourceId: ev.sourceId,
     targetId: ev.targetId,
@@ -621,7 +624,8 @@ export function resolveHit(
     !isNormalAttackHit ||
     (source.id === self.controlledOperatorId && isFinalNormalAttackHit);
   const staggerOnHit = Number(
-    ev.staggerOnHit ?? getStaggerOnHitFromAncestorEvent(self.read, source.id, ev),
+    ev.staggerOnHit ??
+      getStaggerOnHitFromAncestorEvent(self.read, source.id, ev),
   );
   let shouldApplyStaggeredDebuff = false;
   if (canApplyStagger && staggerOnHit > 0) {
@@ -692,12 +696,16 @@ export function resolveHit(
       const realSpRatio = spent > 0 ? Math.min(1, realSpent / spent) : 0;
       const gainPerOperator = NORMAL_SKILL_TEAM_ULTIMATE_GAIN * realSpRatio;
       if (gainPerOperator > 0) {
-        const operatorIds = Object.keys(self.env.resources.ultimateByOperatorId)
-          .sort((a, b) => a.localeCompare(b));
+        const operatorIds = Object.keys(
+          self.env.resources.ultimateByOperatorId,
+        ).sort((a, b) => a.localeCompare(b));
         let totalGained = 0;
 
         for (const operatorId of operatorIds) {
-          totalGained += self.ops.gainUltimateEnergy(operatorId, gainPerOperator);
+          totalGained += self.ops.gainUltimateEnergy(
+            operatorId,
+            gainPerOperator,
+          );
         }
 
         if (totalGained > 0) {
@@ -712,6 +720,7 @@ export function resolveHit(
 
   const spawned = self.registry.runAfterHit({
     read: self.read,
+    ops: self.ops,
     ev: ev,
     sourceId: source.id,
     targetId: target.id,
@@ -1100,7 +1109,11 @@ export function resolveInflictionApplication(
         sourceId: source.id,
         targetId: owner.id,
         damageType: artsType,
-        staggerOnHit: getStaggerOnHitFromAncestorEvent(self.read, source.id, ev),
+        staggerOnHit: getStaggerOnHitFromAncestorEvent(
+          self.read,
+          source.id,
+          ev,
+        ),
         dmgMultiplier:
           initialHitBaseMul + consumedArtsStacks * initialHitPerStackMul,
         ref: ev.id,
@@ -1148,7 +1161,11 @@ export function resolveInflictionApplication(
         sourceId: source.id,
         targetId: owner.id,
         damageType: artsType,
-        staggerOnHit: getStaggerOnHitFromAncestorEvent(self.read, source.id, ev),
+        staggerOnHit: getStaggerOnHitFromAncestorEvent(
+          self.read,
+          source.id,
+          ev,
+        ),
         dmgMultiplier: ARTS_BURST_BASE_MUL + after * ARTS_BURST_PER_STACK_MUL,
         ref: ev.id,
       } as SimEvent);
@@ -1165,6 +1182,7 @@ export function resolveInflictionApplication(
 
   const spawned = self.registry.runOnInflictionApply({
     read: self.read,
+    ops: self.ops,
     ev,
     sourceId: source.id,
     targetId: owner.id,

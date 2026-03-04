@@ -71,15 +71,8 @@ class CrystalBuffDef extends BuffDef {
 
     registry.registerOnStatusApply({
       id: CRYSTAL_ON_STATUS_APPLY_PLUGIN_ID,
-      fn: function* ({
-        read,
-        ev,
-        targetId,
-        emit,
-        sourceId,
-        startFrame,
-        skillType,
-      }) {
+      fn: function* (ctx) {
+        const { read, ev, targetId } = ctx;
         if (ev?.type !== "statusApply" || !targetId) return;
         if (!read.env.entitiesById[ENDMINISTRATOR_ID]) return;
 
@@ -98,29 +91,14 @@ class CrystalBuffDef extends BuffDef {
           read,
           targetId,
         });
-        yield* script({
-          read,
-          ev,
-          emit,
-          sourceId,
-          targetId,
-          startFrame,
-          skillType,
-        });
+        yield* script(ctx);
       },
     });
 
     registry.registerOnInflictionApply({
       id: "buff.crystal.consume.onInflictionApply",
-      fn: function* ({
-        read,
-        ev,
-        targetId,
-        emit,
-        sourceId,
-        startFrame,
-        skillType,
-      }) {
+      fn: function* (ctx) {
+        const { read, ev, targetId } = ctx;
         if (ev?.type !== "inflictionApply" || !targetId) return;
         if (!read.env.entitiesById[ENDMINISTRATOR_ID]) return;
 
@@ -138,15 +116,7 @@ class CrystalBuffDef extends BuffDef {
           read,
           targetId,
         });
-        yield* script({
-          read,
-          ev,
-          emit,
-          sourceId,
-          targetId,
-          startFrame,
-          skillType,
-        });
+        yield* script(ctx);
       },
     });
   }

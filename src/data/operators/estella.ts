@@ -173,7 +173,9 @@ class EstellaDef extends OperatorDef {
     } satisfies OperatorDefInit);
   }
 
-  override getComboCooldownSecondsByRank(_potentialRank?: number): readonly number[] | null {
+  override getComboCooldownSecondsByRank(
+    _potentialRank?: number,
+  ): readonly number[] | null {
     return CS_COOLDOWN_SECONDS;
   }
 
@@ -189,7 +191,9 @@ class EstellaDef extends OperatorDef {
     return 9;
   }
 
-  override getPotentialAttributeBonus(potentialRank?: number): OperatorAttributeBonus {
+  override getPotentialAttributeBonus(
+    potentialRank?: number,
+  ): OperatorAttributeBonus {
     if (!potentialRank || potentialRank < 4) {
       return {};
     }
@@ -206,7 +210,8 @@ class EstellaDef extends OperatorDef {
     registry.registerOnBuffApply({
       id: "operator.estella.combo.triggerOnSolidification",
       when: { buffId: "buff.solidification" },
-      fn: function* ({ read, ev, emit }) {
+      fn: function* (ctx) {
+        const { read, ev, emit } = ctx;
         if (!read.env.entitiesById[selfId]) return;
         if (ev?.type !== "buffApply") return;
 
@@ -221,7 +226,8 @@ class EstellaDef extends OperatorDef {
       id: "operator.estella.potential5.energyOnSolidification",
       when: { buffId: "buff.solidification" },
       cooldown: 60,
-      fn: function* ({ read, ev, emit }) {
+      fn: function* (ctx) {
+        const { read, ev, emit } = ctx;
         if (ev?.type !== "buffApply") return;
         const build = read.getBuild(selfId);
         if (!build || build.potentialRank < 5) return;

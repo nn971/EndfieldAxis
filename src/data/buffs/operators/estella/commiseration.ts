@@ -33,7 +33,8 @@ class CommiserationDef extends BuffDef {
     registry.registerOnBuffConsumed({
       id: "operator.estella.talent1.commiseration.applyOnShatter",
       when: { buffId: SOLIDIFICATION_BUFF_ID },
-      fn: function* ({ read, ev, emit }) {
+      fn: function* (ctx) {
+        const { read, ev, emit } = ctx;
         if (ev?.type !== "buffRemove" || !ev.ref) return;
 
         const shatterTrigger = read.getEvent(ev.ref);
@@ -61,9 +62,11 @@ class CommiserationDef extends BuffDef {
 
     registry.registerOnCastStart({
       id: "operator.estella.talent1.commiseration.consumeOnOnomatopoeia",
-      fn: function* ({ read, ev, emit }) {
+      fn: function* (ctx) {
+        const { read, ev, emit } = ctx;
         if (ev?.type !== "castStart") return;
-        if (ev.sourceId !== ESTELLA_ID || ev.skillType !== "normalSkill") return;
+        if (ev.sourceId !== ESTELLA_ID || ev.skillType !== "normalSkill")
+          return;
 
         const estella = read.getEntity(ESTELLA_ID);
         if (!estella?.buffs?.[ESTELLA_TALENT1_COMMISERATION_BUFF_ID]) return;

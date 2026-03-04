@@ -32,7 +32,8 @@ class CombustionBuffDef extends BuffDef {
     registry.registerOnBuffApply({
       id: "buff.combustion.scheduleDot",
       when: { buffId },
-      fn: function* ({ ev, read, emit }) {
+      fn: function* (ctx) {
+        const { ev, read, emit } = ctx;
         if (ev?.type !== "buffApply") return;
         const target = read.getEntity(ev.targetId);
         const buff = (target as any).buffs?.[buffId];

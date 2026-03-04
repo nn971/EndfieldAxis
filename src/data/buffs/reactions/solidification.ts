@@ -56,7 +56,8 @@ class SolidificationBuffDef extends BuffDef {
 
     registry.registerOnStatusApply({
       id: "buff.solidification.shatter.onPhysicalStatus",
-      fn: function* ({ read, ev, sourceId, targetId, emit }) {
+      fn: function* (ctx) {
+        const { read, ev, sourceId, targetId, emit } = ctx;
         if (ev?.type !== "statusApply" || !sourceId || !targetId) return;
         if (
           ev.statusType !== "lift" &&
@@ -87,7 +88,8 @@ class SolidificationBuffDef extends BuffDef {
 
     registry.registerOnInflictionApply({
       id: "buff.solidification.shatter.onVulnerable",
-      fn: function* ({ read, ev, sourceId, targetId, emit }) {
+      fn: function* (ctx) {
+        const { read, ev, sourceId, targetId, emit } = ctx;
         if (ev?.type !== "inflictionApply" || !sourceId || !targetId) return;
         if (ev.inflictionType !== "vulnerable") return;
 

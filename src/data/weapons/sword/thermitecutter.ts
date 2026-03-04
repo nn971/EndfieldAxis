@@ -1,5 +1,5 @@
-import type { SimRead } from "../../../simulator/simulator";
 import { SimRegistry } from "../../../simulator/listeners/registry";
+import type { SimScriptContext } from "../../../simulator/scripts";
 import { WeaponDef } from "../WeaponDef";
 
 const BUFF_KEY = "weapon.thermitecutter.teamAtkBuff" as const;
@@ -27,8 +27,11 @@ class ThermiteCutterDef extends WeaponDef {
         bonus: {
           bucket: "atkIncRatio",
           byRank: r => {
-            const values = [0.10, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.20, 0.22];
-            return values[r] ?? 0.10;
+            const values = [
+              0.1, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.2,
+              0.22,
+            ];
+            return values[r] ?? 0.1;
           },
         },
       },
@@ -38,7 +41,10 @@ class ThermiteCutterDef extends WeaponDef {
   override registerSimPlugins(registry: SimRegistry): void {
     const selfId = this.id;
 
-    const applyTeamBuff = function* ({ read, emit, sourceId }: { read: SimRead; emit: any; sourceId: string }) {
+    const applyTeamBuff = function* (
+      ctx: Pick<SimScriptContext, "read" | "emit" | "sourceId">,
+    ) {
+      const { read, emit, sourceId } = ctx;
       for (const entityId of Object.keys(read.env.entitiesById)) {
         const entity = read.getEntity(entityId);
         if (entity?.type === "operator") {
@@ -60,7 +66,8 @@ class ThermiteCutterDef extends WeaponDef {
 
     registry.registerOnSpRecover({
       id: "weapon.thermitecutter.onSpRecover",
-      fn: function* ({ read, ev, emit }) {
+      fn: function* (ctx) {
+        const { read, ev, emit } = ctx;
         if (ev?.type !== "spRecover") return;
         const sourceId = ev.sourceId;
         const build = read.getBuild(sourceId);
@@ -72,7 +79,8 @@ class ThermiteCutterDef extends WeaponDef {
     registry.registerOnBuffApply({
       id: "weapon.thermitecutter.onLinkApplied",
       when: { buffId: "buff.link" },
-      fn: function* ({ read, ev, emit, sourceId }) {
+      fn: function* (ctx) {
+        const { read, ev, emit, sourceId } = ctx;
         if (ev?.type !== "buffApply") return;
         if (!sourceId) return;
         const build = read.getBuild(sourceId);

@@ -148,12 +148,20 @@ class ChenQianyuDef extends OperatorDef {
             const potentialRank = Number(
               ctx.read.getBuild(ctx.sourceId!)?.potentialRank ?? 0,
             );
-            const slashMultiplierBase = ctx.byRank!(r => ULT_SLASH_DMG_MUL[r] ?? 0);
+            const slashMultiplierBase = ctx.byRank!(
+              r => ULT_SLASH_DMG_MUL[r] ?? 0,
+            );
             const slashMultiplier =
-              potentialRank >= 3 ? slashMultiplierBase * 1.1 : slashMultiplierBase;
-            const finalMultiplierBase = ctx.byRank!(r => ULT_FINAL_DMG_MUL[r] ?? 0);
+              potentialRank >= 3
+                ? slashMultiplierBase * 1.1
+                : slashMultiplierBase;
+            const finalMultiplierBase = ctx.byRank!(
+              r => ULT_FINAL_DMG_MUL[r] ?? 0,
+            );
             const finalMultiplier =
-              potentialRank >= 3 ? finalMultiplierBase * 1.1 : finalMultiplierBase;
+              potentialRank >= 3
+                ? finalMultiplierBase * 1.1
+                : finalMultiplierBase;
             yield delay(32);
             for (let i = 0; i < 7; i += 1) {
               yield ctx.emit.hit({
@@ -177,7 +185,9 @@ class ChenQianyuDef extends OperatorDef {
     } satisfies OperatorDefInit);
   }
 
-  override getComboCooldownSecondsByRank(potentialRank?: number): readonly number[] | null {
+  override getComboCooldownSecondsByRank(
+    potentialRank?: number,
+  ): readonly number[] | null {
     if (potentialRank && potentialRank >= 5) {
       return CS_COOLDOWN_SECONDS_P5;
     }
@@ -204,7 +214,8 @@ class ChenQianyuDef extends OperatorDef {
 
     registry.registerOnInflictionApply({
       id: "operator.chenqianyu.combo.triggerOnVulnerableApply",
-      fn: function* ({ ev, emit }) {
+      fn: function* (ctx) {
+        const { ev, emit } = ctx;
         if (
           ev?.type !== "inflictionApply" ||
           ev.inflictionType !== "vulnerable"
@@ -222,7 +233,8 @@ class ChenQianyuDef extends OperatorDef {
     registry.registerAfterHit({
       id: "operator.chenqianyu.talent.atkStack",
       when: { sourceOperatorId: selfId },
-      fn: function* ({ read, ev, sourceId, emit }) {
+      fn: function* (ctx) {
+        const { read, ev, sourceId, emit } = ctx;
         if (ev?.type !== "hit" || !sourceId) return;
         const parent = ev.ref ? read.getEvent(ev.ref) : null;
         const isSkillHit = parent
@@ -302,7 +314,8 @@ class ChenQianyuDef extends OperatorDef {
         const target = read.getEntity(targetId);
         if (!target) return;
 
-        const targetHpPercent = (target as any).hp / ((target as any).maxHp ?? 1);
+        const targetHpPercent =
+          (target as any).hp / ((target as any).maxHp ?? 1);
         if (targetHpPercent >= 0.5) return;
 
         collector.addValue(

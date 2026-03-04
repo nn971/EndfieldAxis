@@ -75,7 +75,8 @@ export abstract class EternalXiraniteSetDef extends GearsDef {
         ETERNAL_XIRANITE_TRIGGER_BUFF_IDS.includes(
           ev.buffId as (typeof ETERNAL_XIRANITE_TRIGGER_BUFF_IDS)[number],
         ),
-      fn: function* ({ read, ev, emit, sourceId }) {
+      fn: function* (ctx) {
+        const { read, ev, emit, sourceId } = ctx;
         if (ev?.type !== "buffApply") return;
         if (!sourceId) return;
 

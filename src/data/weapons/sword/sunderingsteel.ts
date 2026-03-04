@@ -38,7 +38,8 @@ class SunderingSteelDef extends WeaponDef {
     registry.registerOnStatusApply({
       id: SUNDERING_STEEL_ON_STATUS_APPLY_PLUGIN_ID,
       when: { sourceWeaponId: this.id },
-      fn: function* ({ sourceId, emit, ev }) {
+      fn: function* (ctx) {
+        const { sourceId, emit, ev } = ctx;
         if (ev?.type !== "statusApply" || !sourceId) return;
         yield emit.buffApply({
           sourceId,

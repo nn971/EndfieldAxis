@@ -172,7 +172,8 @@ class AkekuriDef extends OperatorDef {
 
     registry.registerOnCastStart({
       id: "global.link.consumeOnCastStart",
-      fn: function* ({ read, ev }) {
+      fn: function* (ctx) {
+        const { read, ev } = ctx;
         if (ev?.type !== "castStart") return;
         const globalBuffs = (read.env as SimEnv).globalBuffs;
         const link = globalBuffs.link;
@@ -206,7 +207,8 @@ class AkekuriDef extends OperatorDef {
 
     registry.registerOnCastEnd({
       id: "global.link.cleanupCastMap",
-      fn: function* ({ read, ev }) {
+      fn: function* (ctx) {
+        const { read, ev } = ctx;
         if (ev?.type !== "castEnd") return;
         const globalBuffs = (read.env as SimEnv).globalBuffs;
         const map = globalBuffs?.link?.castBonusByCastStartId;

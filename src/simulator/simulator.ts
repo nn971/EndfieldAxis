@@ -160,7 +160,9 @@ type SimResolvers = {
   ) => void;
   resolveSpRecover: (ev: Extract<SimEvent, { type: "spRecover" }>) => void;
   resolveSpReturn: (ev: Extract<SimEvent, { type: "spReturn" }>) => void;
-  resolveStaggerExpire: (ev: Extract<SimEvent, { type: "staggerExpire" }>) => void;
+  resolveStaggerExpire: (
+    ev: Extract<SimEvent, { type: "staggerExpire" }>,
+  ) => void;
 };
 
 type SimWorldInit = {
@@ -293,7 +295,8 @@ export class SimWorld {
         return self.env;
       },
       getEntity: (id: SimEntityId) => self.getEntityOrThrow(id),
-      hasBuffType: (targetId, buffTypeId) => self.hasBuffType(targetId, buffTypeId),
+      hasBuffType: (targetId, buffTypeId) =>
+        self.hasBuffType(targetId, buffTypeId),
       getBuffByKey: (targetId, buffKey) => self.getBuffByKey(targetId, buffKey),
       getBuild: (entityId: SimEntityId) => self.buildByOperatorId?.[entityId],
       getEvent: (id: string | null) =>
@@ -829,6 +832,7 @@ export class SimWorld {
           const triggerPlugins = () => {
             const spawned = this.registry.runOnStatusApply({
               read: this.read,
+              ops: this.ops,
               ev,
               sourceId: source.id,
               targetId: target.id,
@@ -852,6 +856,7 @@ export class SimWorld {
 
           const spawned = this.registry.runOnBuffApply({
             read: this.read,
+            ops: this.ops,
             ev: ev,
             sourceId: source?.id,
             targetId: owner.id,
@@ -870,6 +875,7 @@ export class SimWorld {
 
           const spawned = this.registry.runOnBuffConsumed({
             read: this.read,
+            ops: this.ops,
             ev,
             sourceId: ev.targetId,
           });
@@ -923,6 +929,7 @@ export class SimWorld {
           this.resolvers.resolveSpReturn(ev);
           const drafts = this.registry.runOnSpReturn({
             read: this.read,
+            ops: this.ops,
             ev,
             sourceId: ev.sourceId,
           });
@@ -934,6 +941,7 @@ export class SimWorld {
           this.resolvers.resolveSpRecover(ev);
           const drafts = this.registry.runOnSpRecover({
             read: this.read,
+            ops: this.ops,
             ev,
             sourceId: ev.sourceId,
           });

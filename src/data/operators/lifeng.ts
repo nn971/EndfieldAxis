@@ -213,9 +213,9 @@ class LifengDef extends OperatorDef {
     // Talent 2: Subduer of Evil - Deal bonus damage when applying Knock Down
     registry.registerOnStatusApply({
       id: "operator.lifeng.talent2.subduerOfEvil",
-      fn: function* ({ read, ev, emit, sourceId }) {
-        if (ev?.type !== "statusApply" || ev.statusType !== "knockDown")
-          return;
+      fn: function* (ctx) {
+        const { read, ev, emit, sourceId } = ctx;
+        if (ev?.type !== "statusApply" || ev.statusType !== "knockDown") return;
         if (!sourceId || sourceId !== selfId) return;
 
         // TODO: Check talent rank and apply bonus damage

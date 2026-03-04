@@ -237,34 +237,36 @@ class AleshDef extends OperatorDef {
     registry.registerOnBuffApply({
       id: "operator.alesh.talent.energyOnSolidification",
       when: { buffId: "buff.solidification" },
-      fn: function* ({ read, ev, emit, sourceId }) {
+      fn: function* (ctx) {
+        const { read, ev, emit, sourceId } = ctx;
         if (ev?.type !== "buffApply") return;
         if (!read.env.entitiesById[selfId]) return;
 
         const isAppliedByAlesh = sourceId === selfId;
-        const baseEnergy = isAppliedByAlesh ? 12 : 6;
-
-        yield emit.spRecover({
-          sourceId: selfId,
-          amount: baseEnergy,
-        });
+        if (!ctx.sourceTalent1Rank) return;
+        if (ctx.sourceTalent1Rank === 1) {
+          ctx.ops.gainUltimateEnergy(selfId, isAppliedByAlesh ? 3 : 9);
+        } else if (ctx.sourceTalent1Rank === 2) {
+          ctx.ops.gainUltimateEnergy(selfId, isAppliedByAlesh ? 4 : 12);
+        }
       },
     });
 
     registry.registerOnBuffApply({
       id: "operator.alesh.talent.energyOnCrystal",
       when: { buffId: "buff.crystal" },
-      fn: function* ({ read, ev, emit, sourceId }) {
+      fn: function* (ctx) {
+        const { read, ev, emit, sourceId } = ctx;
         if (ev?.type !== "buffApply") return;
         if (!read.env.entitiesById[selfId]) return;
 
         const isAppliedByAlesh = sourceId === selfId;
-        const baseEnergy = isAppliedByAlesh ? 12 : 6;
-
-        yield emit.spRecover({
-          sourceId: selfId,
-          amount: baseEnergy,
-        });
+        if (!ctx.sourceTalent1Rank) return;
+        if (ctx.sourceTalent1Rank === 1) {
+          ctx.ops.gainUltimateEnergy(selfId, isAppliedByAlesh ? 3 : 9);
+        } else if (ctx.sourceTalent1Rank === 2) {
+          ctx.ops.gainUltimateEnergy(selfId, isAppliedByAlesh ? 4 : 12);
+        }
       },
     });
   }

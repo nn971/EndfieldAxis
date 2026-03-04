@@ -164,13 +164,16 @@ class EmberDef extends OperatorDef {
     // Talent 2: Pay the Ferric Price - Gain ATK when receiving damage
     registry.registerAfterHit({
       id: "operator.ember.talent2.payTheFerricPrice",
-      fn: function* ({ read, ev, emit }) {
+      fn: function* (ctx) {
+        const { read, ev, emit } = ctx;
         if (ev?.type !== "hit" || ev.targetId !== selfId) return;
 
         const source = ev.sourceId ? read.getEntity(ev.sourceId) : null;
         if (!source || source.type === "operator") return; // Only from enemies
 
-        const talentRank = Number(read.getBuild(selfId)?.talentRanks?.talent2 ?? 0);
+        const talentRank = Number(
+          read.getBuild(selfId)?.talentRanks?.talent2 ?? 0,
+        );
         const atkBonus = talentRank >= 2 ? 0.09 : 0.06;
         yield emit.buffApply({
           sourceId: selfId,

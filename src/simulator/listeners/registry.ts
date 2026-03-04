@@ -2,7 +2,7 @@ import type { SimBuff } from "../../types/simulator/infliction";
 import type { SimEntityId, SimEvent } from "../../types/simulator/simulator";
 import type { SimEventDraft, SimScript } from "../scripts";
 import type { DamageBonusCollector } from "../damage/damageBonuses";
-import type { SimRead } from "../simulator";
+import type { SimOps, SimRead } from "../simulator";
 import operatorsData from "../../data/operators";
 import buffsData from "../../data/buffs";
 import weaponsData from "../../data/weapons";
@@ -14,7 +14,11 @@ import {
   type PluginOrderingBucket,
 } from "./pluginOrder";
 import type { SimEventWhen } from "../../types/simulator/when";
-import { runSimScript, type SimScriptContext } from "../scripts";
+import {
+  runSimScript,
+  type SimScriptContext,
+  type SimScriptOps,
+} from "../scripts";
 import type { SkillType } from "../../data/operators/OperatorDef";
 
 /**
@@ -48,6 +52,7 @@ export type BuffDamageBonusListener = (
 
 export type AfterHitTriggerContext = {
   read: SimRead;
+  ops: SimOps;
   ev: Extract<SimEvent, { type: "hit" }>;
   sourceId: SimEntityId;
   targetId: SimEntityId;
@@ -56,6 +61,7 @@ export type AfterHitTrigger = SimScript;
 
 export type OnCastTriggerContext = {
   read: SimRead;
+  ops: SimOps;
   ev: Extract<SimEvent, { type: "castStart" | "castEnd" }>;
   sourceId: SimEntityId;
   targetId?: SimEntityId;
@@ -64,6 +70,7 @@ export type OnCastTrigger = SimScript;
 
 export type OnStatusApplyTriggerContext = {
   read: SimRead;
+  ops: SimOps;
   ev: Extract<SimEvent, { type: "statusApply" }>;
   sourceId: SimEntityId;
   targetId: SimEntityId;
@@ -72,6 +79,7 @@ export type OnStatusApplyTrigger = SimScript;
 
 export type OnBuffApplyTriggerContext = {
   read: SimRead;
+  ops: SimOps;
   ev: Extract<SimEvent, { type: "buffApply" }>;
   sourceId?: SimEntityId;
   targetId: SimEntityId;
@@ -80,6 +88,7 @@ export type OnBuffApplyTrigger = SimScript;
 
 export type OnBuffConsumedTriggerContext = {
   read: SimRead;
+  ops: SimOps;
   ev: Extract<SimEvent, { type: "buffRemove" }>;
   sourceId: SimEntityId;
 };
@@ -87,6 +96,7 @@ export type OnBuffConsumedTrigger = SimScript;
 
 export type OnInflictionApplyTriggerContext = {
   read: SimRead;
+  ops: SimOps;
   ev: Extract<SimEvent, { type: "inflictionApply" }>;
   sourceId: SimEntityId;
   targetId: SimEntityId;
@@ -95,6 +105,7 @@ export type OnInflictionApplyTrigger = SimScript;
 
 export type OnInflictionConsumedTriggerContext = {
   read: SimRead;
+  ops: SimOps;
   ev: Extract<SimEvent, { type: "inflictionExpire" }>;
   sourceId: SimEntityId;
 };
@@ -102,6 +113,7 @@ export type OnInflictionConsumedTrigger = SimScript;
 
 export type OnSpRecoverTriggerContext = {
   read: SimRead;
+  ops: SimOps;
   ev: Extract<SimEvent, { type: "spRecover" }>;
   sourceId: SimEntityId;
 };
@@ -109,6 +121,7 @@ export type OnSpRecoverTrigger = SimScript;
 
 export type OnSpReturnTriggerContext = {
   read: SimRead;
+  ops: SimOps;
   ev: Extract<SimEvent, { type: "spReturn" }>;
   sourceId: SimEntityId;
 };
@@ -149,6 +162,19 @@ function normalizeCooldown(cooldown: number | undefined): number | undefined {
   const value = Math.floor(Number(cooldown));
   if (!Number.isFinite(value) || value <= 0) return undefined;
   return value;
+}
+
+function normalizeRank(value: unknown): number {
+  const rank = Number(value);
+  if (!Number.isFinite(rank)) return 0;
+  return Math.max(0, Math.round(rank));
+}
+
+function makeScriptOps(ops: SimOps): SimScriptOps {
+  return {
+    gainUltimateEnergy: (operatorId, amount) =>
+      ops.gainUltimateEnergy(operatorId, amount),
+  };
 }
 
 function sortEntries<TFn>(
@@ -496,11 +522,12 @@ export class SimRegistry {
 
   private buildScriptContext(
     ctx: TriggerContext,
-  ): Omit<SimScriptContext, "emit"> {
+  ): Omit<SimScriptContext, "emit" | "byRank"> {
     const sourceId = "sourceId" in ctx ? ctx.sourceId : ctx.ev.targetId;
     const targetId =
       "targetId" in ctx && ctx.targetId ? ctx.targetId : sourceId;
     const skillType = this.getSkillTypeFromEvent(ctx.ev);
+    const sourceBuild = sourceId ? ctx.read.getBuild(sourceId) : undefined;
     const defaultHitStaggerOnHit =
       ctx.ev.type === "castStart" && sourceId
         ? Number(operatorsData[sourceId]?.skills[skillType]?.staggerOnHit ?? 0)
@@ -508,13 +535,17 @@ export class SimRegistry {
 
     return {
       read: ctx.read,
+      ops: makeScriptOps(ctx.ops),
       ev: ctx.ev,
       sourceId,
       targetId,
       startFrame: ctx.ev.frame,
       skillType,
       defaultHitStaggerOnHit,
-      sourceBuild: sourceId ? ctx.read.getBuild(sourceId) : undefined,
+      sourceBuild,
+      sourcePotentialRank: normalizeRank(sourceBuild?.potentialRank),
+      sourceTalent1Rank: normalizeRank(sourceBuild?.talentRanks?.talent1),
+      sourceTalent2Rank: normalizeRank(sourceBuild?.talentRanks?.talent2),
     };
   }
 

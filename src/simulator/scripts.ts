@@ -61,9 +61,15 @@ export type SimScriptEmit = {
 
 export type ByRankSelector = (rankIndex: number) => number;
 
+export type SimScriptOps = {
+  /** TODO need to be boosted by ultimate gain efficiency */
+  gainUltimateEnergy: (operatorId: string, amount: number) => void;
+};
+
 export type SimScriptContext = {
   read: SimRead;
   emit: SimScriptEmit;
+  ops: SimScriptOps;
   /**
    * Select a value based on current skill rank (1-12).
    * The selector receives a 0-based rank index (0-11).
@@ -77,8 +83,13 @@ export type SimScriptContext = {
   skillType: SkillType;
   defaultHitStaggerOnHit?: number;
   sourceBuild?: {
+    potentialRank?: number;
+    talentRanks?: Record<string, number>;
     skillRanks?: Record<string, number>;
   };
+  sourcePotentialRank: number;
+  sourceTalent1Rank: number;
+  sourceTalent2Rank: number;
   ev?: SimEvent;
 };
 
@@ -199,6 +210,13 @@ function makeCtxByRank(
   };
 }
 
+function makeCtxOps(ops?: SimScriptOps): SimScriptOps {
+  return {
+    gainUltimateEnergy: (operatorId, amount) =>
+      ops?.gainUltimateEnergy(operatorId, amount),
+  };
+}
+
 export const emit = {
   /** @deprecated Prefer ctx.emit.* from SimScriptContext */
   ...makeCtxEmit({ sourceId: undefined, targetId: undefined }),
@@ -206,7 +224,9 @@ export const emit = {
 
 export function runSimScript(params: {
   script: SimScript;
-  ctx: Omit<SimScriptContext, "emit">;
+  ctx: Omit<SimScriptContext, "emit" | "byRank" | "ops"> & {
+    ops?: SimScriptOps;
+  };
   baseFrame: number;
 }): SimEventDraft[] {
   const { script, ctx, baseFrame } = params;
@@ -217,6 +237,7 @@ export function runSimScript(params: {
       targetId: ctx.targetId,
       defaultHitStaggerOnHit: ctx.defaultHitStaggerOnHit,
     }),
+    ops: makeCtxOps(ctx.ops),
     byRank: makeCtxByRank(ctx),
   } satisfies SimScriptContext;
   const out: SimEventDraft[] = [];

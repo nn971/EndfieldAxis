@@ -4,28 +4,28 @@ import { OperatorDef, OperatorDefInit } from "./OperatorDef";
 
 // Normal Skill: Dolly Rush
 const NS_DMG_MUL = [
-  1.42, 1.56, 1.71, 1.85, 1.99, 2.13, 2.28, 2.42, 2.56, 2.74, 2.95, 3.20,
+  1.42, 1.56, 1.71, 1.85, 1.99, 2.13, 2.28, 2.42, 2.56, 2.74, 2.95, 3.2,
 ] as const;
 
 // Combo Skill: Eruption Column
 const CS_DMG_MUL = [
-  0.45, 0.49, 0.54, 0.58, 0.62, 0.67, 0.71, 0.76, 0.80, 0.86, 0.93, 1.00,
+  0.45, 0.49, 0.54, 0.58, 0.62, 0.67, 0.71, 0.76, 0.8, 0.86, 0.93, 1.0,
 ] as const;
 const CS_EXPLOSION_DMG_MUL = [
-  1.11, 1.22, 1.33, 1.44, 1.55, 1.67, 1.78, 1.89, 2.00, 2.14, 2.30, 2.50,
+  1.11, 1.22, 1.33, 1.44, 1.55, 1.67, 1.78, 1.89, 2.0, 2.14, 2.3, 2.5,
 ] as const;
 
 // Ultimate: Wooly Party
 const ULT_DMG_MUL = [
-  2.31, 2.54, 2.77, 3.00, 3.23, 3.46, 3.69, 3.92, 4.15, 4.44, 4.79, 5.20,
+  2.31, 2.54, 2.77, 3.0, 3.23, 3.46, 3.69, 3.92, 4.15, 4.44, 4.79, 5.2,
 ] as const;
 
 // Normal Attack: Rocky Whispers - 4 hits
 const NA_HIT1_DMG_MUL = [
-  0.30, 0.33, 0.36, 0.39, 0.42, 0.45, 0.48, 0.51, 0.54, 0.58, 0.62, 0.68,
+  0.3, 0.33, 0.36, 0.39, 0.42, 0.45, 0.48, 0.51, 0.54, 0.58, 0.62, 0.68,
 ] as const;
 const NA_HIT2_DMG_MUL = [
-  0.40, 0.44, 0.48, 0.52, 0.56, 0.60, 0.64, 0.68, 0.72, 0.77, 0.83, 0.90,
+  0.4, 0.44, 0.48, 0.52, 0.56, 0.6, 0.64, 0.68, 0.72, 0.77, 0.83, 0.9,
 ] as const;
 const NA_HIT3_DMG_MUL = [
   0.53, 0.58, 0.63, 0.68, 0.74, 0.79, 0.84, 0.89, 0.95, 1.01, 1.09, 1.18,
@@ -166,7 +166,8 @@ class ArdeliaDef extends OperatorDef {
     // Talent 1: Friendly Presence - Healing when using skills on multiple enemies
     registry.registerAfterHit({
       id: "operator.ardelia.talent1.friendlyPresence",
-      fn: function* ({ read, ev, emit }) {
+      fn: function* (ctx) {
+        const { read, ev, emit } = ctx;
         if (ev?.type !== "hit" || ev.sourceId !== selfId) return;
         // Check if hit multiple enemies (simplified - actual implementation needs hit count tracking)
         // Apply healing based on Will attribute

@@ -166,7 +166,8 @@ class EndministratorDef extends OperatorDef {
 
     registry.registerAfterHit({
       id: "operator.endministrator.combo.triggerOnAllyComboHit",
-      fn: function* ({ read, ev, sourceId, emit }) {
+      fn: function* (ctx) {
+        const { read, ev, sourceId, emit } = ctx;
         if (ev?.type !== "hit" || !sourceId || sourceId === selfId) return;
         const source = read.getEntity(sourceId);
         if (!source || source.type !== "operator") return;
@@ -186,7 +187,8 @@ class EndministratorDef extends OperatorDef {
     registry.registerOnBuffConsumed({
       id: "operator.endministrator.talent1.onCrystalConsumed",
       when: { buffId: "buff.crystal" },
-      fn: function* ({ read, ev, emit }) {
+      fn: function* (ctx) {
+        const { read, ev, emit } = ctx;
         if (ev?.type !== "buffRemove" || !read.env.entitiesById[selfId]) return;
         const build = read.getBuild(selfId) as OperatorBuild;
         const talentRank = Number(build?.talentRanks?.talent1 ?? 0);
@@ -235,7 +237,8 @@ class EndministratorDef extends OperatorDef {
     registry.registerOnBuffApply({
       id: "operator.endministrator.potential2.shareAtkBuff.high",
       when: { buffKey: "buff.endministrator.talent1.atkInc" },
-      fn: function* ({ read, ev, emit }) {
+      fn: function* (ctx) {
+        const { read, ev, emit } = ctx;
         if (ev?.type !== "buffApply" || ev.targetId !== selfId) return;
         const build = read.getBuild(selfId);
         if (Number(build?.potentialRank ?? 0) < 2) return;
@@ -264,7 +267,8 @@ class EndministratorDef extends OperatorDef {
     registry.registerOnBuffApply({
       id: "operator.endministrator.potential2.shareAtkBuff.low",
       when: { buffKey: "buff.endministrator.talent1.atkInc.low" },
-      fn: function* ({ read, ev, emit }) {
+      fn: function* (ctx) {
+        const { read, ev, emit } = ctx;
         if (ev?.type !== "buffApply" || ev.targetId !== selfId) return;
         const build = read.getBuild(selfId);
         if (Number(build?.potentialRank ?? 0) < 2) return;
