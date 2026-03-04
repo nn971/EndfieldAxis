@@ -16,7 +16,7 @@ class TurbidCuttingTorchDef extends TideSurgeSetDef {
       bonusValuesByRank: {
         s1: [32, 35, 38, 41],
         s2: [21, 23, 25, 27],
-        s3: [13.8, 15.2, 16.6, 17.9],
+        s3: [0.138, 0.152, 0.166, 0.179],
       },
     });
   }

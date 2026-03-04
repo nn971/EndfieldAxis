@@ -16,7 +16,7 @@ class Type50YinglungRadarDef extends Type50YinglungSetDef {
       bonusValuesByRank: {
         s1: [32, 35, 38, 41],
         s2: [21, 23, 25, 27],
-        s3: [11.5, 12.7, 13.8, 14.9],
+        s3: [0.115, 0.127, 0.138, 0.149],
       },
     });
   }

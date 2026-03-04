@@ -62,7 +62,6 @@ export type SimScriptEmit = {
 export type ByRankSelector = (rankIndex: number) => number;
 
 export type SimScriptOps = {
-  /** TODO need to be boosted by ultimate gain efficiency */
   gainUltimateEnergy: (operatorId: string, amount: number) => void;
 };
 

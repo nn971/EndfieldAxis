@@ -16,7 +16,7 @@ class Type50YinglungGlovesT1Def extends Type50YinglungSetDef {
       bonusValuesByRank: {
         s1: [65, 71, 78, 84],
         s2: [43, 47, 51, 55],
-        s3: [20.7, 22.8, 24.8, 26.9],
+        s3: [0.207, 0.228, 0.248, 0.269],
       },
     });
   }

@@ -16,7 +16,7 @@ class MISecurityOverallsDef extends MISecuritySetDef {
       bonusValuesByRank: {
         s1: [87, 95, 104, 113],
         s2: [58, 63, 69, 75],
-        s3: [13.8, 15.2, 16.6, 17.9],
+        s3: [0.138, 0.152, 0.166, 0.179],
       },
     });
   }

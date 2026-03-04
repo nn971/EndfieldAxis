@@ -427,15 +427,6 @@ function getComboUltimateGain(operatorId: SimEntityId): number {
   return Number.isFinite(raw) ? Math.max(0, raw) : 6.5;
 }
 
-function getUltimateGainEfficiency(
-  read: SimRead,
-  operatorId: SimEntityId,
-): number {
-  const build = read.getBuild(operatorId);
-  const raw = Number(build?.restStat?.ultimateGainEfficiency ?? 0);
-  return Math.max(0, Number.isFinite(raw) ? raw : 0);
-}
-
 function toMilli(value: number): number {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return 0;
@@ -671,12 +662,10 @@ export function resolveHit(
 
   if (parentCastStart?.skillType === "comboSkill") {
     const gainBase = getComboUltimateGain(parentCastStart.sourceId);
-    const efficiency = getUltimateGainEfficiency(
-      self.read,
+    const gained = self.ops.gainUltimateEnergy(
       parentCastStart.sourceId,
+      gainBase,
     );
-    const gain = gainBase * (1 + efficiency);
-    const gained = self.ops.gainUltimateEnergy(parentCastStart.sourceId, gain);
     if (gained > 0) {
       self.ops.log(
         "act",

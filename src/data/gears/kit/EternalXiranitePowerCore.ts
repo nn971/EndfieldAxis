@@ -16,7 +16,7 @@ class EternalXiranitePowerCoreDef extends EternalXiraniteSetDef {
       bonusValuesByRank: {
         s1: [32, 35, 38, 41],
         s2: [21, 23, 25, 27],
-        s3: [24.6, 27.1, 29.6, 32.0],
+        s3: [0.246, 0.271, 0.296, 0.32],
       },
     });
   }

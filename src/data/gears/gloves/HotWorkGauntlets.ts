@@ -16,7 +16,7 @@ class HotWorkGauntletsDef extends HotWorkSetDef {
       bonusValuesByRank: {
         s1: [65, 71, 78, 84],
         s2: [43, 47, 51, 55],
-        s3: [19.2, 21.1, 23.0, 24.9],
+        s3: [0.192, 0.211, 0.23, 0.249],
       },
     });
   }

@@ -16,7 +16,7 @@ class MISecurityHandsPPEDef extends MISecuritySetDef {
       bonusValuesByRank: {
         s1: [65, 71, 78, 84],
         s2: [43, 47, 51, 55],
-        s3: [13.8, 15.2, 16.6, 17.9],
+        s3: [0.138, 0.152, 0.166, 0.179],
       },
     });
   }

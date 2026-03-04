@@ -16,7 +16,7 @@ class HotWorkExoskeletonDef extends HotWorkSetDef {
       bonusValuesByRank: {
         s1: [87, 95, 104, 113],
         s2: [58, 63, 69, 75],
-        s3: [11.5, 12.7, 13.8, 14.9],
+        s3: [0.115, 0.127, 0.138, 0.149],
       },
     });
   }

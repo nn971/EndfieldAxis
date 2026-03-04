@@ -16,7 +16,7 @@ class BonekrushaFigurineT1Def extends BonekrushaSetDef {
       bonusValuesByRank: {
         s1: [32, 35, 38, 41],
         s2: [21, 23, 25, 27],
-        s3: [20.7, 22.8, 24.8, 26.9],
+        s3: [0.207, 0.228, 0.248, 0.269],
       },
     });
   }

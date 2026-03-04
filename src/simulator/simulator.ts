@@ -740,7 +740,11 @@ export class SimWorld {
   private gainUltimateEnergy(operatorId: SimEntityId, amount: number): number {
     const state = this.env.resources.ultimateByOperatorId[operatorId];
     if (!state) return 0;
-    const gain = Math.max(0, Number(amount) || 0);
+    const baseGain = Math.max(0, Number(amount) || 0);
+    const build = this.buildByOperatorId?.[operatorId];
+    const rawEfficiency = Number(build?.restStat?.ultimateGainEfficiency ?? 0);
+    const efficiency = Math.max(0, Number.isFinite(rawEfficiency) ? rawEfficiency : 0);
+    const gain = baseGain * (1 + efficiency);
     const before = state.current;
     state.current = Math.min(state.max, before + gain);
     return state.current - before;

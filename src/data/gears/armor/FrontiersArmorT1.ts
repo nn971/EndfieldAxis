@@ -16,7 +16,7 @@ class FrontiersArmorT1Def extends FrontiersSetDef {
       bonusValuesByRank: {
         s1: [87, 95, 104, 113],
         s2: [58, 63, 69, 75],
-        s3: [20.7, 22.8, 24.8, 26.9],
+        s3: [0.207, 0.228, 0.248, 0.269],
       },
     });
   }

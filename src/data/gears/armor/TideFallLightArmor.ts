@@ -16,7 +16,7 @@ class TideFallLightArmorDef extends TideSurgeSetDef {
       bonusValuesByRank: {
         s1: [87, 95, 104, 113],
         s2: [58, 63, 69, 75],
-        s3: [12.3, 13.6, 14.8, 16.0],
+        s3: [0.123, 0.136, 0.148, 0.16],
       },
     });
   }

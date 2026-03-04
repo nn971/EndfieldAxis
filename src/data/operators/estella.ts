@@ -100,12 +100,11 @@ class EstellaDef extends OperatorDef {
               inflictionType: "cryo",
               inflictionStacks: 1,
             });
-            const potentialRank = Number(
-              ctx.read.getBuild(ctx.sourceId!)?.potentialRank ?? 0,
-            );
             const dmgMultiplier = ctx.byRank!(r => NS_DMG_MUL[r] ?? 0);
             const finalMultiplier =
-              potentialRank >= 3 ? dmgMultiplier * 1.4 : dmgMultiplier;
+              ctx.sourcePotentialRank >= 3
+                ? dmgMultiplier + 0.4
+                : dmgMultiplier;
             yield ctx.emit.hit({
               damageType: "cryo",
               dmgMultiplier: finalMultiplier,
@@ -233,10 +232,7 @@ class EstellaDef extends OperatorDef {
         if (!build || build.potentialRank < 5) return;
         if (!read.env.entitiesById[selfId]) return;
 
-        yield emit.spRecover({
-          sourceId: selfId,
-          amount: 5,
-        });
+        ctx.ops.gainUltimateEnergy(selfId, 5);
       },
     });
   }

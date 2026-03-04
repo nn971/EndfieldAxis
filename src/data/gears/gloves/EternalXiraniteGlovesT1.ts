@@ -16,7 +16,7 @@ class EternalXiraniteGlovesT1Def extends EternalXiraniteSetDef {
       bonusValuesByRank: {
         s1: [65, 71, 78, 84],
         s2: [43, 47, 51, 55],
-        s3: [20.5, 22.6, 24.6, 26.7],
+        s3: [0.205, 0.226, 0.246, 0.267],
       },
     });
   }
