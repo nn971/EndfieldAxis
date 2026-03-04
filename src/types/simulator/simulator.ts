@@ -101,6 +101,7 @@ export type SimEvent =
       sourceId?: SimEntityId;
       targetId: SimEntityId;
       buffId: BuffId;
+      /** only buffs with the same buffKey can stack */
       buffKey?: BuffKey;
       durationFrames?: number;
       mods?: readonly BuffMod[];

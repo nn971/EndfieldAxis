@@ -226,7 +226,7 @@ class ChenQianyuDef extends OperatorDef {
         if (ev?.type !== "hit" || !sourceId) return;
         const parent = ev.ref ? read.getEvent(ev.ref) : null;
         const isSkillHit = parent
-          ? parent.type === "castStart" && parent.skillType != "normalAttack"
+          ? parent.type === "castStart" && parent.skillType !== "normalAttack"
           : false;
         if (!isSkillHit) return;
 
@@ -276,7 +276,7 @@ class ChenQianyuDef extends OperatorDef {
 
         const parent = ev.ref ? read.getEvent(ev.ref) : null;
         const isSkillHit = parent
-          ? parent.type === "castStart" && parent.skillType != "normalAttack"
+          ? parent.type === "castStart" && parent.skillType !== "normalAttack"
           : false;
         if (!isSkillHit) return;
 

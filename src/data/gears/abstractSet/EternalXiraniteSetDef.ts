@@ -3,6 +3,16 @@ import type { RestBonusEntry, OperatorBuild } from "../../../types/operator";
 import type { SimRegistry } from "../../../simulator/listeners/registry";
 import { GearSetBonusData } from "..";
 
+const ETERNAL_XIRANITE_TRIGGER_BUFF_IDS = [
+  "buff.common.amp",
+  "buff.common.protected",
+  "buff.common.susceptibility",
+  "buff.common.weakened",
+] as const;
+
+const ETERNAL_XIRANITE_TEAM_DMG_BUFF_KEY =
+  "set.eternalxiranite.teamDmgDealtBuff" as const;
+
 function countSetPieces(build: OperatorBuild, set: GearSetBonusData): number {
   return Object.values(build.gears).filter(
     slot => !!slot.gearId && set.gearIds.includes(slot.gearId),
@@ -59,21 +69,38 @@ export abstract class EternalXiraniteSetDef extends GearsDef {
     if (EternalXiraniteSetDef.registeredRegistries.has(registry)) return;
     EternalXiraniteSetDef.registeredRegistries.add(registry);
 
-    registry.registerGlobalDamageBonus({
-      id: "set.eternalxiranite.elementalDmgBonus",
-      fn: ({ read, sourceId, type, collector }) => {
+    registry.registerOnBuffApply({
+      id: "set.eternalxiranite.teamDmgDealtOnDebuffApply",
+      match: ({ ev }) =>
+        ETERNAL_XIRANITE_TRIGGER_BUFF_IDS.includes(
+          ev.buffId as (typeof ETERNAL_XIRANITE_TRIGGER_BUFF_IDS)[number],
+        ),
+      fn: function* ({ read, ev, emit, sourceId }) {
+        if (ev?.type !== "buffApply") return;
         if (!sourceId) return;
 
         const build = read.getBuild(sourceId);
         if (!build || !EternalXiraniteSetDef.hasRequiredPieces(build)) return;
 
-        const elementalTypes = ["heat", "electric", "cryo", "nature"] as const;
-        if (elementalTypes.includes(type as typeof elementalTypes[number])) {
-          collector.addValue(
-            "dmgIncRatio",
-            0.15,
-            "Eternal Xiranite 3-piece: Elemental DMG +15%"
-          );
+        const teammateIds = Object.values(read.env.entitiesById)
+          .filter(
+            entity => entity.type === "operator" && entity.id !== sourceId,
+          )
+          .map(entity => entity.id);
+
+        for (const teammateId of teammateIds) {
+          yield emit.buffApply({
+            sourceId,
+            targetId: teammateId,
+            buffId: "buff.common.dmgIncRatio",
+            buffKey: ETERNAL_XIRANITE_TEAM_DMG_BUFF_KEY,
+            durationFrames: 900,
+            maxStacks: 1,
+            runtime: {
+              value: 0.16,
+              role: "source",
+            },
+          });
         }
       },
     });

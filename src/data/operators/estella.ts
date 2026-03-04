@@ -136,7 +136,7 @@ class EstellaDef extends OperatorDef {
               yield ctx.emit.buffApply({
                 sourceId: ctx.sourceId,
                 targetId: ctx.targetId,
-                buffId: "buff.common.rcvDmgIncRatio",
+                buffId: "buff.common.susceptibility",
                 buffKey: "buff.estella.combo.physicalSusceptibility",
                 durationFrames,
                 maxStacks: 1,

@@ -123,6 +123,16 @@ class AleshDef extends OperatorDef {
               yield ctx.emit.buffApply({
                 buffId: "buff.solidification",
               });
+              const potential =
+                ctx.read.getBuild(ctx.sourceId!)?.potentialRank ?? 0;
+              yield ctx.emit.spRecover({
+                amount: ctx.byRank!(
+                  r =>
+                    10 * cryoStacks +
+                    (r >= 9 ? 5 : 0) +
+                    (potential >= 1 ? 10 : 0),
+                ),
+              });
             }
             yield ctx.emit.hit({
               damageType: "physical",
@@ -182,20 +192,20 @@ class AleshDef extends OperatorDef {
             if (potentialRank >= 5) {
               const target = ctx.read.getEntity(ctx.targetId ?? null);
               const targetHpPercent =
-                ((target as any)?.hp ?? 0) /
-                ((target as any)?.maxHp ?? 1);
+                ((target as any)?.hp ?? 0) / ((target as any)?.maxHp ?? 1);
               if (targetHpPercent < 0.5) {
                 dmgMultiplier *= 1.5;
               }
             }
+
+            yield ctx.emit.inflictionApply({
+              inflictionType: "cryo",
+              inflictionStacks: 2,
+            });
             yield ctx.emit.hit({
               damageType: "cryo",
               dmgMultiplier,
               staggerOnHit: 20,
-            });
-            yield ctx.emit.inflictionApply({
-              inflictionType: "cryo",
-              inflictionStacks: 2,
             });
           },
         },
@@ -203,7 +213,9 @@ class AleshDef extends OperatorDef {
     } satisfies OperatorDefInit);
   }
 
-  override getComboCooldownSecondsByRank(_potentialRank?: number): readonly number[] | null {
+  override getComboCooldownSecondsByRank(
+    _potentialRank?: number,
+  ): readonly number[] | null {
     return CS_COOLDOWN_SECONDS;
   }
 
@@ -252,24 +264,6 @@ class AleshDef extends OperatorDef {
         yield emit.spRecover({
           sourceId: selfId,
           amount: baseEnergy,
-        });
-      },
-    });
-
-    registry.registerOnBuffApply({
-      id: "operator.alesh.potential1.nsSpRecovery",
-      when: { buffId: "buff.solidification" },
-      cooldown: 60,
-      fn: function* ({ read, ev, emit, sourceId }) {
-        if (ev?.type !== "buffApply") return;
-        const build = read.getBuild(selfId);
-        if (!build || build.potentialRank < 1) return;
-        if (!read.env.entitiesById[selfId]) return;
-        if (sourceId !== selfId) return;
-
-        yield emit.spRecover({
-          sourceId: selfId,
-          amount: 10,
         });
       },
     });

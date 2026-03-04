@@ -9,7 +9,10 @@ import {
   selectSkillBoxes,
   selectTeamOperatorIds,
 } from "../solution/selectors";
-import { simDamageCacheReplaced, simRenderCacheReplaced } from "../solution/solutionSlice";
+import {
+  simDamageCacheReplaced,
+  simRenderCacheReplaced,
+} from "../solution/solutionSlice";
 import { runSolutionSim } from "./runSolutionSim";
 
 export default function SimPanel() {
@@ -41,7 +44,7 @@ export default function SimPanel() {
       summarizeLog(
         result.log,
         ["sim", "act", "buff", "stat", "dmg", "SP", "dev"],
-        false,
+        true,
       ) +
         "\n\n" +
         `Final world state:\n${finalWorldDescription}`,
