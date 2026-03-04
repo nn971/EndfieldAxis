@@ -1,12 +1,21 @@
 import type { SkillType } from "../data/operators/OperatorDef";
 import type { SimRead } from "./simulator";
-import type { SimEvent, SimEventType } from "../types/simulator/simulator";
+import type { SimEvent } from "../types/simulator/simulator";
 import { DistOmit, makeSimEventId, WithOptional } from "../shared/lib/utils";
 
 export type SimEventDraft = DistOmit<SimEvent, "id" | "seq">;
 type Draft<T extends SimEvent> = DistOmit<
   T,
   "id" | "seq" | "type" | "frame" | "ref"
+>;
+
+type BuffApplyEmitDraft = WithOptional<
+  Draft<Extract<SimEvent, { type: "buffApply" }>>,
+  "sourceId" | "targetId"
+>;
+type BuffRemoveEmitDraft = WithOptional<
+  Draft<Extract<SimEvent, { type: "buffRemove" }>>,
+  "targetId"
 >;
 
 type EmitDraftByType = {
@@ -18,14 +27,8 @@ type EmitDraftByType = {
     Draft<Extract<SimEvent, { type: "statusApply" }>>,
     "sourceId" | "targetId"
   >;
-  buffApply: WithOptional<
-    Draft<Extract<SimEvent, { type: "buffApply" }>>,
-    "sourceId" | "targetId"
-  >;
-  buffRemove: WithOptional<
-    Draft<Extract<SimEvent, { type: "buffRemove" }>>,
-    "targetId"
-  >;
+  buffApply: BuffApplyEmitDraft;
+  buffRemove: BuffRemoveEmitDraft;
   inflictionApply: WithOptional<
     Draft<Extract<SimEvent, { type: "inflictionApply" }>>,
     "sourceId" | "targetId"

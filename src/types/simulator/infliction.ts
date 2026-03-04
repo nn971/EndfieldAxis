@@ -1,4 +1,5 @@
 import { BuffId } from "../../data/buffs/BuffDef";
+import type { DamageBucket } from "../../simulator/damage/damageBonuses";
 import { DamageType } from "../operator";
 
 export type SimStatusType = "lift" | "knockDown" | "crush" | "breach";
@@ -30,14 +31,37 @@ export function isArtsInflictionType(
 }
 
 export type SimBuff = {
-  id: BuffId;
+  id: BuffTypeId;
+  key: BuffKey;
+  expiresAtFrame: number | null;
+  durationFrames: number | null;
+  mods?: readonly BuffMod[];
   lastApplyFrame: number;
 
   /** Optional stacks for stackable buffs */
   stacks?: number;
-  /** Optional per-buff runtime payload (e.g. reaction snapshots). */
   meta?: Record<string, unknown>;
+  runtime?: Record<string, unknown>;
 };
+
+export type BuffTypeId = BuffId;
+export type BuffKey = string;
+
+export type BuffMod =
+  | {
+      kind: "flat";
+      role: "source" | "target";
+      bucket: DamageBucket;
+      value: number;
+      damageType?: DamageType;
+    }
+  | {
+      kind: "perStack";
+      role: "source" | "target";
+      bucket: DamageBucket;
+      valuePerStack: number;
+      damageType?: DamageType;
+    };
 
 export type SimInfliction = {
   type: InflictionType;

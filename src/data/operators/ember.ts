@@ -170,13 +170,19 @@ class EmberDef extends OperatorDef {
         const source = ev.sourceId ? read.getEntity(ev.sourceId) : null;
         if (!source || source.type === "operator") return; // Only from enemies
 
-        // TODO: Apply ATK buff based on talent rank
-        // E2: ATK +6% for 7s, max 3 stacks
-        // E3: ATK +9% for 7s, max 3 stacks
+        const talentRank = Number(read.getBuild(selfId)?.talentRanks?.talent2 ?? 0);
+        const atkBonus = talentRank >= 2 ? 0.09 : 0.06;
         yield emit.buffApply({
           sourceId: selfId,
           targetId: selfId,
-          buffId: "buff.ember.talent2.atkInc",
+          buffId: "buff.common.atkIncRatio",
+          buffKey: "buff.ember.talent2.atkInc",
+          durationFrames: 420,
+          maxStacks: 3,
+          runtime: {
+            valuePerStack: atkBonus,
+            role: "source",
+          },
         });
       },
     });

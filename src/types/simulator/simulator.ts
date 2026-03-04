@@ -2,6 +2,8 @@ import { BuffId } from "../../data/buffs/BuffDef";
 import { DmgType, SkillType } from "../../data/operators/OperatorDef";
 
 import type {
+  BuffMod,
+  BuffKey,
   SimInfliction,
   SimBuff,
   SimStatusType,
@@ -99,18 +101,25 @@ export type SimEvent =
       sourceId?: SimEntityId;
       targetId: SimEntityId;
       buffId: BuffId;
+      buffKey?: BuffKey;
+      durationFrames?: number;
+      mods?: readonly BuffMod[];
+      maxStacks?: number;
       isForced?: boolean;
+      runtime?: Record<string, unknown>;
     })
   | (SimEventBase & {
       type: "buffRemove";
       /** entity who owns the buff */
       targetId: SimEntityId;
       buffId: BuffId;
+      buffKey?: BuffKey;
     })
   | (SimEventBase & {
       type: "buffExpire";
       targetId: SimEntityId; // entity who owns the buff
       buffId: BuffId;
+      buffKey?: BuffKey;
       ref: string;
     })
   | (SimEventBase & {
@@ -199,7 +208,7 @@ export type SimEntity = {
   hp: number;
   inflictions: Record<InflictionType, SimInfliction>;
 
-  buffs: Record<string, SimBuff>;
+  buffs: Record<BuffKey, SimBuff>;
 
   /** Operator-only combo runtime state. */
   combo?: SimComboState;

@@ -37,6 +37,9 @@ const NA_HIT5_DMG_MUL = [
 const CS_COOLDOWN_SECONDS = [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 8] as const;
 
 const RARE_FIN_CHANCE = 0.1;
+const RARE_FIN_TEAM_ATK_BUFF_KEY = "buff.alesh.rareFin.teamAtk" as const;
+const RARE_FIN_TEAM_ATK_BUFF_DURATION_FRAMES = 600;
+const RARE_FIN_TEAM_ATK_BUFF_RATIO = 0.15;
 
 class AleshDef extends OperatorDef {
   constructor() {
@@ -152,7 +155,14 @@ class AleshDef extends OperatorDef {
                   yield ctx.emit.buffApply({
                     sourceId: ctx.sourceId!,
                     targetId: entityId,
-                    buffId: "buff.alesh.rareFin.teamAtk",
+                    buffId: "buff.common.atkIncRatio",
+                    buffKey: RARE_FIN_TEAM_ATK_BUFF_KEY,
+                    durationFrames: RARE_FIN_TEAM_ATK_BUFF_DURATION_FRAMES,
+                    maxStacks: 1,
+                    runtime: {
+                      value: RARE_FIN_TEAM_ATK_BUFF_RATIO,
+                      role: "source",
+                    },
                   });
                 }
               }

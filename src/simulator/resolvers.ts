@@ -127,19 +127,50 @@ function validateWhenAgainstEvent(
     }
   }
 
-  if (when.ownerHasBuffId) {
-    const targetId = "targetId" in ev ? ev.targetId : undefined;
-    if (!targetId) {
+  if (when.buffKey) {
+    if (!("buffId" in ev)) {
       return {
         isValid: false,
-        reason: `ownerHasBuffId requires targetId`,
+        reason: `buffKey requires a buff event`,
       };
     }
-    const owner = read.getEntity(targetId);
-    if (!(owner as any)?.buffs?.[when.ownerHasBuffId]) {
+    const eventBuffKey = ev.buffKey ?? ev.buffId;
+    if (eventBuffKey !== when.buffKey) {
       return {
         isValid: false,
-        reason: `owner missing buff ${when.ownerHasBuffId}`,
+        reason: `buffKey mismatch (expected=${when.buffKey}, actual=${eventBuffKey})`,
+      };
+    }
+  }
+
+  if (when.ownerHasBuffId) {
+    const ownerId = getOwnerIdForWhen(ev, context);
+    if (!ownerId) {
+      return {
+        isValid: false,
+        reason: `ownerHasBuffId requires ownerId`,
+      };
+    }
+    if (!read.hasBuffType(ownerId, when.ownerHasBuffId)) {
+      return {
+        isValid: false,
+        reason: `owner missing buff type ${when.ownerHasBuffId}`,
+      };
+    }
+  }
+
+  if (when.ownerHasBuffKey) {
+    const ownerId = getOwnerIdForWhen(ev, context);
+    if (!ownerId) {
+      return {
+        isValid: false,
+        reason: `ownerHasBuffKey requires ownerId`,
+      };
+    }
+    if (!read.getBuffByKey(ownerId, when.ownerHasBuffKey)) {
+      return {
+        isValid: false,
+        reason: `owner missing buff key ${when.ownerHasBuffKey}`,
       };
     }
   }
@@ -151,16 +182,50 @@ function validateWhenAgainstEvent(
         reason: `targetHasBuffId requires targetId`,
       };
     }
-    const target = read.getEntity(context.targetId);
-    if (!(target as any)?.buffs?.[when.targetHasBuffId]) {
+    if (!read.hasBuffType(context.targetId, when.targetHasBuffId)) {
       return {
         isValid: false,
-        reason: `target missing buff ${when.targetHasBuffId}`,
+        reason: `target missing buff type ${when.targetHasBuffId}`,
+      };
+    }
+  }
+
+  if (when.targetHasBuffKey) {
+    if (!context.targetId) {
+      return {
+        isValid: false,
+        reason: `targetHasBuffKey requires targetId`,
+      };
+    }
+    if (!read.getBuffByKey(context.targetId, when.targetHasBuffKey)) {
+      return {
+        isValid: false,
+        reason: `target missing buff key ${when.targetHasBuffKey}`,
       };
     }
   }
 
   return { isValid: true };
+}
+
+function getOwnerIdForWhen(
+  ev: SimEvent,
+  context: {
+    sourceId?: SimEntityId;
+    targetId?: SimEntityId;
+  },
+): SimEntityId | undefined {
+  if (ev.type === "buffApply" || ev.type === "buffRemove") {
+    return ev.targetId;
+  }
+  if (ev.type === "inflictionApply" || ev.type === "inflictionExpire") {
+    return ev.targetId;
+  }
+  if (ev.type === "spRecover" || ev.type === "spReturn") {
+    return ev.sourceId;
+  }
+  if (context.targetId) return context.targetId;
+  return undefined;
 }
 
 function scheduleApplyVulnerable(
@@ -250,29 +315,76 @@ function scheduleBuffExpire(
   world: SimWorld,
   targetId: SimEntityId,
   buffId: BuffId,
+  buffKey: string,
+  expiresAtFrame: number | null,
 ): void {
-  const duration = buffsData[buffId].durationFrames;
-  if (duration === undefined) {
-    console.warn(
-      `No duration defined for buffId=${buffId}, defaulting to non-expiring`,
-    );
-    return;
-  }
-  if (duration <= 0) {
-    console.warn(
-      `BuffId=${buffId} has non-positive durationFrames=${duration}, defaulting to non-expiring`,
-    );
+  if (expiresAtFrame === null) {
     return;
   }
   world.ops.schedule({
     id: makeSimEventId(),
     type: "buffExpire",
-    frame: world.read.nowInFrames + duration,
+    frame: expiresAtFrame,
     seq: world.ops.nextSeq(),
     targetId: targetId,
     buffId: buffId,
+    buffKey,
     ref: "auto",
   } as SimEvent);
+}
+
+function getEventDurationFrames(
+  ev: Extract<SimEvent, { type: "buffApply" }>,
+): number | undefined {
+  return (ev as { durationFrames?: number }).durationFrames;
+}
+
+function normalizeBuffDurationFrames(params: {
+  buffId: BuffId;
+  stacks: number;
+  durationFramesOverride?: number;
+}): number | null {
+  const { buffId, stacks, durationFramesOverride } = params;
+
+  if (buffId === SOLIDIFICATION_BUFF_ID) {
+    return (
+      SOLIDIFICATION_BASE_DURATION_FRAMES +
+      stacks * SOLIDIFICATION_EXTRA_DURATION_PER_STACK_FRAMES
+    );
+  }
+
+  if (buffId === ELECTRIFICATION_BUFF_ID) {
+    return (
+      ELECTRIFICATION_BASE_DURATION_FRAMES +
+      stacks * ELECTRIFICATION_EXTRA_DURATION_PER_STACK_FRAMES
+    );
+  }
+
+  if (durationFramesOverride === undefined) {
+    const buffDef = buffsData[buffId];
+    if (!buffDef) {
+      console.warn(
+        `Unknown buffId=${buffId} during buff apply, defaulting to non-expiring`,
+      );
+      return null;
+    }
+  }
+
+  const durationFrames = durationFramesOverride ?? buffsData[buffId]?.durationFrames;
+  if (durationFrames === undefined) {
+    console.warn(
+      `No duration defined for buffId=${buffId}, defaulting to non-expiring`,
+    );
+    return null;
+  }
+  if (durationFrames <= 0) {
+    console.warn(
+      `BuffId=${buffId} has non-positive durationFrames=${durationFrames}, defaulting to non-expiring`,
+    );
+    return null;
+  }
+
+  return durationFrames;
 }
 
 function getCastStartForEvent(
@@ -780,22 +892,35 @@ export function resolveBuffApplication(
   const sourceId = ev.sourceId ?? null;
   const targetId = ev.targetId;
   const buffId = ev.buffId;
+  const buffKey = ev.buffKey ?? ev.buffId;
 
   const source = sourceId ? self.read.getEntity(sourceId) : null;
 
   const target = self.read.getEntity(targetId);
   if (!target) throw new Error(`Unknown target with targetId=${targetId}`);
 
-  const existing = (target as any).buffs?.[buffId];
+  const existing = (target as any).buffs?.[buffKey];
+
+  const eventDurationFrames = getEventDurationFrames(ev);
 
   if (buffId === "buff.crystal") {
     const had = Boolean(existing);
+    const durationFrames = normalizeBuffDurationFrames({
+      buffId,
+      stacks: 1,
+      durationFramesOverride: eventDurationFrames,
+    });
+    const expiresAtFrame =
+      durationFrames === null ? null : self.read.nowInFrames + durationFrames;
     self.ops.addBuff(targetId, {
       id: buffId,
+      key: buffKey,
+      durationFrames,
+      expiresAtFrame,
       lastApplyFrame: self.read.nowInFrames,
       stacks: 1,
     } as SimBuff);
-    scheduleBuffExpire(self, targetId, buffId);
+    scheduleBuffExpire(self, targetId, buffId, buffKey, expiresAtFrame);
     self.ops.log(
       "buff",
       `BUFF ${buffId} ${had ? "refresh" : "apply"} (source=${(source as any)?.name ?? "system"} target=${(target as any).name})`,
@@ -817,22 +942,37 @@ export function resolveBuffApplication(
   // );
   // return true;
   const def = buffsData[buffId];
-  const maxStacks = Math.max(1, Number((def as any)?.maxStacks ?? 1));
+  const maxStacks = Math.max(
+    1,
+    Number(ev.maxStacks ?? (def as any)?.maxStacks ?? 1),
+  );
 
   const beforeStacks = Math.max(0, Number((existing as any)?.stacks ?? 0));
   const afterStacks = Math.min(maxStacks, beforeStacks + 1);
+  const durationFrames = normalizeBuffDurationFrames({
+    buffId,
+    stacks: afterStacks,
+    durationFramesOverride: eventDurationFrames,
+  });
+  const expiresAtFrame =
+    durationFrames === null ? null : self.read.nowInFrames + durationFrames;
 
   const had = Boolean(existing);
   self.ops.addBuff(targetId, {
     id: buffId,
+    key: buffKey,
+    durationFrames,
+    expiresAtFrame,
     lastApplyFrame: self.read.nowInFrames,
     stacks: afterStacks,
+    mods: ev.mods ?? (existing as SimBuff | undefined)?.mods,
+    runtime: ev.runtime ?? (existing as SimBuff | undefined)?.runtime,
     meta:
       buffId === CORROSION_BUFF_ID && existing
         ? (existing as any).meta
         : ((ev as any).meta ?? (existing as any)?.meta),
   } as SimBuff);
-  scheduleBuffExpire(self, targetId, buffId);
+  scheduleBuffExpire(self, targetId, buffId, buffKey, expiresAtFrame);
 
   if (maxStacks > 1) {
     self.ops.log(
@@ -858,22 +998,15 @@ export function resolveBuffExpiration(
   if (!ent) throw new Error(`Unknown entity with entityId ${ev.targetId}`);
 
   const buffId = ev.buffId;
-  const buff = (ent as any).buffs?.[buffId];
+  const buffKey = ev.buffKey ?? ev.buffId;
+  const buff = (ent as any).buffs?.[buffKey];
   if (!buff) return false; // already removed or consumed
 
-  const duration =
-    buffId === SOLIDIFICATION_BUFF_ID
-      ? SOLIDIFICATION_BASE_DURATION_FRAMES +
-        Number((buff as any).stacks ?? 0) *
-          SOLIDIFICATION_EXTRA_DURATION_PER_STACK_FRAMES
-      : buffId === ELECTRIFICATION_BUFF_ID
-        ? ELECTRIFICATION_BASE_DURATION_FRAMES +
-          Number((buff as any).stacks ?? 0) *
-            ELECTRIFICATION_EXTRA_DURATION_PER_STACK_FRAMES
-        : (buffsData[buffId].durationFrames ?? 0);
-  if (duration <= 0) return false;
-  if (self.read.nowInFrames >= buff.lastApplyFrame + duration) {
-    self.ops.removeBuff(ent.id, buffId);
+  const expiresAtFrame = (buff as SimBuff).expiresAtFrame;
+  if (expiresAtFrame === null) return false;
+  if (expiresAtFrame !== ev.frame) return false;
+  if (self.read.nowInFrames >= expiresAtFrame) {
+    self.ops.removeBuff(ent.id, buffKey);
     self.ops.log("buff", `BUFF ${buffId} expire (entity=${(ent as any).name})`);
     return true;
   }
@@ -984,8 +1117,6 @@ export function resolveInflictionApplication(
         isForced: false,
         ref: ev.id,
       } as Extract<SimEvent, { type: "buffApply" }>);
-
-      scheduleBuffExpire(self, owner.id, reactionBuffId);
 
       self.ops.log(
         "buff",

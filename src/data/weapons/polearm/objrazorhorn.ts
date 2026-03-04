@@ -1,15 +1,14 @@
 import { SimRegistry } from "../../../simulator/listeners/registry";
 import { WeaponDef } from "../WeaponDef";
 
-const ATK_BUFF_ID = "weapon.objrazorhorn.atkBuff" as const;
+const ATK_BUFF_KEY = "weapon.objrazorhorn.atkBuff" as const;
+const ATK_BUFF_DURATION_FRAMES = 900;
+const ATK_BUFF_MAX_STACKS = 1;
+const ATK_BUFF_RATIO = 0.12;
 
 const DMG_BONUS_BY_RANK = [
   0.08, 0.096, 0.112, 0.128, 0.144, 0.16, 0.176, 0.192, 0.224,
 ] as const;
-const ATK_BONUS_BY_RANK = [
-  0.12, 0.144, 0.168, 0.192, 0.216, 0.24, 0.264, 0.288, 0.336,
-] as const;
-
 class OBJRazorhornDef extends WeaponDef {
   constructor() {
     super({
@@ -81,7 +80,14 @@ class OBJRazorhornDef extends WeaponDef {
         yield emit.buffApply({
           sourceId,
           targetId: sourceId,
-          buffId: ATK_BUFF_ID,
+          buffId: "buff.common.atkIncRatio",
+          buffKey: ATK_BUFF_KEY,
+          durationFrames: ATK_BUFF_DURATION_FRAMES,
+          maxStacks: ATK_BUFF_MAX_STACKS,
+          runtime: {
+            value: ATK_BUFF_RATIO,
+            role: "source",
+          },
         });
       },
     });

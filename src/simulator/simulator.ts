@@ -1,10 +1,11 @@
 import type { OperatorBuild } from "../types/operator";
 import operatorsData from "../data/operators";
 import type {
+  BuffKey,
+  BuffTypeId,
   InflictionType,
   SimBuff,
   SimInfliction,
-  SimStatusType,
 } from "../types/simulator/infliction";
 import { INFLICTION_TYPE_LIST } from "../types/simulator/infliction";
 import type {
@@ -15,7 +16,6 @@ import type {
   SimComboState,
 } from "../types/simulator/simulator";
 import type { SimEventDraft } from "./scripts";
-import type { DamageBonusLogEntry } from "./damage/damageBonuses";
 import type {
   DamageBreakdown,
   DamageContext,
@@ -23,16 +23,14 @@ import type {
 } from "./damage/damageModel";
 import { pushLog, type SimLog, type SimLogEntryCat } from "./log";
 import { SimRegistry } from "./listeners/registry";
-import { DistOmit, makeSimEventId, WithOptional } from "../shared/lib/utils";
+import { makeSimEventId } from "../shared/lib/utils";
 
-import { buildDamageContext } from "./damage/damageEngine";
 // import { dispatchAfterHit } from "./listeners/handlers";
 import { createDefaultDamageModel } from "./damage/damageModel";
 
 // import resolver methods
 import "./resolvers";
 import {
-  DEFAULT_INFLICTION_DURATION_FRAMES,
   resolveBuffApplication,
   resolveBuffExpiration,
   resolveInflictionExpiration,
@@ -51,11 +49,6 @@ import {
   resolveComboTriggerElapse,
   resolveStaggerExpire,
 } from "./resolvers";
-import { BuffId } from "../data/buffs/BuffDef";
-import {
-  COMBUSTION_BUFF_ID,
-  COMBUSTION_DOT_INTERVAL_FRAMES,
-} from "../data/buffs/reactions/combustion";
 import { materializeDrafts } from "./scripts";
 
 /**
@@ -79,6 +72,8 @@ export type SimRead = {
   readonly nowInFrames: number;
   readonly env: SimEnv;
   getEntity(id: SimEntityId | null): SimEntity | null;
+  hasBuffType(targetId: SimEntityId, buffTypeId: BuffTypeId): boolean;
+  getBuffByKey(targetId: SimEntityId, buffKey: BuffKey): SimBuff | undefined;
   /** Returns operator build if this entityId corresponds to an operator, else undefined. */
   getBuild(entityId: SimEntityId): OperatorBuild | undefined;
   /** Lookup an event by id (useful for provenance via SimEventBase.ref). */
@@ -111,7 +106,7 @@ export type SimOps = {
   /** Apply raw damage (integer) to target hp. */
   applyDamage: (targetId: SimEntityId, amount: number) => void;
   addBuff: (targetId: SimEntityId, buff: SimBuff) => void;
-  removeBuff: (targetId: SimEntityId, buffId: BuffId) => void;
+  removeBuff: (targetId: SimEntityId, buffKey: BuffKey) => void;
   addInfliction: (
     targetId: SimEntityId,
     inflictionType: InflictionType,
@@ -229,7 +224,6 @@ export class SimWorld {
   private currentEvent: SimEvent | null = null;
   private readonly teamOperatorOrder: string[];
   private readonly comboQueue: SimEntityId[] = [];
-  private readonly blockedCastStartIds = new Set<string>();
   public readonly controlledOperatorId?: string;
 
   private rngState: number;
@@ -299,6 +293,8 @@ export class SimWorld {
         return self.env;
       },
       getEntity: (id: SimEntityId) => self.getEntityOrThrow(id),
+      hasBuffType: (targetId, buffTypeId) => self.hasBuffType(targetId, buffTypeId),
+      getBuffByKey: (targetId, buffKey) => self.getBuffByKey(targetId, buffKey),
       getBuild: (entityId: SimEntityId) => self.buildByOperatorId?.[entityId],
       getEvent: (id: string | null) =>
         id ? self.eventById.get(id) : undefined,
@@ -316,7 +312,7 @@ export class SimWorld {
         this.appendLog(cat, message, ctx, breakdown, amount),
       applyDamage: (targetId, amount) => this.applyDamage(targetId, amount),
       addBuff: (targetId, buff) => this.addBuff(targetId, buff),
-      removeBuff: (targetId, buffId) => this.removeBuff(targetId, buffId),
+      removeBuff: (targetId, buffKey) => this.removeBuff(targetId, buffKey),
       // addBuffStacks: params => this.addBuffStacks(params),
       addInfliction: (targetId, inflictionType, stacks) =>
         this.addInfliction(targetId, inflictionType, stacks),
@@ -356,6 +352,32 @@ export class SimWorld {
     const ent = this.env.entitiesById[id];
     if (!ent) throw new Error(`Unknown entity id=${id}`);
     return ent;
+  }
+
+  private hasBuffType(targetId: SimEntityId, buffTypeId: BuffTypeId): boolean {
+    const buffs = this.getEntityOrThrow(targetId).buffs;
+    return Object.values(buffs).some(buff => buff.id === buffTypeId);
+  }
+
+  private getBuffByKey(
+    targetId: SimEntityId,
+    buffKey: BuffKey,
+  ): SimBuff | undefined {
+    return this.getEntityOrThrow(targetId).buffs[buffKey];
+  }
+
+  private resolveBuffKeyForRemoval(
+    targetId: SimEntityId,
+    buffKeyOrId: BuffKey,
+  ): BuffKey | null {
+    const buffs = this.getEntityOrThrow(targetId).buffs;
+    if (buffs[buffKeyOrId]) return buffKeyOrId;
+
+    const matchedByType = Object.keys(buffs)
+      .filter(key => buffs[key]?.id === buffKeyOrId)
+      .sort((a, b) => a.localeCompare(b));
+
+    return matchedByType[0] ?? null;
   }
 
   private captureResourceSample(frame: number, seq: number): void {
@@ -424,7 +446,8 @@ export class SimWorld {
   }
 
   private random(): number {
-    let t = (this.rngState += 0x6d2b79f5);
+    this.rngState += 0x6d2b79f5;
+    let t = this.rngState;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
@@ -466,28 +489,6 @@ export class SimWorld {
   private getTeamOrderIndex(operatorId: SimEntityId): number {
     const idx = this.teamOperatorOrder.indexOf(operatorId);
     return idx >= 0 ? idx : Number.MAX_SAFE_INTEGER;
-  }
-
-  private getComboCooldownFrames(operatorId: SimEntityId): number {
-    const opDef = operatorsData[operatorId];
-    const build = this.read.getBuild(operatorId);
-    const potentialRank = Number(build?.potentialRank ?? 0);
-    const cooldownTable = opDef?.getComboCooldownSecondsByRank?.(potentialRank) ?? null;
-    if (!cooldownTable || cooldownTable.length === 0) return 0;
-
-    const rank = Math.max(
-      1,
-      Math.floor(Number(build?.skillRanks?.comboSkill ?? 9)),
-    );
-
-    const cooldownSec = Number(
-      cooldownTable[Math.min(cooldownTable.length - 1, rank - 1)] ?? 0,
-    );
-    const cdr = Math.max(
-      0,
-      Number(build?.restStat?.comboCooldownReduction ?? 0),
-    );
-    return Math.max(1, Math.round(cooldownSec * (1 - cdr) * 60));
   }
 
   private getUltimateEnergyCost(operatorId: SimEntityId): number {
@@ -631,51 +632,6 @@ export class SimWorld {
     }
   >();
 
-  private validateComboCast(ev: Extract<SimEvent, { type: "castStart" }>): {
-    isLegal: boolean;
-    reason?: string;
-  } {
-    if (ev.skillType !== "comboSkill") return { isLegal: true };
-
-    const source = this.getEntityOrThrow(ev.sourceId);
-    const combo = source.combo;
-    if (!combo)
-      return { isLegal: false, reason: "operator has no combo state" };
-    if (combo.cooldown > 0)
-      return { isLegal: false, reason: "combo is on cooldown" };
-    if (!combo.pending)
-      return { isLegal: false, reason: "combo was not triggered" };
-    if (ev.frame > combo.availableUntilFrame) {
-      combo.pending = false;
-      combo.availableUntilFrame = -1;
-      this.removeFromComboQueue(ev.sourceId);
-      return { isLegal: false, reason: "combo trigger expired" };
-    }
-    if (this.comboQueue[0] !== ev.sourceId) {
-      return { isLegal: false, reason: "combo is not first in pending queue" };
-    }
-
-    this.removeFromComboQueue(ev.sourceId);
-    combo.pending = false;
-    combo.availableUntilFrame = -1;
-
-    const cooldownFrames = this.getComboCooldownFrames(ev.sourceId);
-    combo.cooldown = cooldownFrames;
-
-    if (cooldownFrames > 0) {
-      this.ops.schedule({
-        id: makeSimEventId(),
-        type: "comboCooldownEnd",
-        frame: ev.frame + cooldownFrames,
-        seq: this.ops.nextSeq(),
-        sourceId: ev.sourceId,
-        ref: ev.id,
-      });
-    }
-
-    return { isLegal: true };
-  }
-
   // ----- Log -----
   private appendLog(
     cat: SimLogEntryCat,
@@ -706,13 +662,17 @@ export class SimWorld {
   private addBuff(targetId: SimEntityId, buff: SimBuff): void {
     const ent = this.getEntityOrThrow(targetId);
     (ent as any).buffs ??= {};
-    (ent as any).buffs[buff.id] = buff;
+    (ent as any).buffs[buff.key] = buff;
   }
 
-  private removeBuff(targetId: SimEntityId, buffId: BuffId): void {
+  private removeBuff(targetId: SimEntityId, buffKey: BuffKey): void {
     const ent = this.getEntityOrThrow(targetId);
     if (!(ent as any).buffs) return;
-    delete (ent as any).buffs[buffId];
+
+    const keyToRemove = this.resolveBuffKeyForRemoval(targetId, buffKey);
+    if (!keyToRemove) return;
+
+    delete (ent as any).buffs[keyToRemove];
   }
 
   private addInfliction(
@@ -902,7 +862,7 @@ export class SimWorld {
 
         case "buffRemove": {
           const owner = this.read.getEntity(ev.targetId);
-          this.ops.removeBuff(ev.targetId, ev.buffId);
+          this.ops.removeBuff(ev.targetId, ev.buffKey ?? ev.buffId);
           this.ops.log(
             "buff",
             `BUFF ${ev.buffId} removed (entity=${(owner as any).name})`,

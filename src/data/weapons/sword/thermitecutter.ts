@@ -2,7 +2,10 @@ import type { SimRead } from "../../../simulator/simulator";
 import { SimRegistry } from "../../../simulator/listeners/registry";
 import { WeaponDef } from "../WeaponDef";
 
-const BUFF_ID = "weapon.thermitecutter.teamAtkBuff" as const;
+const BUFF_KEY = "weapon.thermitecutter.teamAtkBuff" as const;
+const BUFF_DURATION_FRAMES = 1200;
+const BUFF_MAX_STACKS = 1;
+const BUFF_BONUS_PER_STACK = 0.05;
 
 class ThermiteCutterDef extends WeaponDef {
   constructor() {
@@ -42,7 +45,14 @@ class ThermiteCutterDef extends WeaponDef {
           yield emit.buffApply({
             sourceId,
             targetId: entityId,
-            buffId: BUFF_ID,
+            buffId: "buff.common.atkIncRatio",
+            buffKey: BUFF_KEY,
+            durationFrames: BUFF_DURATION_FRAMES,
+            maxStacks: BUFF_MAX_STACKS,
+            runtime: {
+              valuePerStack: BUFF_BONUS_PER_STACK,
+              role: "source",
+            },
           });
         }
       }

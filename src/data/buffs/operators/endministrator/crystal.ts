@@ -1,6 +1,9 @@
 import { BuffDef } from "../../BuffDef";
 import type { SimRegistry } from "../../../../simulator/listeners/registry";
-import { type SimScript, type SimScriptContext } from "../../../../simulator/scripts";
+import {
+  type SimScript,
+  type SimScriptContext,
+} from "../../../../simulator/scripts";
 import type { SimRead } from "../../../../simulator/simulator";
 
 const ENDMINISTRATOR_ID = "endministrator";
@@ -55,7 +58,7 @@ class CrystalBuffDef extends BuffDef {
     registry.registerBuffDamageBonus({
       id: this.id,
       fn: ({ role, collector }) => {
-        // crystal: increases damage suffered by +20% (incomingIncMul)
+        // crystal: increases damage suffered by +20% (rcvDmgIncMul)
         if (role === "target") {
           collector.addValue(
             "rcvDmgIncRatio",
@@ -68,7 +71,15 @@ class CrystalBuffDef extends BuffDef {
 
     registry.registerOnStatusApply({
       id: CRYSTAL_ON_STATUS_APPLY_PLUGIN_ID,
-      fn: function* ({ read, ev, targetId, emit, sourceId, startFrame, skillType }) {
+      fn: function* ({
+        read,
+        ev,
+        targetId,
+        emit,
+        sourceId,
+        startFrame,
+        skillType,
+      }) {
         if (ev?.type !== "statusApply" || !targetId) return;
         if (!read.env.entitiesById[ENDMINISTRATOR_ID]) return;
 
@@ -87,13 +98,29 @@ class CrystalBuffDef extends BuffDef {
           read,
           targetId,
         });
-        yield* script({ read, ev, emit, sourceId, targetId, startFrame, skillType });
+        yield* script({
+          read,
+          ev,
+          emit,
+          sourceId,
+          targetId,
+          startFrame,
+          skillType,
+        });
       },
     });
 
     registry.registerOnInflictionApply({
       id: "buff.crystal.consume.onInflictionApply",
-      fn: function* ({ read, ev, targetId, emit, sourceId, startFrame, skillType }) {
+      fn: function* ({
+        read,
+        ev,
+        targetId,
+        emit,
+        sourceId,
+        startFrame,
+        skillType,
+      }) {
         if (ev?.type !== "inflictionApply" || !targetId) return;
         if (!read.env.entitiesById[ENDMINISTRATOR_ID]) return;
 
@@ -111,7 +138,15 @@ class CrystalBuffDef extends BuffDef {
           read,
           targetId,
         });
-        yield* script({ read, ev, emit, sourceId, targetId, startFrame, skillType });
+        yield* script({
+          read,
+          ev,
+          emit,
+          sourceId,
+          targetId,
+          startFrame,
+          skillType,
+        });
       },
     });
   }

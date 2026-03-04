@@ -132,12 +132,19 @@ class EstellaDef extends OperatorDef {
               const potentialRank = Number(
                 ctx.read.getBuild(ctx.sourceId!)?.potentialRank ?? 0,
               );
-              const buffId =
-                potentialRank >= 1
-                  ? "buff.estella.combo.physicalSusceptibility.p1"
-                  : "buff.estella.combo.physicalSusceptibility";
+              const durationFrames = potentialRank >= 1 ? 540 : 360;
               yield ctx.emit.buffApply({
-                buffId,
+                sourceId: ctx.sourceId,
+                targetId: ctx.targetId,
+                buffId: "buff.common.rcvDmgIncRatio",
+                buffKey: "buff.estella.combo.physicalSusceptibility",
+                durationFrames,
+                maxStacks: 1,
+                runtime: {
+                  value: 0.1,
+                  role: "target",
+                  damageType: "physical",
+                },
               });
             }
             yield ctx.emit.hit({

@@ -197,7 +197,9 @@ class ChenQianyuDef extends OperatorDef {
   }
 
   override registerSimPlugins(registry: SimRegistry): void {
-    const BONUS_BUFF = "buff.chenqianyu.talent1.atkInc" as const;
+    const BONUS_BUFF_KEY = "buff.chenqianyu.talent1.atkInc" as const;
+    const BONUS_DURATION_FRAMES = 600;
+    const BONUS_MAX_STACKS = 5;
     const selfId = this.id;
 
     registry.registerOnInflictionApply({
@@ -233,10 +235,19 @@ class ChenQianyuDef extends OperatorDef {
         );
         if (talentRank <= 0) return;
 
+        const bonusPerStack = talentRank >= 2 ? 0.08 : 0.04;
+
         yield emit.buffApply({
           sourceId,
           targetId: sourceId,
-          buffId: BONUS_BUFF,
+          buffId: "buff.common.atkIncRatio",
+          buffKey: BONUS_BUFF_KEY,
+          durationFrames: BONUS_DURATION_FRAMES,
+          maxStacks: BONUS_MAX_STACKS,
+          runtime: {
+            valuePerStack: bonusPerStack,
+            role: "source",
+          },
         });
       },
     });

@@ -197,11 +197,19 @@ class EndministratorDef extends OperatorDef {
           talentRank >= 2
             ? "buff.endministrator.talent1.atkInc"
             : "buff.endministrator.talent1.atkInc.low";
+        const atkIncRatio = talentRank >= 2 ? 0.3 : 0.15;
 
         yield emit.buffApply({
           sourceId: selfId,
           targetId: selfId,
-          buffId: buffId,
+          buffId: "buff.common.atkIncRatio",
+          buffKey: buffId,
+          durationFrames: 900,
+          maxStacks: 1,
+          runtime: {
+            value: atkIncRatio,
+            role: "source",
+          },
         });
 
         if (build.potentialRank >= 1) {
@@ -226,7 +234,7 @@ class EndministratorDef extends OperatorDef {
 
     registry.registerOnBuffApply({
       id: "operator.endministrator.potential2.shareAtkBuff.high",
-      when: { buffId: "buff.endministrator.talent1.atkInc" },
+      when: { buffKey: "buff.endministrator.talent1.atkInc" },
       fn: function* ({ read, ev, emit }) {
         if (ev?.type !== "buffApply" || ev.targetId !== selfId) return;
         const build = read.getBuild(selfId);
@@ -240,7 +248,14 @@ class EndministratorDef extends OperatorDef {
           yield emit.buffApply({
             sourceId: selfId,
             targetId: targetId,
-            buffId: "buff.endministrator.potential2.teamAtkShare.high",
+            buffId: "buff.common.atkIncRatio",
+            buffKey: "buff.endministrator.potential2.teamAtkShare.high",
+            durationFrames: 900,
+            maxStacks: 1,
+            runtime: {
+              value: 0.15,
+              role: "source",
+            },
           });
         }
       },
@@ -248,7 +263,7 @@ class EndministratorDef extends OperatorDef {
 
     registry.registerOnBuffApply({
       id: "operator.endministrator.potential2.shareAtkBuff.low",
-      when: { buffId: "buff.endministrator.talent1.atkInc.low" },
+      when: { buffKey: "buff.endministrator.talent1.atkInc.low" },
       fn: function* ({ read, ev, emit }) {
         if (ev?.type !== "buffApply" || ev.targetId !== selfId) return;
         const build = read.getBuild(selfId);
@@ -262,7 +277,14 @@ class EndministratorDef extends OperatorDef {
           yield emit.buffApply({
             sourceId: selfId,
             targetId: targetId,
-            buffId: "buff.endministrator.potential2.teamAtkShare.low",
+            buffId: "buff.common.atkIncRatio",
+            buffKey: "buff.endministrator.potential2.teamAtkShare.low",
+            durationFrames: 900,
+            maxStacks: 1,
+            runtime: {
+              value: 0.075,
+              role: "source",
+            },
           });
         }
       },

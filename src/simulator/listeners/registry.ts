@@ -8,8 +8,6 @@ import buffsData from "../../data/buffs";
 import weaponsData from "../../data/weapons";
 import gearsData from "../../data/gears";
 import { BuffId } from "../../data/buffs/BuffDef";
-import { WeaponId } from "../../data/weapons/WeaponDef";
-import { OperatorId } from "../../data/operators/OperatorDef";
 import { DamageType } from "../../types/operator";
 import {
   sortPluginsByGameOrder,
@@ -200,8 +198,12 @@ export class SimRegistry {
     fn: BuffDamageBonusListener;
     priority?: number;
   }): void {
-    const list = (this.buffDamageBonus[params.id] ??=
-      []) as ListenerEntry<BuffDamageBonusListener>[];
+    const buffId = params.id as BuffId;
+    let list = this.buffDamageBonus[buffId];
+    if (!list) {
+      list = [];
+      this.buffDamageBonus[buffId] = list;
+    }
     list.push({
       id: params.id,
       fn: params.fn,
@@ -550,18 +552,34 @@ export class SimRegistry {
       if (ctx.ev.buffId !== when.buffId) return false;
     }
 
+    if (when.buffKey) {
+      if (!("ev" in ctx && "buffId" in ctx.ev)) return false;
+      const eventBuffKey = ctx.ev.buffKey ?? ctx.ev.buffId;
+      if (eventBuffKey !== when.buffKey) return false;
+    }
+
     if (when.ownerHasBuffId) {
       const targetId = this.getOwnerIdForContext(ctx);
       if (!targetId) return false;
-      const owner = ctx.read.getEntity(targetId);
-      if (!(owner as any)?.buffs?.[when.ownerHasBuffId]) return false;
+      if (!ctx.read.hasBuffType(targetId, when.ownerHasBuffId)) return false;
+    }
+
+    if (when.ownerHasBuffKey) {
+      const targetId = this.getOwnerIdForContext(ctx);
+      if (!targetId) return false;
+      if (!ctx.read.getBuffByKey(targetId, when.ownerHasBuffKey)) return false;
     }
 
     if (when.targetHasBuffId) {
       const targetId = "targetId" in ctx ? ctx.targetId : undefined;
       if (!targetId) return false;
-      const target = ctx.read.getEntity(targetId);
-      if (!(target as any)?.buffs?.[when.targetHasBuffId]) return false;
+      if (!ctx.read.hasBuffType(targetId, when.targetHasBuffId)) return false;
+    }
+
+    if (when.targetHasBuffKey) {
+      const targetId = "targetId" in ctx ? ctx.targetId : undefined;
+      if (!targetId) return false;
+      if (!ctx.read.getBuffByKey(targetId, when.targetHasBuffKey)) return false;
     }
 
     return true;

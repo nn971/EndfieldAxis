@@ -95,7 +95,8 @@ function buildSimRenderCache(
 
     if (ev.type === "buffApply") {
       const targetId = ev.targetId;
-      const key = `buff:${targetId}:${ev.buffId}`;
+      const buffInstanceId = ev.buffKey ?? ev.buffId;
+      const key = `buff:${targetId}:${buffInstanceId}`;
       const active = activeByKey.get(key);
       if (active) {
         active.refreshFrames.push(ev.frame);
@@ -103,7 +104,7 @@ function buildSimRenderCache(
           id: `buff-refresh:${ev.id}`,
           type: "buffRefresh",
           targetId,
-          effectId: ev.buffId,
+          effectId: buffInstanceId,
           frame: ev.frame,
         });
       } else {
@@ -112,7 +113,7 @@ function buildSimRenderCache(
           key,
           type: "buff",
           targetId,
-          effectId: ev.buffId,
+          effectId: buffInstanceId,
           startFrame: ev.frame,
           endFrame: ev.frame,
           refreshFrames: [],
@@ -122,7 +123,7 @@ function buildSimRenderCache(
     }
 
     if (ev.type === "buffExpire" || ev.type === "buffRemove") {
-      closeBar(`buff:${ev.targetId}:${ev.buffId}`, ev.frame);
+      closeBar(`buff:${ev.targetId}:${ev.buffKey ?? ev.buffId}`, ev.frame);
       continue;
     }
 

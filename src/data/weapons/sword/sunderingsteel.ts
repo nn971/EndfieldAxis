@@ -30,8 +30,10 @@ class SunderingSteelDef extends WeaponDef {
   }
 
   override registerSimPlugins(registry: SimRegistry): void {
+    const BONUS_BUFF_KEY = "weapon.sunderingsteel.atkIncRatio" as const;
+    const BONUS_DURATION_FRAMES = 1200;
     const MAX_STACKS = 2;
-    const BONUS_BUFF = "weapon.sunderingsteel.atkIncRatio";
+    const BONUS_PER_STACK = 0.12;
 
     registry.registerOnStatusApply({
       id: SUNDERING_STEEL_ON_STATUS_APPLY_PLUGIN_ID,
@@ -41,7 +43,14 @@ class SunderingSteelDef extends WeaponDef {
         yield emit.buffApply({
           sourceId,
           targetId: sourceId,
-          buffId: BONUS_BUFF as any,
+          buffId: "buff.common.atkIncRatio",
+          buffKey: BONUS_BUFF_KEY,
+          durationFrames: BONUS_DURATION_FRAMES,
+          maxStacks: MAX_STACKS,
+          runtime: {
+            valuePerStack: BONUS_PER_STACK,
+            role: "source",
+          },
         });
       },
     });
