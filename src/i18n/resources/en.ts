@@ -252,5 +252,58 @@ export const en = {
       clickRun: '(click Run)',
       finalWorldState: 'Final world state:',
     },
+    simLog: {
+      sim_start: 'Simulation started.',
+      sim_end: 'Simulation ended.',
+      sim_abort_max_steps: 'Simulation aborted after reaching max steps ({{maxSteps}}).',
+      dev_dismiss_event_when_mismatch:
+        'Dismiss event {{eventType}} ({{eventId}}): {{reason}}.',
+      dev_warn_unknown_event: 'Unknown event type: {{eventType}}.',
+      act_cast_illegal_combo:
+        '{{sourceDisplayName}} cannot cast {{skillType}} due to illegal combo: {{reason}}.',
+      act_cast_start:
+        '{{sourceDisplayName}} starts {{skillType}} targeting {{targetDisplayName}}.',
+      act_cast_end:
+        '{{sourceDisplayName}} ends {{skillType}} targeting {{targetDisplayName}}.',
+      act_cast_insufficient_sp:
+        '{{sourceDisplayName}} lacks SP (spent {{spent}} / cost {{cost}}).',
+      act_cast_insufficient_ultimate:
+        '{{sourceDisplayName}} lacks Ultimate energy (spent {{spent}} / cost {{cost}}).',
+      act_combo_triggered: '{{sourceDisplayName}} triggered combo state.',
+      act_combo_elapsed: '{{sourceDisplayName}} combo state elapsed.',
+      act_team_sp_recover:
+        '{{sourceDisplayName}} recovered team SP +{{gained}} (real {{real}}, fake {{fake}}).',
+      act_team_sp_return:
+        '{{sourceDisplayName}} returned team SP +{{gained}} (real {{real}}, fake {{fake}}).',
+      act_ultimate_gain_combo_hit:
+        '{{sourceDisplayName}} gained Ultimate energy +{{gained}} from combo hit.',
+      act_team_ultimate_gain_normal_skill_final_hit:
+        'Team gained Ultimate energy +{{gained}} from normal skill final hit (realSpRatio={{realSpRatio}}).',
+      dmg_hit:
+        '{{sourceDisplayName}} hit {{targetDisplayName}} for {{amount}} damage (HP left {{hpLeft}}).',
+      buff_apply: 'Applied buff {{buffId}} to {{targetDisplayName}}.',
+      buff_refresh: 'Refreshed buff {{buffId}} on {{targetDisplayName}}.',
+      buff_stack_change:
+        'Buff {{buffId}} stacks changed on {{targetDisplayName}}: {{before}} -> {{after}}.',
+      buff_expire: 'Buff {{buffId}} expired on {{targetDisplayName}}.',
+      buff_removed: 'Buff {{buffId}} removed from {{targetDisplayName}}.',
+      buff_vulnerable_consumed:
+        'Consumed {{consumed}} stacks of {{statusType}} on {{targetDisplayName}}.',
+      infliction_stack_change:
+        'Infliction {{inflictionType}} stacks changed on {{targetDisplayName}}: {{before}} -> {{after}}.',
+      infliction_expire:
+        'Infliction {{inflictionType}} expired on {{targetDisplayName}}.',
+      reaction_triggered:
+        'Reaction {{reactionBuffId}} triggered on {{targetDisplayName}} (consumed arts stacks: {{consumedArtsStacks}}).',
+      reaction_consumed_inflictions:
+        'Reaction {{reactionBuffId}} consumed inflictions on {{targetDisplayName}} (consumed arts stacks: {{consumedArtsStacks}}).',
+      dmg_breakdown_attack:
+        'Base attack {{baseAttack}} + weapon {{weaponAttack}}, atkIncRatio {{atkIncRatio}}, attributeBonusRatio {{attributeBonusRatio}}, final attack {{atkFinal}}.',
+      dmg_breakdown_raw:
+        'Raw outcoming {{rawOutcoming}}, raw damage {{rawDamage}}.',
+      dmg_breakdown_multiplier_header:
+        'Final multiplier {{dmgFinalMultiplier}}, gained from:',
+      dmg_breakdown_bonus_line: 'bucket={{bucket}}, +{{addValue}}, {{note}}',
+    },
   },
 } as const;

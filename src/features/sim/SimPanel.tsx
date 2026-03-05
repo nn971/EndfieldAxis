@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { summarizeLog } from "../../simulator/log";
@@ -14,16 +14,41 @@ import {
   simDamageCacheReplaced,
   simRenderCacheReplaced,
 } from "../solution/solutionSlice";
-import { runSolutionSim } from "./runSolutionSim";
+import { formatSimLog } from "./formatSimLog";
+import { runSolutionSim, type RunSolutionSimResult } from "./runSolutionSim";
 
 export default function SimPanel() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const dispatch = useAppDispatch();
-  const [logText, setLogText] = useState("");
+  const [lastRunResult, setLastRunResult] =
+    useState<RunSolutionSimResult | null>(null);
   const teamOperatorIds = useAppSelector(selectTeamOperatorIds);
   const controlledOperatorId = useAppSelector(selectControlledOperatorId);
   const skillBoxes = useAppSelector(selectSkillBoxes);
   const buildByOperatorId = useAppSelector(selectBuildByOperatorId);
+
+  const logText = useMemo(() => {
+    if (!lastRunResult) return "";
+
+    const finalWorldDescription = JSON.stringify(lastRunResult.env, null, 2);
+    return (
+      summarizeLog(
+        lastRunResult.log,
+        ["sim", "act", "buff", "stat", "dmg", "SP", "dev"],
+        true,
+        (message, entry) =>
+          formatSimLog({
+            t,
+            language: i18n.language,
+            env: entry.env,
+            entry,
+            message,
+          }),
+      ) +
+      "\n\n" +
+      `${t("sim.finalWorldState")}\n${finalWorldDescription}`
+    );
+  }, [i18n.language, lastRunResult, t]);
 
   const run = () => {
     const result = runSolutionSim({
@@ -41,16 +66,7 @@ export default function SimPanel() {
       }),
     );
 
-    const finalWorldDescription = JSON.stringify(result.env, null, 2);
-    setLogText(
-      summarizeLog(
-        result.log,
-        ["sim", "dmg"], // ["sim", "act", "buff", "stat", "dmg", "SP", "dev"],
-        true,
-      ) +
-        "\n\n" +
-        `${t("sim.finalWorldState")}\n${finalWorldDescription}`,
-    );
+    setLastRunResult(result);
   };
 
   return (
@@ -78,7 +94,7 @@ export default function SimPanel() {
             type="button"
             className="px-3 py-1 text-xs rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700"
             onClick={() => {
-              setLogText("");
+              setLastRunResult(null);
               dispatch(simRenderCacheReplaced(makeEmptySimRenderCache()));
               dispatch(simDamageCacheReplaced(makeEmptySimDamageCache()));
             }}
