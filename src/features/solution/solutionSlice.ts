@@ -14,6 +14,7 @@ import {
 import type { OperatorId, SkillType } from "../../data/operators/OperatorDef";
 import type { OperatorBuild, RestStatSnapshot } from "../../types/operator";
 import { statUpdater } from "./statUpdater";
+import { CURRENT_SOLUTION_VERSION } from "./solutionSL";
 import { makeId } from "../../shared/lib/id";
 import { assignNoDup, moveItem } from "../../shared/lib/utils";
 
@@ -113,7 +114,7 @@ function initState(): SolutionState {
   const initialSkillBoxes: SkillBox[] = [];
 
   return {
-    version: 1,
+    version: CURRENT_SOLUTION_VERSION,
     teamOperatorIds,
     controlledOperatorId: teamOperatorIds[0] ?? "",
     skillBoxes: initialSkillBoxes,
@@ -124,7 +125,90 @@ function initState(): SolutionState {
   };
 }
 
-const initialState: SolutionState = initState();
+type SolutionWorkspaceEntity = {
+  id: string;
+  name: string;
+  solution: SolutionState;
+};
+
+type SolutionWorkspaceState = {
+  workspaceVersion: 1;
+  activeId: string;
+  order: string[];
+  entities: Record<string, SolutionWorkspaceEntity>;
+} & SolutionState;
+
+function cloneSolutionState(solution: SolutionState): SolutionState {
+  if (typeof structuredClone === "function") {
+    return structuredClone(solution);
+  }
+  return JSON.parse(JSON.stringify(solution)) as SolutionState;
+}
+
+function normalizeSolution(solution: SolutionState): SolutionState {
+  const next: SolutionState = {
+    ...solution,
+    version: CURRENT_SOLUTION_VERSION,
+    controlledOperatorId:
+      solution.controlledOperatorId ?? solution.teamOperatorIds[0] ?? "",
+    simDamageCache: solution.simDamageCache ?? makeEmptySimDamageCache(),
+    damageWatches: solution.damageWatches ?? [],
+  };
+  for (const [opId, build] of Object.entries(next.buildByOperatorId ?? {})) {
+    try {
+      build.id = opId;
+      statUpdater(build);
+    } catch (e) {
+      console.warn(
+        `Failed to update stats for operator ${opId} during solution load.`,
+        JSON.stringify(e),
+      );
+    }
+  }
+  normalizeControlledOperatorId(next);
+  return next;
+}
+
+function getActiveEntity(
+  state: SolutionWorkspaceState,
+): SolutionWorkspaceEntity | undefined {
+  return state.entities[state.activeId];
+}
+
+function getActiveSolution(
+  state: SolutionWorkspaceState,
+): SolutionState | undefined {
+  return getActiveEntity(state)?.solution;
+}
+
+function syncActiveSolutionCompat(state: SolutionWorkspaceState): void {
+  const activeSolution = getActiveSolution(state);
+  if (!activeSolution) return;
+  state.version = activeSolution.version;
+  state.teamOperatorIds = activeSolution.teamOperatorIds;
+  state.controlledOperatorId = activeSolution.controlledOperatorId;
+  state.skillBoxes = activeSolution.skillBoxes;
+  state.buildByOperatorId = activeSolution.buildByOperatorId;
+  state.simRenderCache = activeSolution.simRenderCache;
+  state.simDamageCache = activeSolution.simDamageCache;
+  state.damageWatches = activeSolution.damageWatches;
+}
+
+const initialSolution = normalizeSolution(initState());
+const initialTabId = makeId("wst_");
+const initialState: SolutionWorkspaceState = {
+  workspaceVersion: 1,
+  activeId: initialTabId,
+  order: [initialTabId],
+  entities: {
+    [initialTabId]: {
+      id: initialTabId,
+      name: "",
+      solution: initialSolution,
+    },
+  },
+  ...initialSolution,
+};
 
 export const solutionSlice = createSlice({
   name: "solution",
@@ -135,49 +219,120 @@ export const solutionSlice = createSlice({
      * NOTE: reducers in createSlice may either mutate OR return a new state.
      */
     solutionReplaced(_state, action: PayloadAction<SolutionState>) {
-      const next = {
-        ...action.payload,
-        controlledOperatorId:
-          action.payload.controlledOperatorId ??
-          action.payload.teamOperatorIds[0] ??
-          "",
+      const active = getActiveEntity(_state);
+      if (!active) return;
+      active.solution = normalizeSolution(action.payload);
+      syncActiveSolutionCompat(_state);
+    },
+    workspaceTabNew(
+      state,
+      action: PayloadAction<{ name?: string } | undefined>,
+    ) {
+      const id = makeId("wst_");
+      const solution = normalizeSolution(initState());
+      state.entities[id] = {
+        id,
+        name: action.payload?.name ?? "",
+        solution,
       };
-      next.simDamageCache ??= makeEmptySimDamageCache();
-      next.damageWatches ??= [];
-      for (const [opId, build] of Object.entries(
-        next.buildByOperatorId ?? {},
-      )) {
-        try {
-          build.id = opId;
-          statUpdater(build);
-        } catch (e) {
-          console.warn(
-            `Failed to update stats for operator ${opId} during solution load.`,
-            JSON.stringify(e),
-          );
-        }
-      }
-      normalizeControlledOperatorId(next);
-      return next;
+      state.order.push(id);
+      state.activeId = id;
+      syncActiveSolutionCompat(state);
+    },
+    workspaceTabOpened(
+      state,
+      action: PayloadAction<{ name?: string; solution: SolutionState }>,
+    ) {
+      const id = makeId("wst_");
+      state.entities[id] = {
+        id,
+        name: action.payload.name ?? "",
+        solution: normalizeSolution(action.payload.solution),
+      };
+      state.order.push(id);
+      state.activeId = id;
+      syncActiveSolutionCompat(state);
+    },
+    workspaceTabSetActive(state, action: PayloadAction<{ id: string }>) {
+      if (!state.entities[action.payload.id]) return;
+      state.activeId = action.payload.id;
+      syncActiveSolutionCompat(state);
+    },
+    workspaceTabRename(
+      state,
+      action: PayloadAction<{ id: string; name: string }>,
+    ) {
+      const entity = state.entities[action.payload.id];
+      if (!entity) return;
+      const trimmedName = action.payload.name.trim();
+      if (!trimmedName) return;
+      entity.name = trimmedName;
+    },
+    workspaceTabClone(
+      state,
+      action: PayloadAction<{ id: string; name?: string }>,
+    ) {
+      const source = state.entities[action.payload.id];
+      if (!source) return;
+      const sourceIndex = state.order.findIndex(id => id === source.id);
+      if (sourceIndex < 0) return;
+
+      const id = makeId("wst_");
+      const cloned = normalizeSolution(cloneSolutionState(source.solution));
+      cloned.simRenderCache = makeEmptySimRenderCache();
+      cloned.simDamageCache = makeEmptySimDamageCache();
+      state.entities[id] = {
+        id,
+        name: action.payload.name ?? "",
+        solution: cloned,
+      };
+      state.order.splice(sourceIndex + 1, 0, id);
+      state.activeId = id;
+      syncActiveSolutionCompat(state);
+    },
+    workspaceTabClose(state, action: PayloadAction<{ id: string }>) {
+      if (state.order.length <= 1) return;
+      const closeId = action.payload.id;
+      const index = state.order.findIndex(id => id === closeId);
+      if (index < 0) return;
+
+      state.order.splice(index, 1);
+      delete state.entities[closeId];
+
+      if (state.activeId !== closeId) return;
+      const nextIndex = index - 1 >= 0 ? index - 1 : 0;
+      const nextActiveId = state.order[nextIndex];
+      if (!nextActiveId) return;
+      state.activeId = nextActiveId;
+      syncActiveSolutionCompat(state);
     },
     simRenderCacheReplaced(state, action: PayloadAction<SimRenderCache>) {
-      state.simRenderCache = action.payload;
+      const active = getActiveSolution(state);
+      if (!active) return;
+      active.simRenderCache = action.payload;
+      syncActiveSolutionCompat(state);
     },
     simDamageCacheReplaced(state, action: PayloadAction<SimDamageCache>) {
-      state.simDamageCache = action.payload;
+      const active = getActiveSolution(state);
+      if (!active) return;
+      active.simDamageCache = action.payload;
+      syncActiveSolutionCompat(state);
     },
     damageWatchAdded(state, action: PayloadAction<{ name?: string } | undefined>) {
+      const active = getActiveSolution(state);
+      if (!active) return;
       const id = makeId("dw_");
-      const defaultSourceId = state.controlledOperatorId || null;
-      state.damageWatches.push({
+      const defaultSourceId = active.controlledOperatorId || null;
+      active.damageWatches.push({
         id,
-        name: action.payload?.name ?? `Watch ${state.damageWatches.length + 1}`,
+        name: action.payload?.name ?? `Watch ${active.damageWatches.length + 1}`,
         filter: {
           sourceId: defaultSourceId,
           skillType: null,
           damageType: null,
         },
       });
+      syncActiveSolutionCompat(state);
     },
     damageWatchPatched(
       state,
@@ -186,43 +341,58 @@ export const solutionSlice = createSlice({
         patch: Partial<Omit<DamageWatchEntry, "id">>;
       }>,
     ) {
+      const active = getActiveSolution(state);
+      if (!active) return;
       const { id, patch } = action.payload;
-      const watch = state.damageWatches.find(w => w.id === id);
+      const watch = active.damageWatches.find(w => w.id === id);
       if (!watch) return;
       Object.assign(watch, patch);
+      syncActiveSolutionCompat(state);
     },
     damageWatchDeleted(state, action: PayloadAction<{ id: string }>) {
+      const active = getActiveSolution(state);
+      if (!active) return;
       const { id } = action.payload;
-      const idx = state.damageWatches.findIndex(w => w.id === id);
-      if (idx >= 0) state.damageWatches.splice(idx, 1);
+      const idx = active.damageWatches.findIndex(w => w.id === id);
+      if (idx >= 0) active.damageWatches.splice(idx, 1);
+      syncActiveSolutionCompat(state);
     },
     laneReordered(state, action: PayloadAction<{ from: number; to: number }>) {
+      const active = getActiveSolution(state);
+      if (!active) return;
       const { from, to } = action.payload;
-      state.teamOperatorIds = moveItem(state.teamOperatorIds, from, to);
-      normalizeControlledOperatorId(state);
+      active.teamOperatorIds = moveItem(active.teamOperatorIds, from, to);
+      normalizeControlledOperatorId(active);
+      syncActiveSolutionCompat(state);
     },
     teammateAssigned(
       state,
       action: PayloadAction<{ laneIndex: number; newOpId: string }>,
     ) {
+      const active = getActiveSolution(state);
+      if (!active) return;
       const { laneIndex, newOpId } = action.payload;
-      const replacedOperatorId = state.teamOperatorIds[laneIndex];
-      state.teamOperatorIds = assignNoDup(
-        state.teamOperatorIds,
+      const replacedOperatorId = active.teamOperatorIds[laneIndex];
+      active.teamOperatorIds = assignNoDup(
+        active.teamOperatorIds,
         laneIndex,
         newOpId,
       );
-      if (replacedOperatorId === state.controlledOperatorId) {
-        state.controlledOperatorId = newOpId;
+      if (replacedOperatorId === active.controlledOperatorId) {
+        active.controlledOperatorId = newOpId;
       }
-      normalizeControlledOperatorId(state);
+      normalizeControlledOperatorId(active);
+      syncActiveSolutionCompat(state);
     },
     controlledOperatorSet(
       state,
       action: PayloadAction<{ operatorId: string }>,
     ) {
-      state.controlledOperatorId = action.payload.operatorId;
-      normalizeControlledOperatorId(state);
+      const active = getActiveSolution(state);
+      if (!active) return;
+      active.controlledOperatorId = action.payload.operatorId;
+      normalizeControlledOperatorId(active);
+      syncActiveSolutionCompat(state);
     },
     skillBoxPatched(
       state,
@@ -231,10 +401,13 @@ export const solutionSlice = createSlice({
         patch: Partial<Omit<SkillBox, "id">>;
       }>,
     ) {
+      const active = getActiveSolution(state);
+      if (!active) return;
       const { id, patch } = action.payload;
-      const box = state.skillBoxes.find(b => b.id === id);
+      const box = active.skillBoxes.find(b => b.id === id);
       if (!box) return;
       Object.assign(box, patch);
+      syncActiveSolutionCompat(state);
     },
     operatorBuildPatched(
       state,
@@ -243,8 +416,10 @@ export const solutionSlice = createSlice({
         patch: Partial<OperatorBuild>;
       }>,
     ) {
+      const active = getActiveSolution(state);
+      if (!active) return;
       const { operatorId, patch } = action.payload;
-      const cur = state.buildByOperatorId[operatorId];
+      const cur = active.buildByOperatorId[operatorId];
       if (!cur) return;
 
       // Recompute stats
@@ -252,7 +427,8 @@ export const solutionSlice = createSlice({
       next.id = operatorId;
       statUpdater(next);
 
-      state.buildByOperatorId[operatorId] = next;
+      active.buildByOperatorId[operatorId] = next;
+      syncActiveSolutionCompat(state);
     },
     skillBoxAdded(
       state,
@@ -263,22 +439,28 @@ export const solutionSlice = createSlice({
         durationFrames?: number;
       }>,
     ) {
+      const active = getActiveSolution(state);
+      if (!active) return;
       const { operatorId, skillType, startFrame } = action.payload;
       const durationFrames =
         action.payload.durationFrames ??
         getDurationFrames(operatorId, skillType);
-      state.skillBoxes.push({
+      active.skillBoxes.push({
         id: makeId("sb_"),
         operatorId,
         skillType,
         startFrame,
         durationFrames,
       });
+      syncActiveSolutionCompat(state);
     },
     skillBoxDeleted(state, action: PayloadAction<{ id: string }>) {
+      const active = getActiveSolution(state);
+      if (!active) return;
       const { id } = action.payload;
-      const idx = state.skillBoxes.findIndex(b => b.id === id);
-      if (idx >= 0) state.skillBoxes.splice(idx, 1);
+      const idx = active.skillBoxes.findIndex(b => b.id === id);
+      if (idx >= 0) active.skillBoxes.splice(idx, 1);
+      syncActiveSolutionCompat(state);
     },
   },
 });
@@ -297,6 +479,12 @@ export const {
   damageWatchPatched,
   damageWatchDeleted,
   controlledOperatorSet,
+  workspaceTabNew,
+  workspaceTabOpened,
+  workspaceTabSetActive,
+  workspaceTabRename,
+  workspaceTabClone,
+  workspaceTabClose,
 } = solutionSlice.actions;
 
 export default solutionSlice.reducer;

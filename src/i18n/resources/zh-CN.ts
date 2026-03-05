@@ -3,6 +3,8 @@ import { zhCNContent } from "./content/zh-CN-content";
 export const zhCN = {
   translation: {
     common: {
+      close: "关闭",
+      new: "新建",
       replace: "替换",
       newTab: "新建标签页",
     },
@@ -10,6 +12,9 @@ export const zhCN = {
       title: "终末地轴",
     },
     content: zhCNContent,
+    workspace: {
+      defaultTabName: "标签页 {{index}}",
+    },
     axis: {
       title: "轴编辑器",
       placeholder: "这是 Axis 编辑器组件的占位内容。",

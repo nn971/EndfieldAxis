@@ -3,6 +3,8 @@ import { enContent } from './content/enContent';
 export const en = {
   translation: {
     common: {
+      close: 'Close',
+      new: 'New',
       replace: 'Replace',
       newTab: 'New Tab',
     },
@@ -10,6 +12,9 @@ export const en = {
       title: 'EndfieldAxis',
     },
     content: enContent,
+    workspace: {
+      defaultTabName: 'Tab {{index}}',
+    },
     axis: {
       title: 'Axis Editor',
       placeholder: 'This is a placeholder for the Axis Editor component.',
