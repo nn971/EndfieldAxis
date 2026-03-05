@@ -295,21 +295,24 @@ function scheduleBuffExpire(
   targetId: SimEntityId,
   buffId: BuffId,
   buffKey: string,
-  expiresAtFrame: number | null,
+  expiresAtGameFrame: number | null,
 ): void {
-  if (expiresAtFrame === null) {
+  if (expiresAtGameFrame === null) {
     return;
   }
-  world.ops.schedule({
-    id: makeSimEventId(),
-    type: "buffExpire",
-    frame: expiresAtFrame,
-    seq: world.ops.nextSeq(),
-    targetId: targetId,
-    buffId: buffId,
-    buffKey,
-    ref: "auto",
-  } as SimEvent);
+  world.ops.scheduleAtGameFrame(
+    {
+      id: makeSimEventId(),
+      type: "buffExpire",
+      seq: world.ops.nextSeq(),
+      targetId: targetId,
+      buffId: buffId,
+      buffKey,
+      ref: "auto",
+    } as Omit<Extract<SimEvent, { type: "buffExpire" }>, "frame">,
+    expiresAtGameFrame,
+    world.nowRealInFrames,
+  );
 }
 
 function getEventDurationFrames(
@@ -453,14 +456,17 @@ function applyStaggeredStatus(
   target.stagger.staggeredExpireFrame =
     self.read.nowInFrames + STAGGER_DURATION_FRAMES;
 
-  self.ops.schedule({
-    id: makeSimEventId(),
-    type: "staggerExpire",
-    frame: target.stagger.staggeredExpireFrame,
-    seq: self.ops.nextSeq(),
-    targetId,
-    ref,
-  });
+  self.ops.scheduleAtGameFrame(
+    {
+      id: makeSimEventId(),
+      type: "staggerExpire",
+      seq: self.ops.nextSeq(),
+      targetId,
+      ref,
+    } as Omit<Extract<SimEvent, { type: "staggerExpire" }>, "frame">,
+    target.stagger.staggeredExpireFrame,
+    self.nowRealInFrames,
+  );
 }
 
 function scheduleStaggeredDebuffApply(
@@ -558,12 +564,41 @@ export function resolveCastStart(
     }),
   );
 
+  if (ev.skillType === "normalAttack" || ev.skillType === "normalSkill") {
+    const spawned = self.registry.runOnCastStart({
+      read: self.read,
+      ops: self.ops,
+      ev: ev,
+      sourceId: ev.sourceId,
+      targetId: ev.targetId,
+    });
+    self.ops.scheduleDraftsGameTime(spawned, {
+      minRealFrame: self.nowRealInFrames,
+    });
+  }
+}
+
+export function resolveCastScriptStart(
+  self: SimWorld,
+  ev: Extract<SimEvent, { type: "castScriptStart" }>,
+) {
+  const castStart = self.read.getEvent(ev.ref);
+  if (!castStart || castStart.type !== "castStart") {
+    throw new Error(
+      `castScriptStart ref=${ev.ref} does not point to castStart event`,
+    );
+  }
+
+  if (castStart.skillType !== "comboSkill" && castStart.skillType !== "ultimate") {
+    return;
+  }
+
   const spawned = self.registry.runOnCastStart({
     read: self.read,
     ops: self.ops,
-    ev: ev,
-    sourceId: ev.sourceId,
-    targetId: ev.targetId,
+    ev: castStart,
+    sourceId: castStart.sourceId,
+    targetId: castStart.targetId,
   });
   self.ops.scheduleDraftsGameTime(spawned, {
     minRealFrame: self.nowRealInFrames,
@@ -1067,10 +1102,9 @@ export function resolveBuffExpiration(
   const buff = (ent as any).buffs?.[buffKey];
   if (!buff) return false; // already removed or consumed
 
-  const expiresAtFrame = (buff as SimBuff).expiresAtFrame;
-  if (expiresAtFrame === null) return false;
-  if (expiresAtFrame !== ev.frame) return false;
-  if (self.read.nowInFrames >= expiresAtFrame) {
+  const expiresAtGameFrame = (buff as SimBuff).expiresAtFrame;
+  if (expiresAtGameFrame === null) return false;
+  if (self.read.nowInFrames >= expiresAtGameFrame) {
     self.ops.removeBuff(ent.id, buffKey);
     self.ops.log(
       "buff",
@@ -1288,15 +1322,18 @@ export function resolveInflictionApplication(
     minRealFrame: self.nowRealInFrames,
   });
 
-  self.ops.schedule({
-    id: makeSimEventId(),
-    type: "inflictionExpire",
-    frame: self.read.nowInFrames + DEFAULT_INFLICTION_DURATION_FRAMES,
-    seq: self.ops.nextSeq(),
-    targetId: owner.id,
-    inflictionType: ev.inflictionType,
-    ref: ev.id,
-  } as SimEvent);
+  self.ops.scheduleAtGameFrame(
+    {
+      id: makeSimEventId(),
+      type: "inflictionExpire",
+      seq: self.ops.nextSeq(),
+      targetId: owner.id,
+      inflictionType: ev.inflictionType,
+      ref: ev.id,
+    } as Omit<Extract<SimEvent, { type: "inflictionExpire" }>, "frame">,
+    self.read.nowInFrames + DEFAULT_INFLICTION_DURATION_FRAMES,
+    self.nowRealInFrames,
+  );
 }
 
 export function resolveInflictionExpiration(
@@ -1379,16 +1416,19 @@ export function resolveReactionTick(
     } as SimEvent);
   }
 
-  self.ops.schedule({
-    id: makeSimEventId(),
-    type: "reactionTick",
-    frame: ev.frame + COMBUSTION_DOT_INTERVAL_FRAMES,
-    seq: self.ops.nextSeq(),
-    sourceId: tickSourceId,
-    targetId: ev.targetId,
-    reactionBuffId: COMBUSTION_BUFF_ID,
-    ref: ev.id,
-  } as SimEvent);
+  self.ops.scheduleAtGameFrame(
+    {
+      id: makeSimEventId(),
+      type: "reactionTick",
+      seq: self.ops.nextSeq(),
+      sourceId: tickSourceId,
+      targetId: ev.targetId,
+      reactionBuffId: COMBUSTION_BUFF_ID,
+      ref: ev.id,
+    } as Omit<Extract<SimEvent, { type: "reactionTick" }>, "frame">,
+    self.read.nowInFrames + COMBUSTION_DOT_INTERVAL_FRAMES,
+    self.nowRealInFrames,
+  );
 }
 
 export function resolveComboTriggered(
@@ -1494,7 +1534,8 @@ export function resolveStaggerExpire(
   const target = self.read.getEntity(ev.targetId);
   if (!target?.stagger) return;
 
-  if (target.stagger.staggeredExpireFrame === ev.frame) {
+  if (target.stagger.staggeredExpireFrame === undefined) return;
+  if (self.read.nowInFrames >= target.stagger.staggeredExpireFrame) {
     target.stagger.currentMilli = 0;
     target.stagger.pendingApplyFrame = undefined;
     target.stagger.isStaggered = false;

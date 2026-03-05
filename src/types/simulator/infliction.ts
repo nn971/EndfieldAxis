@@ -33,9 +33,12 @@ export function isArtsInflictionType(
 export type SimBuff = {
   id: BuffTypeId;
   key: BuffKey;
+  /** Game-time frame. Does not advance during freezes. */
   expiresAtFrame: number | null;
+  /** Duration measured in game-time frames. */
   durationFrames: number | null;
   mods?: readonly BuffMod[];
+  /** Latest apply frame in game-time frames. */
   lastApplyFrame: number;
 
   /** Optional stacks for stackable buffs */
@@ -66,5 +69,6 @@ export type BuffMod =
 export type SimInfliction = {
   type: InflictionType;
   stacks: number;
+  /** Latest apply frame in game-time frames. */
   lastApplyFrame: number;
 };

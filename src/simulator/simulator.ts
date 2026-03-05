@@ -39,6 +39,7 @@ import "./resolvers";
 import {
   resolveBuffApplication,
   resolveBuffExpiration,
+  resolveCastScriptStart,
   resolveInflictionExpiration,
   resolveInflictionRemoval,
   resolveStatusApplication,
@@ -140,6 +141,9 @@ export type SimOps = {
 
 type SimResolvers = {
   resolveCastStart: (ev: Extract<SimEvent, { type: "castStart" }>) => void;
+  resolveCastScriptStart: (
+    ev: Extract<SimEvent, { type: "castScriptStart" }>,
+  ) => void;
   resolveCastEnd: (ev: Extract<SimEvent, { type: "castEnd" }>) => void;
   resolveHit: (ev: Extract<SimEvent, { type: "hit" }>) => void;
   /** should return whether the status is triggered */
@@ -368,6 +372,7 @@ export class SimWorld {
 
     this.resolvers = {
       resolveCastStart: ev => resolveCastStart(self, ev),
+      resolveCastScriptStart: ev => resolveCastScriptStart(self, ev),
       resolveCastEnd: ev => resolveCastEnd(self, ev),
       resolveHit: ev => resolveHit(self, ev),
       resolveBuffApplication: ev => resolveBuffApplication(self, ev),
@@ -888,6 +893,11 @@ export class SimWorld {
       switch (ev.type) {
         case "castStart": {
           this.resolvers.resolveCastStart(ev);
+          break;
+        }
+
+        case "castScriptStart": {
+          this.resolvers.resolveCastScriptStart(ev);
           break;
         }
 
