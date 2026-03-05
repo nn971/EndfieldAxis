@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import operatorsData from "../../data/operators";
 import { getAvatarUrl } from "../../shared/imgRegistry/imgRegistry";
 // import PreviewSlider from "../../shared/components/PreviewSlider";
@@ -8,6 +9,7 @@ import { OperatorBuildTab, WeaponTab, GearsTab } from "./Tabs";
 import { OperatorId } from "../../data/operators/OperatorDef";
 
 function RestStatPreview({ build }: { build: OperatorBuild }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const rest = build.restStat;
   if (!rest) return null;
@@ -24,13 +26,14 @@ function RestStatPreview({ build }: { build: OperatorBuild }) {
   return (
     <div className="mt-3 rounded border border-zinc-700 bg-zinc-950/40 p-3">
       <div className="flex items-center justify-between">
-        <div className="text-sm font-semibold">Build preview</div>
+        <div className="text-sm font-semibold">{t("operator.buildPreview")}</div>
         <button
+          type="button"
           className="text-[11px] px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700"
           onClick={() => setOpen(v => !v)}
-          title="Show restStat breakdown"
+          title={t("operator.showRestStatBreakdown")}
         >
-          {open ? "Hide" : "Show"}
+          {open ? t("operator.hide") : t("operator.show")}
         </button>
       </div>
 
@@ -38,18 +41,18 @@ function RestStatPreview({ build }: { build: OperatorBuild }) {
         <>
           <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
             <div className="rounded border border-zinc-800 bg-zinc-950 p-2">
-              <div className="text-zinc-400">ATK</div>
+              <div className="text-zinc-400">{t("operator.atk")}</div>
               <div className="mt-1">
-                <span className="text-zinc-300">base</span>{" "}
+                <span className="text-zinc-300">{t("operator.base")}</span>{" "}
                 {fmtInt(rest.baseAtk)}
               </div>
               <div className="text-[11px] text-zinc-500">
-                op {fmtInt(rest.operatorAttack)} + weapon{" "}
+                {t("operator.op")} {fmtInt(rest.operatorAttack)} + {t("operator.weapon")}{" "}
                 {fmtInt(rest.weaponAttack)}
               </div>
 
               <div className="mt-1">
-                <span className="text-zinc-300">final</span>{" "}
+                <span className="text-zinc-300">{t("operator.final")}</span>{" "}
                 {fmtInt(
                   fmtInt(rest.baseAtk * (1 + atkIncRatio) + atkIncFlat) *
                     (1 + attributeBonusRatio),
@@ -58,14 +61,14 @@ function RestStatPreview({ build }: { build: OperatorBuild }) {
             </div>
 
             <div className="rounded border border-zinc-800 bg-zinc-950 p-2">
-              <div className="text-zinc-400">Static damage buckets</div>
+              <div className="text-zinc-400">{t("operator.staticDamageBuckets")}</div>
               <div className="mt-1 flex flex-col gap-0.5">
                 <div>
-                  <span className="text-zinc-500">atIncRatio</span>{" "}
+                  <span className="text-zinc-500">{t("operator.atIncRatio")}</span>{" "}
                   {fmtPct(atkIncRatio)}
                 </div>
                 <div>
-                  <span className="text-zinc-500">atkIncFlat</span>{" "}
+                  <span className="text-zinc-500">{t("operator.atkIncFlat")}</span>{" "}
                   {fmtInt(atkIncFlat)}
                 </div>
                 {/* <div>
@@ -77,7 +80,7 @@ function RestStatPreview({ build }: { build: OperatorBuild }) {
             </div>
 
             <div className="col-span-2 rounded border border-zinc-800 bg-zinc-950 p-2">
-              <div className="text-zinc-400">Attributes</div>
+              <div className="text-zinc-400">{t("operator.attributes")}</div>
               <div className="mt-1 grid grid-cols-4 gap-2 text-[11px]">
                 {Object.entries(rest.attributes ?? {}).map(([k, v]) => (
                   <div key={k} className="rounded bg-zinc-900/50 px-2 py-1">
@@ -90,14 +93,14 @@ function RestStatPreview({ build }: { build: OperatorBuild }) {
           </div>
           <div className="mt-3">
             <div className="text-xs text-zinc-400">
-              Contributors (restStat.log)
+              {t("operator.contributorsRestStatLog")}
             </div>
             <div className="mt-1 max-h-56 overflow-auto rounded border border-zinc-800 bg-zinc-950 p-2">
               {rest.log?.length ? (
                 <div className="space-y-1">
-                  {rest.log.map((e, i) => (
+                  {rest.log.map(e => (
                     <div
-                      key={i}
+                      key={`${e.source}:${e.bucket}:${e.log}`}
                       className="text-[11px] leading-4 text-zinc-300"
                     >
                       <span className="text-zinc-500">[{e.source}]</span>{" "}
@@ -121,7 +124,7 @@ function RestStatPreview({ build }: { build: OperatorBuild }) {
                   ))}
                 </div>
               ) : (
-                <div className="text-[11px] text-zinc-500">No entries.</div>
+                <div className="text-[11px] text-zinc-500">{t("operator.noEntries")}</div>
               )}
             </div>
           </div>
@@ -146,6 +149,7 @@ function OperatorPicker({
   onPick,
   onClose,
 }: OperatorPickerProps) {
+  const { t } = useTranslation();
   const operatorEntries = useMemo(
     () =>
       Object.values(operatorsData).sort((a, b) => {
@@ -162,15 +166,16 @@ function OperatorPicker({
         <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2">
           <div>
             <div className="text-[11px] uppercase tracking-wide text-zinc-500">
-              Operator Picker
+              {t("operator.operatorPicker")}
             </div>
-            <div className="font-semibold text-zinc-100">Select operator</div>
+            <div className="font-semibold text-zinc-100">{t("operator.selectOperator")}</div>
           </div>
           <button
+            type="button"
             className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-300 transition-colors hover:border-zinc-500 hover:bg-zinc-800"
             onClick={onClose}
           >
-            Close
+            {t("operator.close")}
           </button>
         </div>
 
@@ -185,6 +190,7 @@ function OperatorPicker({
 
               return (
                 <button
+                  type="button"
                   key={op.id}
                   disabled={disabled}
                   className={
@@ -221,7 +227,7 @@ function OperatorPicker({
 
                   {disabled && (
                     <div className="rounded bg-zinc-900/90 px-1.5 py-0.5 text-[10px] text-zinc-400">
-                      in lane {usedLane + 1}
+                      {t("operator.inLane", { lane: usedLane + 1 })}
                     </div>
                   )}
                 </button>
@@ -235,11 +241,6 @@ function OperatorPicker({
 }
 
 type BuildTab = "operator" | "weapon" | "gears";
-const tabs: { key: BuildTab; label: string }[] = [
-  { key: "operator", label: "Operator" },
-  { key: "weapon", label: "Weapon" },
-  { key: "gears", label: "Gears" },
-];
 
 type Props = {
   laneIndex: number | null;
@@ -267,8 +268,15 @@ export default function OperatorEditor({
   onSetControlledOperator,
   onClose,
 }: Props) {
+  const { t } = useTranslation();
   const [isPicking, setIsPicking] = useState(false);
   const [page, setPage] = useState<BuildTab>("operator");
+
+  const tabs: { key: BuildTab; label: string }[] = [
+    { key: "operator", label: t("operator.tabOperator") },
+    { key: "weapon", label: t("operator.tabWeapon") },
+    { key: "gears", label: t("operator.tabGears") },
+  ];
 
   const operator = useMemo(
     () => (operatorId ? operatorsData[operatorId] : null),
@@ -282,7 +290,7 @@ export default function OperatorEditor({
   if (!operator || !operatorBuild || laneIndex == null) {
     return (
       <div className="h-full p-4 border border-zinc-700 rounded bg-zinc-900">
-        Unknown operator: {operatorId}
+        {t("operator.unknownOperator", { operatorId })}
       </div>
     );
   }
@@ -296,6 +304,7 @@ export default function OperatorEditor({
       <div className="mt-4 flex gap-2">
         {tabs.map(t => (
           <button
+            type="button"
             key={t.key}
             className={
               "text-xs px-3 py-1 rounded border " +
@@ -324,21 +333,25 @@ export default function OperatorEditor({
             onClick={() => onSetControlledOperator(operatorId)}
             disabled={isControlled}
           >
-            {isControlled ? "Controlled" : "Set Controlled"}
+            {isControlled
+              ? t("operator.controlled")
+              : t("operator.setControlled")}
           </button>
           <button
+            type="button"
             className="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700"
             onClick={onClose}
           >
-            Close
+            {t("operator.close")}
           </button>
         </div>
       </div>
 
       <button
+        type="button"
         className="mt-4 w-full rounded border border-zinc-700 hover:border-zinc-500 p-3 flex items-center gap-3"
         onClick={() => setIsPicking(true)}
-        title="Click to change operator"
+        title={t("operator.clickToChangeOperator")}
       >
         <div className="w-16 h-16 rounded bg-zinc-800 overflow-hidden shrink-0">
           {avatarUrl ? (
@@ -349,14 +362,14 @@ export default function OperatorEditor({
             />
           ) : (
             <div className="w-full h-full grid place-items-center text-xs text-zinc-400">
-              No avatar
+              {t("operator.noAvatar")}
             </div>
           )}
         </div>
         <div className="text-left">
-          <div className="text-sm text-zinc-300">Operator</div>
+          <div className="text-sm text-zinc-300">{t("operator.operator")}</div>
           <div className="text-base font-medium">{operator.name}</div>
-          <div className="text-xs text-zinc-500">click avatar to change</div>
+          <div className="text-xs text-zinc-500">{t("operator.clickAvatarToChange")}</div>
         </div>
       </button>
 

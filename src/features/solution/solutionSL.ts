@@ -8,6 +8,27 @@ import { makeEmptySimDamageCache } from "../../types/simDamage";
 // Bump this when you change the serialized shape.
 export const CURRENT_SOLUTION_VERSION = 2;
 
+export type DeserializeSolutionErrorCode =
+  | "invalid_json"
+  | "not_object"
+  | "unsupported_version"
+  | "missing_version"
+  | "invalid_team_ids"
+  | "invalid_skill_boxes"
+  | "invalid_build_map"
+  | "missing_build_entry";
+
+export type DeserializeSolutionError = {
+  ok: false;
+  code: DeserializeSolutionErrorCode;
+  meta?: Record<string, unknown>;
+};
+
+type DeserializeSolutionSuccess = { ok: true; solution: SolutionState };
+type DeserializeSolutionResult =
+  | DeserializeSolutionSuccess
+  | DeserializeSolutionError;
+
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
@@ -64,12 +85,12 @@ export function serializeSolution(sol: SolutionState): string {
 
 export function deserializeSolution(
   text: string,
-): { ok: true; solution: SolutionState } | { ok: false; error: string } {
+): DeserializeSolutionResult {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
   } catch (e) {
-    return { ok: false, error: "Invalid JSON (parse failed)." };
+    return { ok: false, code: "invalid_json" };
   }
 
   // Migration entry point.
@@ -83,10 +104,10 @@ export function deserializeSolution(
 
 function migrateToCurrent(
   raw: unknown,
-): { ok: true; solution: SolutionState } | { ok: false; error: string } {
+): DeserializeSolutionResult {
   // v0 (legacy): allow missing "version" and treat it as v1 if other fields match.
   if (!isPlainObject(raw))
-    return { ok: false, error: "Solution must be a JSON object." };
+    return { ok: false, code: "not_object" };
 
   const version = typeof raw.version === "number" ? raw.version : 0;
   if (version === 0) {
@@ -140,32 +161,36 @@ function migrateToCurrent(
 
   return {
     ok: false,
-    error: `Unsupported solution version ${String(version)} (expected ${CURRENT_SOLUTION_VERSION}).`,
+    code: "unsupported_version",
+    meta: {
+      version,
+      expectedVersion: CURRENT_SOLUTION_VERSION,
+    },
   };
 }
 
 function validateSolution(
   sol: unknown,
-): { ok: true; solution: SolutionState } | { ok: false; error: string } {
+): DeserializeSolutionResult {
   if (!isPlainObject(sol))
-    return { ok: false, error: "Solution must be an object." };
+    return { ok: false, code: "not_object" };
 
   if (typeof sol.version !== "number") {
-    return { ok: false, error: "Solution.version must be a number." };
+    return { ok: false, code: "missing_version" };
   }
   if (!Array.isArray(sol.teamOperatorIds) || sol.teamOperatorIds.length !== 4) {
     return {
       ok: false,
-      error: "Solution.teamOperatorIds must be an array of length 4.",
+      code: "invalid_team_ids",
     };
   }
   if (!Array.isArray(sol.skillBoxes) || !sol.skillBoxes.every(isSkillBox)) {
-    return { ok: false, error: "Solution.skillBoxes has invalid entries." };
+    return { ok: false, code: "invalid_skill_boxes" };
   }
   if (!isPlainObject(sol.buildByOperatorId)) {
     return {
       ok: false,
-      error: "Solution.buildByOperatorId must be an object map.",
+      code: "invalid_build_map",
     };
   }
 
@@ -176,7 +201,8 @@ function validateSolution(
     if (!(opId in sol.buildByOperatorId)) {
       return {
         ok: false,
-        error: `Missing buildByOperatorId entry for operatorId: ${opId}`,
+        code: "missing_build_entry",
+        meta: { operatorId: opId },
       };
     }
   }
