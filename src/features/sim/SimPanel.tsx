@@ -45,7 +45,7 @@ export default function SimPanel() {
     setLogText(
       summarizeLog(
         result.log,
-        ["sim", "act", "buff", "stat", "dmg", "SP", "dev"],
+        ["sim", "dmg"], // ["sim", "act", "buff", "stat", "dmg", "SP", "dev"],
         true,
       ) +
         "\n\n" +

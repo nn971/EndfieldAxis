@@ -17,51 +17,51 @@ import {
   type ArtsInflictionType,
   type InflictionType,
 } from "../types/simulator/infliction";
-import {
-  SOLIDIFICATION_BUFF_ID,
-  SOLIDIFICATION_INITIAL_HIT_BASE_MUL,
-  SOLIDIFICATION_INITIAL_HIT_PER_STACK_MUL,
-  SOLIDIFICATION_BASE_DURATION_FRAMES,
-  SOLIDIFICATION_EXTRA_DURATION_PER_STACK_FRAMES,
-} from "../data/buffs/reactions/solidification";
-import {
-  COMBUSTION_BUFF_ID,
-  COMBUSTION_INITIAL_HIT_BASE_MUL,
-  COMBUSTION_INITIAL_HIT_PER_STACK_MUL,
-  COMBUSTION_DOT_BASE_MUL,
-  COMBUSTION_DOT_PER_STACK_MUL,
-  COMBUSTION_DOT_INTERVAL_FRAMES,
-} from "../data/buffs/reactions/combustion";
-import {
-  ELECTRIFICATION_BUFF_ID,
-  ELECTRIFICATION_INITIAL_HIT_BASE_MUL,
-  ELECTRIFICATION_INITIAL_HIT_PER_STACK_MUL,
-  ELECTRIFICATION_BASE_DURATION_FRAMES,
-  ELECTRIFICATION_EXTRA_DURATION_PER_STACK_FRAMES,
-} from "../data/buffs/reactions/electrification";
-import {
-  CORROSION_BUFF_ID,
-  CORROSION_INITIAL_HIT_BASE_MUL,
-  CORROSION_INITIAL_HIT_PER_STACK_MUL,
-  CORROSION_REDUCTION_PER_SECOND_BASE,
-  CORROSION_REDUCTION_PER_SECOND_PER_STACK,
-  CORROSION_MIN_RESISTANCE_BASE,
-  CORROSION_MIN_RESISTANCE_PER_STACK,
-} from "../data/buffs/reactions/corrosion";
 import { makeSimEventId } from "../shared/lib/utils";
 import { buildDamageContext } from "./damage/damageEngine";
 import operatorsData from "../data/operators";
 import type { SkillType } from "../data/operators/OperatorDef";
 import { SimEventWhen } from "../types/simulator/when";
 import { STAGGER_DURATION_FRAMES } from "../types/simulator/stagger";
+import { SOLIDIFICATION_BUFF_ID } from "../data/buffs/reactions/solidification";
+import { COMBUSTION_BUFF_ID } from "../data/buffs/reactions/combustion";
+import { ELECTRIFICATION_BUFF_ID } from "../data/buffs/reactions/electrification";
+import { CORROSION_BUFF_ID } from "../data/buffs/reactions/corrosion";
+import {
+  computePhysicalStatusMultiplier,
+  computeArtsReactionMultiplier,
+  computeArtsBurstMultiplier,
+  type ArtsReactionType,
+  ARTS_BURST_DELAY_FRAMES,
+  ARTS_BURST_BASE_MUL,
+  ARTS_BURST_PER_STACK_MUL,
+  SOLIDIFICATION_INITIAL_HIT_BASE_MUL,
+  SOLIDIFICATION_INITIAL_HIT_PER_STACK_MUL,
+  SOLIDIFICATION_BASE_DURATION_FRAMES,
+  SOLIDIFICATION_EXTRA_DURATION_PER_STACK_FRAMES,
+  SOLIDIFICATION_SHATTER_BASE_MUL,
+  SOLIDIFICATION_SHATTER_PER_STACK_MUL,
+  COMBUSTION_INITIAL_HIT_BASE_MUL,
+  COMBUSTION_INITIAL_HIT_PER_STACK_MUL,
+  COMBUSTION_DOT_BASE_MUL,
+  COMBUSTION_DOT_PER_STACK_MUL,
+  COMBUSTION_DOT_INTERVAL_FRAMES,
+  ELECTRIFICATION_INITIAL_HIT_BASE_MUL,
+  ELECTRIFICATION_INITIAL_HIT_PER_STACK_MUL,
+  ELECTRIFICATION_BASE_DURATION_FRAMES,
+  ELECTRIFICATION_EXTRA_DURATION_PER_STACK_FRAMES,
+  ELECTRIFICATION_RCV_ARTS_BASE,
+  ELECTRIFICATION_RCV_ARTS_PER_STACK,
+  CORROSION_INITIAL_HIT_BASE_MUL,
+  CORROSION_INITIAL_HIT_PER_STACK_MUL,
+  CORROSION_REDUCTION_PER_SECOND_BASE,
+  CORROSION_REDUCTION_PER_SECOND_PER_STACK,
+  CORROSION_MIN_RESISTANCE_BASE,
+  CORROSION_MIN_RESISTANCE_PER_STACK,
+} from "./damage/statusDamage";
 
-// TODO: come up with a way to configure this
 export const DEFAULT_INFLICTION_DURATION_FRAMES = 1800;
 
-/** Any Arts Burst have damage multiplier 1.6 */
-export const ARTS_BURST_DELAY_FRAMES = 12;
-export const ARTS_BURST_BASE_MUL = 1.6;
-export const ARTS_BURST_PER_STACK_MUL = 0;
 export const NORMAL_SKILL_TEAM_ULTIMATE_GAIN = 6.5;
 
 export const COMBO_AVAILABLE_WINDOW_FRAMES = 300;
@@ -281,34 +281,12 @@ function computePhysicalStatusSpecialMul(
   const rawArts = Number(build?.restStat?.artsIntensity ?? 0);
   const artsIntensity = Number.isFinite(rawArts) ? rawArts : 0;
 
-  const levelMul = 1 + (level + 9) / 426.5; // TODO this formula need to be verified by tons of real data
-  const artsMul = 1 + artsIntensity / 100;
-
-  const consumed = Math.max(0, Number(vulnerableConsumed ?? 0));
-
-  let baseMul = 1;
-  switch (statusType) {
-    case "lift":
-    case "knockDown":
-      baseMul = 1.2;
-      break;
-    case "crush":
-      baseMul = 1.5 * (1 + consumed);
-      break;
-    case "breach":
-      baseMul = 0.5 * (1 + consumed);
-      break;
-    default:
-      console.warn(
-        `unknown statusType ${statusType} when computing special multiplier`,
-      );
-      baseMul = 1;
-  }
-
-  const finalMul = baseMul * levelMul * artsMul;
-  // console.log(baseMul, levelMul, artsMul, finalMul);
-
-  return finalMul;
+  return computePhysicalStatusMultiplier(
+    statusType,
+    level,
+    artsIntensity,
+    vulnerableConsumed,
+  );
 }
 
 function scheduleBuffExpire(
@@ -1018,6 +996,7 @@ export function resolveInflictionApplication(
 ) {
   const source = self.read.getEntity(ev.sourceId ?? null);
   if (!source) throw new Error(`Unknown source with sourceId=${ev.sourceId}`);
+  const sourceBuild = self.read.getBuild(source.id);
 
   const owner = self.read.getEntity(ev.targetId ?? null);
   if (!owner) throw new Error(`Unknown target with targetId=${ev.targetId}`);
@@ -1045,49 +1024,48 @@ export function resolveInflictionApplication(
         scheduleInflictionRemove(self, owner.id, type, ev.id);
       }
 
-      let reactionBuffId: BuffId;
-      let initialHitBaseMul: number;
-      let initialHitPerStackMul: number;
-      let buffStacks = consumedArtsStacks;
-      let buffMeta: Record<string, unknown> | undefined;
+      const reactionTypeMap: Record<
+        ArtsInflictionType,
+        { buffId: BuffId; reactionType: ArtsReactionType; buffStacksOverride?: number }
+      > = {
+        cryo: { buffId: SOLIDIFICATION_BUFF_ID, reactionType: "solidification" },
+        heat: {
+          buffId: COMBUSTION_BUFF_ID,
+          reactionType: "combustion",
+          buffStacksOverride: 1,
+        },
+        electric: {
+          buffId: ELECTRIFICATION_BUFF_ID,
+          reactionType: "electrification",
+        },
+        nature: {
+          buffId: CORROSION_BUFF_ID,
+          reactionType: "corrosion",
+          buffStacksOverride: 1,
+        },
+      };
 
-      switch (artsType) {
-        case "cryo":
-          reactionBuffId = SOLIDIFICATION_BUFF_ID;
-          initialHitBaseMul = SOLIDIFICATION_INITIAL_HIT_BASE_MUL;
-          initialHitPerStackMul = SOLIDIFICATION_INITIAL_HIT_PER_STACK_MUL;
-          break;
-        case "heat":
-          reactionBuffId = COMBUSTION_BUFF_ID;
-          initialHitBaseMul = COMBUSTION_INITIAL_HIT_BASE_MUL;
-          initialHitPerStackMul = COMBUSTION_INITIAL_HIT_PER_STACK_MUL;
-          buffStacks = 1;
-          buffMeta = {
-            reactionSourceId: source.id,
-            combustionTickMultiplier:
-              COMBUSTION_DOT_BASE_MUL +
-              consumedArtsStacks * COMBUSTION_DOT_PER_STACK_MUL,
-          };
-          break;
-        case "electric":
-          reactionBuffId = ELECTRIFICATION_BUFF_ID;
-          initialHitBaseMul = ELECTRIFICATION_INITIAL_HIT_BASE_MUL;
-          initialHitPerStackMul = ELECTRIFICATION_INITIAL_HIT_PER_STACK_MUL;
-          break;
-        case "nature":
-          reactionBuffId = CORROSION_BUFF_ID;
-          initialHitBaseMul = CORROSION_INITIAL_HIT_BASE_MUL;
-          initialHitPerStackMul = CORROSION_INITIAL_HIT_PER_STACK_MUL;
-          buffStacks = 1;
-          buffMeta = {
-            corrosionReductionPerSecond:
-              CORROSION_REDUCTION_PER_SECOND_BASE +
-              consumedArtsStacks * CORROSION_REDUCTION_PER_SECOND_PER_STACK,
-            corrosionMinResistanceMul:
-              CORROSION_MIN_RESISTANCE_BASE +
-              consumedArtsStacks * CORROSION_MIN_RESISTANCE_PER_STACK,
-          };
-          break;
+      const reactionConfig = reactionTypeMap[artsType];
+      const reactionBuffId = reactionConfig.buffId;
+      const buffStacks = reactionConfig.buffStacksOverride ?? consumedArtsStacks;
+
+      let buffMeta: Record<string, unknown> | undefined;
+      if (artsType === "heat") {
+        buffMeta = {
+          reactionSourceId: source.id,
+          combustionTickMultiplier:
+            COMBUSTION_DOT_BASE_MUL +
+            consumedArtsStacks * COMBUSTION_DOT_PER_STACK_MUL,
+        };
+      } else if (artsType === "nature") {
+        buffMeta = {
+          corrosionReductionPerSecond:
+            CORROSION_REDUCTION_PER_SECOND_BASE +
+            consumedArtsStacks * CORROSION_REDUCTION_PER_SECOND_PER_STACK,
+          corrosionMinResistanceMul:
+            CORROSION_MIN_RESISTANCE_BASE +
+            consumedArtsStacks * CORROSION_MIN_RESISTANCE_PER_STACK,
+        };
       }
 
       self.ops.schedule({
@@ -1103,8 +1081,12 @@ export function resolveInflictionApplication(
           source.id,
           ev,
         ),
-        dmgMultiplier:
-          initialHitBaseMul + consumedArtsStacks * initialHitPerStackMul,
+        dmgMultiplier: computeArtsReactionMultiplier(
+          reactionConfig.reactionType,
+          consumedArtsStacks,
+          sourceBuild?.level ?? 1,
+          sourceBuild?.restStat?.artsIntensity ?? 0,
+        ),
         ref: ev.id,
       } as SimEvent);
 
@@ -1150,12 +1132,12 @@ export function resolveInflictionApplication(
         sourceId: source.id,
         targetId: owner.id,
         damageType: artsType,
-        staggerOnHit: getStaggerOnHitFromAncestorEvent(
-          self.read,
-          source.id,
-          ev,
+        staggerOnHit: 0,
+        dmgMultiplier: computeArtsBurstMultiplier(
+          after,
+          sourceBuild?.level ?? 1,
+          sourceBuild?.restStat?.artsIntensity ?? 0,
         ),
-        dmgMultiplier: ARTS_BURST_BASE_MUL + after * ARTS_BURST_PER_STACK_MUL,
         ref: ev.id,
       } as SimEvent);
     }

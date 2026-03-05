@@ -52,4 +52,35 @@ test.describe('i18n locale switching smoke tests', () => {
     await expect(simHeading).toHaveText('模拟器');
     await expect(zhButton).toHaveClass(/bg-zinc-600/);
   });
+
+  test('sim logs relocalize after language switch without rerun', async ({ page }) => {
+    await page.goto('/');
+
+    const enButton = page
+      .getByTestId('lang-en')
+      .or(page.getByRole('button', { name: 'EN' }))
+      .first();
+    const zhButton = page
+      .getByTestId('lang-zh-CN')
+      .or(page.getByRole('button', { name: '简体中文' }))
+      .first();
+    const simPanel = page.getByTestId('panel-sim');
+    const runButton = page.getByTestId('sim-run');
+    const simHeading = simPanel
+      .locator('h2')
+      .or(page.getByRole('heading', { name: /Simulator|模拟器/ }))
+      .first();
+    const logView = simPanel.locator('pre').first();
+
+    await expect(enButton).toBeVisible();
+    await runButton.click();
+    await expect(logView).toContainText('Simulation started.');
+    await expect(logView).toContainText('Simulation ended.');
+    await expect(logView).toContainText('Final world state:');
+
+    await zhButton.click();
+    await expect(simHeading).toHaveText('模拟器');
+    await expect(logView).toContainText('最终世界状态：');
+    await expect(logView).not.toContainText('Final world state:');
+  });
 });

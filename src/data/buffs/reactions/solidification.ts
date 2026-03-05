@@ -1,5 +1,6 @@
 import type { SimRegistry } from "../../../simulator/listeners/registry";
 import { BuffDef } from "../BuffDef";
+import { computeSolidificationShatterMultiplier } from "../../../simulator/damage/statusDamage";
 
 /** Triggers Cryo damage 1.2 * (1+stacksConsumed).
  *  Last for 6s/7s/8s/9s.
@@ -34,6 +35,8 @@ class SolidificationBuffDef extends BuffDef {
         sourceId: string;
         targetId: string;
         stacks: number;
+        level: number;
+        artsIntensity: number;
         ref?: string | null;
       },
       emit: { buffRemove: (draft: any) => any; hit: (draft: any) => any },
@@ -47,9 +50,11 @@ class SolidificationBuffDef extends BuffDef {
         sourceId: params.sourceId,
         targetId: params.targetId,
         damageType: "physical",
-        dmgMultiplier:
-          SOLIDIFICATION_SHATTER_BASE_MUL +
-          params.stacks * SOLIDIFICATION_SHATTER_PER_STACK_MUL,
+        dmgMultiplier: computeSolidificationShatterMultiplier(
+          params.stacks,
+          params.level,
+          params.artsIntensity,
+        ),
         ref: params.ref,
       });
     };
@@ -74,11 +79,15 @@ class SolidificationBuffDef extends BuffDef {
         );
         if (stacks <= 0) return;
 
+        const sourceBuild = read.getBuild(sourceId);
+
         yield* spawnShatter(
           {
             sourceId,
             targetId,
             stacks,
+            level: sourceBuild?.level ?? 1,
+            artsIntensity: sourceBuild?.restStat?.artsIntensity ?? 0,
             ref: ev.id,
           },
           emit,
@@ -99,11 +108,15 @@ class SolidificationBuffDef extends BuffDef {
         );
         if (stacks <= 0) return;
 
+        const sourceBuild = read.getBuild(sourceId);
+
         yield* spawnShatter(
           {
             sourceId,
             targetId,
             stacks,
+            level: sourceBuild?.level ?? 1,
+            artsIntensity: sourceBuild?.restStat?.artsIntensity ?? 0,
             ref: ev.id,
           },
           emit,

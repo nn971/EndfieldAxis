@@ -26,3 +26,6 @@ dist-ssr
 # Oh-My-OpenCode
 .sisyphus
 artifacts
+
+# playwright test
+test-results
