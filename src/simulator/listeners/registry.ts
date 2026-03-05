@@ -461,7 +461,7 @@ export class SimRegistry {
 
       const drafts = runSimScript({
         script: e.fn,
-        baseFrame: ctx.ev.frame,
+        baseFrame: ctx.read.nowInFrames,
         ctx: this.buildScriptContext(ctx),
       });
       if (drafts.length > 0) {
@@ -482,7 +482,7 @@ export class SimRegistry {
     const stateKey = this.getCooldownStateKey(entry, ctx, bucket);
     const lastTriggeredFrame = this.lastTriggeredFrameByKey.get(stateKey);
     if (lastTriggeredFrame === undefined) return false;
-    return ctx.ev.frame - lastTriggeredFrame < entry.cooldown;
+    return ctx.read.nowInFrames - lastTriggeredFrame < entry.cooldown;
   }
 
   private markCooldownTriggered<TCtx extends TriggerContext>(
@@ -492,7 +492,7 @@ export class SimRegistry {
   ): void {
     if (!entry.cooldown) return;
     const stateKey = this.getCooldownStateKey(entry, ctx, bucket);
-    this.lastTriggeredFrameByKey.set(stateKey, ctx.ev.frame);
+    this.lastTriggeredFrameByKey.set(stateKey, ctx.read.nowInFrames);
   }
 
   private getCooldownStateKey<TCtx extends TriggerContext>(
@@ -539,7 +539,8 @@ export class SimRegistry {
       ev: ctx.ev,
       sourceId,
       targetId,
-      startFrame: ctx.ev.frame,
+      startFrame: ctx.read.nowInFrames,
+      startRealFrame: ctx.read.nowRealInFrames,
       skillType,
       defaultHitStaggerOnHit,
       sourceBuild,

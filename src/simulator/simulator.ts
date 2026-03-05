@@ -918,7 +918,9 @@ export class SimWorld {
               sourceId: source.id,
               targetId: target.id,
             });
-            this.ops.scheduleDrafts(spawned);
+            this.ops.scheduleDraftsGameTime(spawned, {
+              minRealFrame: this.nowRealInFrames,
+            });
           };
           this.resolvers.resolveStatusApplication(triggerPlugins, ev);
 
@@ -942,7 +944,9 @@ export class SimWorld {
             sourceId: source?.id,
             targetId: owner.id,
           });
-          this.ops.scheduleDrafts(spawned);
+          this.ops.scheduleDraftsGameTime(spawned, {
+            minRealFrame: this.nowRealInFrames,
+          });
           break;
         }
 
@@ -964,7 +968,9 @@ export class SimWorld {
             ev,
             sourceId: ev.targetId,
           });
-          this.ops.scheduleDrafts(spawned);
+          this.ops.scheduleDraftsGameTime(spawned, {
+            minRealFrame: this.nowRealInFrames,
+          });
           break;
         }
 
@@ -1018,7 +1024,9 @@ export class SimWorld {
             ev,
             sourceId: ev.sourceId,
           });
-          this.ops.scheduleDrafts(drafts);
+          this.ops.scheduleDraftsGameTime(drafts, {
+            minRealFrame: this.nowRealInFrames,
+          });
           break;
         }
 
@@ -1030,7 +1038,9 @@ export class SimWorld {
             ev,
             sourceId: ev.sourceId,
           });
-          this.ops.scheduleDrafts(drafts);
+          this.ops.scheduleDraftsGameTime(drafts, {
+            minRealFrame: this.nowRealInFrames,
+          });
           break;
         }
 

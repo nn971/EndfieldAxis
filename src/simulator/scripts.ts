@@ -79,6 +79,7 @@ export type SimScriptContext = {
   sourceId?: string;
   targetId?: string;
   startFrame: number;
+  startRealFrame: number;
   skillType: SkillType;
   defaultHitStaggerOnHit?: number;
   sourceBuild?: {

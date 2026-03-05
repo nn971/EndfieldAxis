@@ -565,7 +565,9 @@ export function resolveCastStart(
     sourceId: ev.sourceId,
     targetId: ev.targetId,
   });
-  self.ops.scheduleDrafts(spawned);
+  self.ops.scheduleDraftsGameTime(spawned, {
+    minRealFrame: self.nowRealInFrames,
+  });
 }
 
 export function resolveCastEnd(
@@ -596,7 +598,9 @@ export function resolveCastEnd(
     sourceId: ev.sourceId,
     targetId: ev.targetId,
   });
-  self.ops.scheduleDrafts(spawned);
+  self.ops.scheduleDraftsGameTime(spawned, {
+    minRealFrame: self.nowRealInFrames,
+  });
 }
 
 export function resolveHit(
@@ -734,7 +738,9 @@ export function resolveHit(
     sourceId: source.id,
     targetId: target.id,
   });
-  self.ops.scheduleDrafts(spawned);
+  self.ops.scheduleDraftsGameTime(spawned, {
+    minRealFrame: self.nowRealInFrames,
+  });
 
   if (shouldApplyStaggeredDebuff) {
     scheduleStaggeredDebuffApply(self, source.id, target.id, ev.id);
@@ -1278,7 +1284,9 @@ export function resolveInflictionApplication(
     sourceId: source.id,
     targetId: owner.id,
   });
-  self.ops.scheduleDrafts(spawned);
+  self.ops.scheduleDraftsGameTime(spawned, {
+    minRealFrame: self.nowRealInFrames,
+  });
 
   self.ops.schedule({
     id: makeSimEventId(),
