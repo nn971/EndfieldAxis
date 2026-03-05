@@ -57,6 +57,13 @@ export type SimEvent =
       };
     })
   | (SimEventBase & {
+      type: "castScriptStart";
+      sourceId: SimEntityId;
+      targetId?: SimEntityId;
+      skillType: SkillType;
+      ref: string; // id of the castStart event
+    })
+  | (SimEventBase & {
       type: "castEnd";
       sourceId: SimEntityId;
       targetId?: SimEntityId;
@@ -167,7 +174,7 @@ export type SimTeamSpState = {
   fake: number;
   readonly cap: number;
   readonly regenPerSecond: number;
-  lastRegenFrame: number;
+  lastRegenGameFrame: number;
 };
 
 export type SimUltimateState = {

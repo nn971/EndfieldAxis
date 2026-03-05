@@ -113,7 +113,10 @@ export default function SimPanel() {
       </div>
 
       <div className="mt-3">
-        <pre className="h-[260px] overflow-auto rounded border border-zinc-800 bg-black/40 p-3 text-xs leading-5 whitespace-pre-wrap font-mono">
+        <pre
+          className="h-[260px] overflow-auto rounded border border-zinc-800 bg-black/40 p-3 text-xs leading-5 whitespace-pre-wrap font-mono"
+          data-testid="sim-log"
+        >
           {logText || t("sim.clickRun")}
         </pre>
       </div>

@@ -31,6 +31,8 @@ import {
 } from "../../types/simDamage";
 import { DAMAGE_BUCKETS, type DamageBucket } from "../../simulator/damage/damageBonuses";
 import { DEFAULT_STAGGER_CAP_MILLI } from "../../types/simulator/stagger";
+import { getSkillDurationGameFrames } from "../../shared/simTime/freezeConfig";
+import { buildFreezeTimeline } from "../../shared/simTime/freezeTimeline";
 
 export type RunSolutionSimResult = {
   env: SimEnv;
@@ -219,13 +221,23 @@ function buildSimRenderCache(
 }
 
 function compileSkillCast(params: {
-  sourceId: string;
-  skillType: SkillType;
+  box: SkillBox;
   targetId: string;
-  startFrame: number;
+  scriptStartRealByCastStartId: Map<string, number>;
+  realToGame: (real: number) => number;
+  gameToRealAtOrAfter: (game: number, minReal: number) => number;
   nextSeq: () => number;
 }): SimEvent[] {
-  const { sourceId, skillType, targetId, startFrame, nextSeq } = params;
+  const {
+    box,
+    targetId,
+    scriptStartRealByCastStartId,
+    realToGame,
+    gameToRealAtOrAfter,
+    nextSeq,
+  } = params;
+  const { operatorId: sourceId, skillType } = box;
+  const startReal = box.startFrame;
   const operator = operatorsData[sourceId];
   if (!operator) {
     console.warn(
@@ -242,12 +254,17 @@ function compileSkillCast(params: {
   }
 
   const events: SimEvent[] = [];
+  const operatorSkillDurationFrames = skill.durationFrames;
+  const durationGame = getSkillDurationGameFrames(box, operatorSkillDurationFrames);
+  const startGame = realToGame(startReal);
+  const endGame = startGame + durationGame;
+  const endReal = gameToRealAtOrAfter(endGame, startReal);
 
   const startEventId = makeSimEventId();
   events.push({
     id: startEventId,
     type: "castStart",
-    frame: startFrame,
+    frame: startReal,
     seq: nextSeq(),
     ref: null,
     sourceId,
@@ -255,10 +272,26 @@ function compileSkillCast(params: {
     skillType,
   });
 
+  const scriptStartReal =
+    skillType === "comboSkill" || skillType === "ultimate"
+      ? (scriptStartRealByCastStartId.get(box.id) ?? startReal)
+      : startReal;
+
+  events.push({
+    id: makeSimEventId(),
+    type: "castScriptStart",
+    frame: scriptStartReal,
+    seq: nextSeq(),
+    sourceId,
+    targetId,
+    ref: startEventId,
+    skillType,
+  });
+
   events.push({
     id: makeSimEventId(),
     type: "castEnd",
-    frame: startFrame + skill.durationFrames,
+    frame: endReal,
     seq: nextSeq(),
     sourceId,
     targetId,
@@ -271,10 +304,11 @@ function compileSkillCast(params: {
 
 function compileSkillBoxes(params: {
   skillBoxes: SkillBox[];
+  freezeTimeline: ReturnType<typeof buildFreezeTimeline>;
   targetId: string;
   nextSeq: () => number;
 }): SimEvent[] {
-  const { skillBoxes, targetId, nextSeq } = params;
+  const { skillBoxes, freezeTimeline, targetId, nextSeq } = params;
 
   const sorted = [...skillBoxes].sort((a, b) => {
     if (a.startFrame !== b.startFrame) return a.startFrame - b.startFrame;
@@ -285,13 +319,23 @@ function compileSkillBoxes(params: {
     return a.id.localeCompare(b.id);
   });
 
+  const {
+    illegalCastStartIds,
+    scriptStartRealByCastStartId,
+    realToGame,
+    gameToRealAtOrAfter,
+  } = freezeTimeline;
+
   const out: SimEvent[] = [];
   for (const box of sorted) {
+    if (illegalCastStartIds.has(box.id)) continue;
+
     const evs = compileSkillCast({
-      sourceId: box.operatorId,
-      skillType: box.skillType,
+      box,
       targetId,
-      startFrame: box.startFrame,
+      scriptStartRealByCastStartId,
+      realToGame,
+      gameToRealAtOrAfter,
       nextSeq,
     });
     out.push(...evs);
@@ -399,11 +443,14 @@ export function runSolutionSim(
   ];
 
   const registry = loadSimRegistry();
+  const freezeTimeline = buildFreezeTimeline(skillBoxes);
   const world = new SimWorld({
     entities,
     buildByOperatorId,
-    nowInFrames: 0,
+    nowRealInFrames: 0,
     futureEvents: [],
+    realToGame: freezeTimeline.realToGame,
+    gameToRealAtOrAfter: freezeTimeline.gameToRealAtOrAfter,
     registry,
     damageModel: createDefaultDamageModel(),
     teamOperatorIds,
@@ -412,6 +459,7 @@ export function runSolutionSim(
 
   const events = compileSkillBoxes({
     skillBoxes,
+    freezeTimeline,
     targetId,
     nextSeq: world.ops.nextSeq,
   });
