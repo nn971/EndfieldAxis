@@ -76,6 +76,7 @@ export const COMBO_AVAILABLE_WINDOW_FRAMES = 300;
 
 export type SimRead = {
   readonly nowInFrames: number;
+  readonly nowRealInFrames: number;
   readonly env: SimEnv;
   getEntity(id: SimEntityId | null): SimEntity | null;
   hasBuffType(targetId: SimEntityId, buffTypeId: BuffTypeId): boolean;
@@ -95,6 +96,15 @@ export type SimOps = {
   scheduleDrafts: (
     drafts: readonly SimEventDraft[],
     opts?: { defaultRef?: string },
+  ) => void;
+  scheduleAtGameFrame: (
+    ev: Omit<SimEvent, "frame">,
+    gameFrame: number,
+    minRealFrame?: number,
+  ) => void;
+  scheduleDraftsGameTime: (
+    drafts: readonly SimEventDraft[],
+    opts?: { defaultRef?: string; minRealFrame?: number },
   ) => void;
   random: () => number;
   /** Pop the next event in chronological order. */
@@ -174,9 +184,12 @@ type SimResolvers = {
 type SimWorldInit = {
   entities: SimEntity[];
   buildByOperatorId: Record<string, OperatorBuild>;
+  nowRealInFrames?: number;
   nowInFrames?: number;
   seed?: number;
   futureEvents?: SimEvent[];
+  realToGame?: (realFrame: number) => number;
+  gameToRealAtOrAfter?: (gameFrame: number, minRealFrame: number) => number;
   registry: SimRegistry;
   damageModel?: DamageModel;
   teamOperatorIds?: string[];
@@ -217,7 +230,8 @@ function setEmptyInflictions(e: SimEntity): void {
 export class SimWorld {
   // Publicly readable, but mutations should go through ops.
   public readonly env: SimEnv;
-  public nowInFrames: number;
+  public nowRealInFrames: number;
+  public nowGameInFrames: number;
   public readonly log: SimLog = [];
   public readonly processedEvents: SimEvent[] = [];
   public readonly resourceSamples: SimResourceSample[] = [];
@@ -235,6 +249,11 @@ export class SimWorld {
   public readonly controlledOperatorId?: string;
 
   private rngState: number;
+  private readonly realToGame: (realFrame: number) => number;
+  private readonly gameToRealAtOrAfter: (
+    gameFrame: number,
+    minRealFrame: number,
+  ) => number;
 
   public readonly read: SimRead;
   public readonly ops: SimOps;
@@ -244,6 +263,9 @@ export class SimWorld {
     this.controlledOperatorId = init.controlledOperatorId;
     this.buildByOperatorId = init.buildByOperatorId;
     this.rngState = init.seed ?? 12345;
+    this.realToGame = init.realToGame ?? (realFrame => realFrame);
+    this.gameToRealAtOrAfter =
+      init.gameToRealAtOrAfter ?? ((gameFrame, minRealFrame) => Math.max(gameFrame, minRealFrame));
     const entitiesById: Record<string, SimEntity> = {};
     for (const e of init.entities) {
       entitiesById[e.id] = e;
@@ -259,12 +281,15 @@ export class SimWorld {
           fake: 0,
           cap: 300,
           regenPerSecond: 8,
-          lastRegenFrame: init.nowInFrames ?? 0,
+          lastRegenGameFrame: this.realToGame(
+            init.nowRealInFrames ?? init.nowInFrames ?? 0,
+          ),
         },
         ultimateByOperatorId: {},
       },
     };
-    this.nowInFrames = init.nowInFrames ?? 0;
+    this.nowRealInFrames = init.nowRealInFrames ?? init.nowInFrames ?? 0;
+    this.nowGameInFrames = this.realToGame(this.nowRealInFrames);
     this.teamOperatorOrder = [...(init.teamOperatorIds ?? [])];
 
     for (const ent of Object.values(entitiesById)) {
@@ -276,7 +301,7 @@ export class SimWorld {
       };
     }
 
-    this.captureResourceSample(this.nowInFrames, -1);
+    this.captureResourceSample(this.nowRealInFrames, -1);
 
     if (init.futureEvents && init.futureEvents.length > 0) {
       // Clone to avoid accidental external mutation.
@@ -295,7 +320,10 @@ export class SimWorld {
     const self = this;
     this.read = {
       get nowInFrames() {
-        return self.nowInFrames;
+        return self.nowGameInFrames;
+      },
+      get nowRealInFrames() {
+        return self.nowRealInFrames;
       },
       get env() {
         return self.env;
@@ -314,6 +342,10 @@ export class SimWorld {
       nextSeq: () => this.nextSeq(),
       schedule: (ev: SimEvent) => this.schedule(ev),
       scheduleDrafts: (drafts, opts) => this.scheduleDrafts(drafts, opts),
+      scheduleAtGameFrame: (ev, gameFrame, minRealFrame) =>
+        this.scheduleAtGameFrame(ev, gameFrame, minRealFrame),
+      scheduleDraftsGameTime: (drafts, opts) =>
+        this.scheduleDraftsGameTime(drafts, opts),
       random: () => this.random(),
       popNextEvent: () => this.popNextEvent(),
       advanceToFrame: (frame: number) => this.advanceToFrame(frame),
@@ -354,6 +386,10 @@ export class SimWorld {
       resolveSpReturn: ev => resolveSpReturn(self, ev),
       resolveStaggerExpire: ev => resolveStaggerExpire(self, ev),
     };
+  }
+
+  public get nowInFrames(): number {
+    return this.nowGameInFrames;
   }
 
   // ----- Read helpers -----
@@ -449,6 +485,36 @@ export class SimWorld {
     }
   }
 
+  private scheduleAtGameFrame(
+    ev: Omit<SimEvent, "frame">,
+    gameFrame: number,
+    minRealFrame?: number,
+  ): void {
+    const minReal = Math.max(this.nowRealInFrames, minRealFrame ?? this.nowRealInFrames);
+    const realFrame = this.gameToRealAtOrAfter(gameFrame, minReal);
+    this.schedule({
+      ...(ev as SimEvent),
+      frame: realFrame,
+    });
+  }
+
+  private scheduleDraftsGameTime(
+    drafts: readonly SimEventDraft[],
+    opts?: { defaultRef?: string; minRealFrame?: number },
+  ): void {
+    const minRealFrame = Math.max(
+      this.nowRealInFrames,
+      opts?.minRealFrame ?? this.nowRealInFrames,
+    );
+    const realDrafts = drafts.map(draft => ({
+      ...draft,
+      frame: this.gameToRealAtOrAfter(draft.frame, minRealFrame),
+    }));
+    this.scheduleDrafts(realDrafts, {
+      defaultRef: opts?.defaultRef,
+    });
+  }
+
   private popNextEvent(): SimEvent | null {
     if (this.queue.length === 0) return null;
     return this.queue.shift() ?? null;
@@ -463,15 +529,16 @@ export class SimWorld {
   }
 
   private advanceToFrame(frame: number): void {
-    const delta = Math.max(0, frame - this.nowInFrames);
-    this.nowInFrames = frame;
-    if (delta <= 0) return;
+    const deltaRealFrames = Math.max(0, frame - this.nowRealInFrames);
+    this.nowRealInFrames = frame;
+    this.nowGameInFrames = this.realToGame(frame);
+    if (deltaRealFrames <= 0) return;
 
     for (const ent of Object.values(this.env.entitiesById)) {
       const combo = ent.combo;
       if (!combo) continue;
-      combo.cooldown = Math.max(0, combo.cooldown - delta);
-      if (combo.pending && combo.availableUntilFrame < frame) {
+      combo.cooldown = Math.max(0, combo.cooldown - deltaRealFrames);
+      if (combo.pending && combo.availableUntilFrame < this.nowGameInFrames) {
         combo.pending = false;
         combo.availableUntilFrame = -1;
         this.removeFromComboQueue(ent.id);
@@ -510,12 +577,12 @@ export class SimWorld {
 
   private syncTeamSpRegen(frame: number): void {
     const teamSp = this.env.resources.teamSp;
-    const deltaFrames = Math.max(0, frame - teamSp.lastRegenFrame);
+    const deltaFrames = Math.max(0, frame - teamSp.lastRegenGameFrame);
     if (deltaFrames <= 0) return;
 
     const regen = (deltaFrames / 60) * teamSp.regenPerSecond;
     this.gainRealTeamSp(regen);
-    teamSp.lastRegenFrame = frame;
+    teamSp.lastRegenGameFrame = frame;
   }
 
   private getTeamSpTotal(): number {
@@ -571,7 +638,7 @@ export class SimWorld {
     amount: number,
     frame: number,
   ): { spent: number; realSpent: number; fakeSpent: number; isLegal: boolean } {
-    this.syncTeamSpRegen(frame);
+    this.syncTeamSpRegen(this.realToGame(frame));
     const teamSp = this.env.resources.teamSp;
     const spend = Math.max(0, Number(amount) || 0);
     const before = this.getTeamSpTotal();
@@ -757,12 +824,12 @@ export class SimWorld {
   }
 
   private returnTeamSp(amount: number, frame: number): number {
-    this.syncTeamSpRegen(frame);
+    this.syncTeamSpRegen(this.realToGame(frame));
     return this.gainFakeTeamSp(amount);
   }
 
   private recoverTeamSp(amount: number, frame: number): number {
-    this.syncTeamSpRegen(frame);
+    this.syncTeamSpRegen(this.realToGame(frame));
     return this.gainRealTeamSp(amount);
   }
 
@@ -784,7 +851,7 @@ export class SimWorld {
       if (!ev) break;
 
       this.ops.advanceToFrame(ev.frame);
-      this.syncTeamSpRegen(ev.frame);
+      this.syncTeamSpRegen(this.nowGameInFrames);
       this.captureResourceSample(ev.frame, ev.seq + 0.5);
 
       this.currentEvent = ev;

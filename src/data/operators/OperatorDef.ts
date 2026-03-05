@@ -45,6 +45,7 @@ export type SkillType =
 export type SkillDef = {
   name: string;
   durationFrames: number;
+  freezeFramesOnCastStart?: number;
   icon: string;
   staggerOnHit?: number;
   /** Unified event script runtime entrypoint (preferred). */
@@ -101,11 +102,13 @@ export abstract class OperatorDef {
     this.skills = init.skills;
   }
 
-  getComboCooldownSecondsByRank(potentialRank?: number): readonly number[] | null {
+  getComboCooldownSecondsByRank(
+    _potentialRank?: number,
+  ): readonly number[] | null {
     return null;
   }
 
-  getUltimateEnergyCost(potentialRank?: number): number {
+  getUltimateEnergyCost(_potentialRank?: number): number {
     return 100;
   }
 
