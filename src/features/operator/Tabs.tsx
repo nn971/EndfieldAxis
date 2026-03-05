@@ -1,4 +1,5 @@
 import { Fragment, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { OperatorBuild } from "../../types/operator";
 import PreviewSlider from "../../shared/components/PreviewSlider";
 import weaponsData from "../../data/weapons";
@@ -13,7 +14,7 @@ import {
 import operatorsData from "../../data/operators";
 import { OperatorId } from "../../data/operators/OperatorDef";
 import gearsData, { gearsSetData } from "../../data/gears";
-import { GearsId, GearsType, GearsTypeName } from "../../data/gears/GearsDef";
+import { GearsId, GearsType } from "../../data/gears/GearsDef";
 import {
   BASE_WEAPON_SKILL_LABEL,
   THIRD_WEAPON_SKILL_CAT_LABEL,
@@ -37,6 +38,8 @@ const gearSetNamesById = Object.values(gearsSetData).reduce(
 );
 
 export function OperatorBuildTab({ operatorId, build, onCommit }: TabProps) {
+  const { t } = useTranslation();
+
   const setSkillRank = (
     skillType: "normalAttack" | "normalSkill" | "comboSkill" | "ultimate",
     rank: number,
@@ -52,7 +55,7 @@ export function OperatorBuildTab({ operatorId, build, onCommit }: TabProps) {
   return (
     <div>
       <PreviewSlider
-        label="Level"
+        label={t("operatorTabs.build.level")}
         min={1}
         max={90}
         value={build.level}
@@ -60,7 +63,7 @@ export function OperatorBuildTab({ operatorId, build, onCommit }: TabProps) {
       />
 
       <PreviewSlider
-        label="Potential"
+        label={t("operatorTabs.build.potential")}
         min={0}
         max={5}
         value={build.potentialRank}
@@ -68,7 +71,7 @@ export function OperatorBuildTab({ operatorId, build, onCommit }: TabProps) {
       />
 
       <PreviewSlider
-        label="Talent1"
+        label={t("operatorTabs.build.talent1")}
         min={0}
         max={2}
         value={build.talentRanks.talent1}
@@ -80,7 +83,7 @@ export function OperatorBuildTab({ operatorId, build, onCommit }: TabProps) {
       />
 
       <PreviewSlider
-        label="Talent2"
+        label={t("operatorTabs.build.talent2")}
         min={0}
         max={2}
         value={build.talentRanks.talent2}
@@ -92,37 +95,39 @@ export function OperatorBuildTab({ operatorId, build, onCommit }: TabProps) {
       />
 
       <PreviewSlider
-        label="Trust Bonus Rank"
+        label={t("operatorTabs.build.trustBonusRank")}
         min={0}
         max={4}
         value={build.trustRank}
         onCommit={v => onCommit(operatorId, { trustRank: v })}
       />
 
-      <div className="mt-4 text-xs text-zinc-400">Skill ranks</div>
+      <div className="mt-4 text-xs text-zinc-400">
+        {t("operatorTabs.build.skillRanks")}
+      </div>
       <PreviewSlider
-        label="Normal Attack Rank"
+        label={t("operatorTabs.build.normalAttackRank")}
         min={1}
         max={12}
         value={build.skillRanks.normalAttack}
         onCommit={v => setSkillRank("normalAttack", v)}
       />
       <PreviewSlider
-        label="Normal Skill Rank"
+        label={t("operatorTabs.build.normalSkillRank")}
         min={1}
         max={12}
         value={build.skillRanks.normalSkill}
         onCommit={v => setSkillRank("normalSkill", v)}
       />
       <PreviewSlider
-        label="Combo Skill Rank"
+        label={t("operatorTabs.build.comboSkillRank")}
         min={1}
         max={12}
         value={build.skillRanks.comboSkill}
         onCommit={v => setSkillRank("comboSkill", v)}
       />
       <PreviewSlider
-        label="Ultimate Rank"
+        label={t("operatorTabs.build.ultimateRank")}
         min={1}
         max={12}
         value={build.skillRanks.ultimate}
@@ -133,6 +138,7 @@ export function OperatorBuildTab({ operatorId, build, onCommit }: TabProps) {
 }
 
 export function WeaponTab({ operatorId, build, onCommit }: TabProps) {
+  const { t } = useTranslation();
   const weaponBuild = build.weapon;
   const [isPicking, setIsPicking] = useState(false);
 
@@ -176,36 +182,41 @@ export function WeaponTab({ operatorId, build, onCommit }: TabProps) {
   // }
 
   return (
-    <div>
-      <div className="mt-3 text-xs text-zinc-400">Selected weapon</div>
+      <div>
+      <div className="mt-3 text-xs text-zinc-400">
+        {t("operatorTabs.weapon.selectedWeapon")}
+      </div>
       <button
+        type="button"
         className="mt-2 w-full rounded border border-zinc-700 hover:border-zinc-500 p-3 flex items-center gap-3"
         onClick={() => setIsPicking(true)}
-        title="Click to change weapon"
+        title={t("operatorTabs.weapon.changeWeaponTitle")}
       >
         <div className="w-16 h-16 rounded bg-zinc-800 overflow-hidden shrink-0">
           <img
             className="w-full h-full object-cover"
             src={placeholderUrl}
-            alt={weaponDef?.name ?? "No Weapon"}
+            alt={weaponDef?.name ?? t("operatorTabs.weapon.noWeapon")}
           />
         </div>
         <div className="text-left">
-          <div className="text-sm text-zinc-300">Weapon</div>
+          <div className="text-sm text-zinc-300">{t("operatorTabs.weapon.tab")}</div>
           <div className="text-base font-medium">
-            {weaponDef?.name ?? "None"}
+            {weaponDef?.name ?? t("operatorTabs.weapon.none")}
           </div>
           <div className="text-xs text-zinc-500">
-            {weaponBuild?.id ?? "no weapon equipped"}
+            {weaponBuild?.id ?? t("operatorTabs.weapon.noWeaponEquipped")}
           </div>
-          <div className="text-xs text-zinc-500">click icon to change</div>
+          <div className="text-xs text-zinc-500">
+            {t("operatorTabs.weapon.clickIconToChange")}
+          </div>
         </div>
       </button>
 
       {weaponDef && weaponBuild && (
         <div className="mt-4">
           <PreviewSlider
-            label="Weapon Level"
+            label={t("operatorTabs.weapon.weaponLevel")}
             min={1}
             max={90}
             value={weaponBuild.level}
@@ -218,7 +229,9 @@ export function WeaponTab({ operatorId, build, onCommit }: TabProps) {
               })
             }
           />
-          <div className="text-xs text-zinc-400">Weapon skills</div>
+          <div className="text-xs text-zinc-400">
+            {t("operatorTabs.weapon.weaponSkills")}
+          </div>
           {["s1", "s2", "s3"].map(n => {
             const spec = weaponDef[n as keyof WeaponDef];
             if (spec == null) return null;
@@ -230,7 +243,7 @@ export function WeaponTab({ operatorId, build, onCommit }: TabProps) {
             return (
               <PreviewSlider
                 key={skillId}
-                label={`${skillName} Rank`}
+                label={t("operatorTabs.weapon.skillRankLabel", { skillName })}
                 min={1}
                 max={9}
                 value={weaponBuild.skillRanks[n as "s1" | "s2" | "s3"]}
@@ -301,27 +314,33 @@ function WeaponPicker({
   onClear,
   onClose,
 }: WeaponPickerProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-3 backdrop-blur-sm">
       <div className="w-[560px] max-w-[95vw] rounded-xl border border-zinc-700/90 bg-zinc-900/95 p-3 shadow-2xl shadow-black/60">
         <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2">
           <div>
             <div className="text-[11px] uppercase tracking-wide text-zinc-500">
-              Weapon Picker
+              {t("operatorTabs.weapon.picker.title")}
             </div>
-            <div className="font-semibold text-zinc-100">Select weapon</div>
+            <div className="font-semibold text-zinc-100">
+              {t("operatorTabs.weapon.picker.selectWeapon")}
+            </div>
           </div>
           <button
+            type="button"
             className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-300 transition-colors hover:border-zinc-500 hover:bg-zinc-800"
             onClick={onClose}
           >
-            Close
+            {t("operatorTabs.common.close")}
           </button>
         </div>
 
         <div className="mt-3 max-h-[min(70vh,34rem)] overflow-y-auto pr-1 [scrollbar-color:rgb(82_82_91)_transparent] [scrollbar-width:thin]">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <button
+              type="button"
               className={
                 "flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950/40 p-2 text-left transition-colors hover:border-zinc-600 hover:bg-zinc-800/50 " +
                 (currentId == null
@@ -334,16 +353,19 @@ function WeaponPicker({
                 —
               </div>
               <div className="text-left">
-                <div className="text-sm">(none)</div>
-                <div className="text-xs text-zinc-500">unequip</div>
+                <div className="text-sm">{t("operatorTabs.common.none")}</div>
+                <div className="text-xs text-zinc-500">
+                  {t("operatorTabs.common.unequip")}
+                </div>
               </div>
             </button>
 
             {Object.values(weaponsData).map(w => {
-              if (w.type != weaponType) return null;
+              if (w.type !== weaponType) return null;
               const active = w.id === currentId;
               return (
                 <button
+                  type="button"
                   key={w.id}
                   className={
                     "flex items-center gap-3 rounded-lg border p-2 text-left transition-colors " +
@@ -375,6 +397,8 @@ function WeaponPicker({
 }
 
 export function GearsTab({ operatorId, build, onCommit }: TabProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="mt-2">
       <GearSlotEditor
@@ -382,7 +406,7 @@ export function GearsTab({ operatorId, build, onCommit }: TabProps) {
         build={build}
         onCommit={onCommit}
         slotKey="armor"
-        label="Armor"
+        label={t("operatorTabs.gears.armor")}
         type="armor"
       />
       <GearSlotEditor
@@ -390,7 +414,7 @@ export function GearsTab({ operatorId, build, onCommit }: TabProps) {
         build={build}
         onCommit={onCommit}
         slotKey="gloves"
-        label="Gloves"
+        label={t("operatorTabs.gears.gloves")}
         type="gloves"
       />
       <GearSlotEditor
@@ -398,7 +422,7 @@ export function GearsTab({ operatorId, build, onCommit }: TabProps) {
         build={build}
         onCommit={onCommit}
         slotKey="kit1"
-        label="Kit 1"
+        label={t("operatorTabs.gears.kit1")}
         type="kit"
       />
       <GearSlotEditor
@@ -406,7 +430,7 @@ export function GearsTab({ operatorId, build, onCommit }: TabProps) {
         build={build}
         onCommit={onCommit}
         slotKey="kit2"
-        label="Kit 2"
+        label={t("operatorTabs.gears.kit2")}
         type="kit"
       />
     </div>
@@ -430,24 +454,32 @@ function GearSlotEditor({
   label: string;
   type: GearsType;
 }) {
+  const { t } = useTranslation();
   const [isPicking, setIsPicking] = useState(false);
   const slot = build.gears[slotKey];
   const gear = slot.gearId ? gearsData[slot.gearId] : null;
 
+  const gearsTypeLabelByType: Record<GearsType, string> = {
+    armor: t("operatorTabs.gearTypes.armor"),
+    gloves: t("operatorTabs.gearTypes.gloves"),
+    kit: t("operatorTabs.gearTypes.kit"),
+  };
+  const gearsTypeLabel = gearsTypeLabelByType[type];
+
   const bucketLabel = (b: string) => {
     const m: Record<string, string> = {
-      baseAtk: "Base ATK",
-      atkIncRatio: "ATK%",
-      atkIncFlat: "ATK Flat",
-      artsIntensity: "Arts Intensity",
-      comboCooldownReduction: "Combo CD Reduction",
-      ultimateGainEfficiency: "Ultimate Gain Efficiency",
-      physicalDmgIncRatio: "Physical DMG%",
-      ultimateDmgIncRatio: "Ultimate DMG%",
-      strength: "Strength",
-      agility: "Agility",
-      intellect: "Intellect",
-      will: "Will",
+      baseAtk: t("operatorTabs.restStats.baseAtk"),
+      atkIncRatio: t("operatorTabs.restStats.atkIncRatio"),
+      atkIncFlat: t("operatorTabs.restStats.atkIncFlat"),
+      artsIntensity: t("operatorTabs.restStats.artsIntensity"),
+      comboCooldownReduction: t("operatorTabs.restStats.comboCooldownReduction"),
+      ultimateGainEfficiency: t("operatorTabs.restStats.ultimateGainEfficiency"),
+      physicalDmgIncRatio: t("operatorTabs.restStats.physicalDmgIncRatio"),
+      ultimateDmgIncRatio: t("operatorTabs.restStats.ultimateDmgIncRatio"),
+      strength: t("operatorTabs.restStats.strength"),
+      agility: t("operatorTabs.restStats.agility"),
+      intellect: t("operatorTabs.restStats.intellect"),
+      will: t("operatorTabs.restStats.will"),
     };
     return m[b] ?? b;
   };
@@ -456,28 +488,33 @@ function GearSlotEditor({
     <div className="mt-4 rounded border border-zinc-800 bg-zinc-950/30 p-3">
       <div className="flex items-center justify-between">
         <div className="text-sm font-medium">{label}</div>
-        <div className="text-xs text-zinc-500">{GearsTypeName[type]}</div>
+        <div className="text-xs text-zinc-500">{gearsTypeLabel}</div>
       </div>
 
       <button
+        type="button"
         className="mt-2 w-full rounded border border-zinc-700 hover:border-zinc-500 p-3 flex items-center gap-3"
         onClick={() => setIsPicking(true)}
-        title="Click to select gear"
+        title={t("operatorTabs.gears.clickToSelectGear")}
       >
         <div className="w-16 h-16 rounded bg-zinc-800 overflow-hidden shrink-0">
           <img
             className="w-full h-full object-cover"
             src={placeholderUrl}
-            alt={gear?.name ?? "Gear"}
+            alt={gear?.name ?? t("operatorTabs.gears.gear")}
           />
         </div>
         <div className="text-left">
-          <div className="text-sm text-zinc-300">Gear</div>
-          <div className="text-base font-medium">{gear?.name ?? "(none)"}</div>
-          <div className="text-xs text-zinc-500">
-            {slot.gearId ?? "no gear equipped"}
+          <div className="text-sm text-zinc-300">{t("operatorTabs.gears.gear")}</div>
+          <div className="text-base font-medium">
+            {gear?.name ?? t("operatorTabs.common.none")}
           </div>
-          <div className="text-xs text-zinc-500">click icon to change</div>
+          <div className="text-xs text-zinc-500">
+            {slot.gearId ?? t("operatorTabs.gears.noGearEquipped")}
+          </div>
+          <div className="text-xs text-zinc-500">
+            {t("operatorTabs.gears.clickIconToChange")}
+          </div>
         </div>
       </button>
 
@@ -485,15 +522,23 @@ function GearSlotEditor({
         <div className="mt-2">
           {gear && (
             <div className="mb-1 text-[11px] text-zinc-500">
-              Bonuses: {bucketLabel(gear.bonusBuckets.s1)} /{" "}
-              {bucketLabel(gear.bonusBuckets.s2)} /{" "}
-              {bucketLabel(gear.bonusBuckets.s3)}
+              {t("operatorTabs.gears.bonuses")} {bucketLabel(gear.bonusBuckets.s1)} /{" "}
+              {bucketLabel(gear.bonusBuckets.s2)} / {bucketLabel(gear.bonusBuckets.s3)}
             </div>
           )}
           <PreviewSlider
-            label={`S1 ${gear ? `(${bucketLabel(gear.bonusBuckets.s1)})` : ""} — bonus +${
-              gear ? (gear.bonusValuesByRank.s1[slot.ranks[0]] ?? 0) : 0
-            }`}
+            label={
+              gear
+                ? t("operatorTabs.gears.rankSliderLabelWithBucket", {
+                    slot: t("operatorTabs.gears.slots.s1"),
+                    bucket: bucketLabel(gear.bonusBuckets.s1),
+                    bonus: gear.bonusValuesByRank.s1[slot.ranks[0]] ?? 0,
+                  })
+                : t("operatorTabs.gears.rankSliderLabel", {
+                    slot: t("operatorTabs.gears.slots.s1"),
+                    bonus: 0,
+                  })
+            }
             min={0}
             max={3}
             value={slot.ranks[0]}
@@ -509,9 +554,18 @@ function GearSlotEditor({
             }}
           />
           <PreviewSlider
-            label={`S2 ${gear ? `(${bucketLabel(gear.bonusBuckets.s2)})` : ""} — bonus +${
-              gear ? (gear.bonusValuesByRank.s2[slot.ranks[1]] ?? 0) : 0
-            }`}
+            label={
+              gear
+                ? t("operatorTabs.gears.rankSliderLabelWithBucket", {
+                    slot: t("operatorTabs.gears.slots.s2"),
+                    bucket: bucketLabel(gear.bonusBuckets.s2),
+                    bonus: gear.bonusValuesByRank.s2[slot.ranks[1]] ?? 0,
+                  })
+                : t("operatorTabs.gears.rankSliderLabel", {
+                    slot: t("operatorTabs.gears.slots.s2"),
+                    bonus: 0,
+                  })
+            }
             min={0}
             max={3}
             value={slot.ranks[1]}
@@ -527,9 +581,18 @@ function GearSlotEditor({
             }}
           />
           <PreviewSlider
-            label={`S3 ${gear ? `(${bucketLabel(gear.bonusBuckets.s3)})` : ""} — bonus +${
-              gear ? (gear.bonusValuesByRank.s3[slot.ranks[2]] ?? 0) : 0
-            }`}
+            label={
+              gear
+                ? t("operatorTabs.gears.rankSliderLabelWithBucket", {
+                    slot: t("operatorTabs.gears.slots.s3"),
+                    bucket: bucketLabel(gear.bonusBuckets.s3),
+                    bonus: gear.bonusValuesByRank.s3[slot.ranks[2]] ?? 0,
+                  })
+                : t("operatorTabs.gears.rankSliderLabel", {
+                    slot: t("operatorTabs.gears.slots.s3"),
+                    bonus: 0,
+                  })
+            }
             min={0}
             max={3}
             value={slot.ranks[2]}
@@ -547,7 +610,7 @@ function GearSlotEditor({
         </div>
       ) : (
         <div className="mt-2 text-xs text-zinc-500">
-          Equip a {GearsTypeName[type].toLowerCase()} to edit artificing ranks.
+          {t("operatorTabs.gears.equipPrompt", { type: gearsTypeLabel })}
         </div>
       )}
 
@@ -598,6 +661,8 @@ function GearPicker({
   onClear,
   onClose,
 }: GearPickerProps) {
+  const { t } = useTranslation();
+
   const gearEntries = useMemo(
     () =>
       Object.values(gearsData)
@@ -610,7 +675,7 @@ function GearPicker({
           return {
             gear,
             setLabel: sortedSetNames.length ? sortedSetNames.join(", ") : null,
-            primarySetName: sortedSetNames[0] ?? "No Set",
+            primarySetName: sortedSetNames[0] ?? t("operatorTabs.gears.noSet"),
           };
         })
         .sort((a, b) => {
@@ -626,8 +691,15 @@ function GearPicker({
 
           return a.gear.id.localeCompare(b.gear.id);
         }),
-    [type],
+    [t, type],
   );
+
+  const gearsTypeLabelByType: Record<GearsType, string> = {
+    armor: t("operatorTabs.gearTypes.armor"),
+    gloves: t("operatorTabs.gearTypes.gloves"),
+    kit: t("operatorTabs.gearTypes.kit"),
+  };
+  const gearsTypeLabel = gearsTypeLabelByType[type];
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-3 backdrop-blur-sm">
@@ -635,23 +707,27 @@ function GearPicker({
         <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2">
           <div>
             <div className="text-[11px] uppercase tracking-wide text-zinc-500">
-              Gear Picker
+              {t("operatorTabs.gears.picker.title")}
             </div>
             <div className="font-semibold text-zinc-100">
-              Select {GearsTypeName[type]}
+              {t("operatorTabs.gears.picker.selectGearType", {
+                type: gearsTypeLabel,
+              })}
             </div>
           </div>
           <button
+            type="button"
             className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-300 transition-colors hover:border-zinc-500 hover:bg-zinc-800"
             onClick={onClose}
           >
-            Close
+            {t("operatorTabs.common.close")}
           </button>
         </div>
 
         <div className="mt-3 max-h-[min(70vh,34rem)] overflow-y-auto pr-1 [scrollbar-color:rgb(82_82_91)_transparent] [scrollbar-width:thin]">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <button
+              type="button"
               className={
                 "flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950/40 p-2 text-left transition-colors hover:border-zinc-600 hover:bg-zinc-800/50 " +
                 (currentId == null
@@ -664,8 +740,10 @@ function GearPicker({
                 —
               </div>
               <div className="text-left">
-                <div className="text-sm">(none)</div>
-                <div className="text-xs text-zinc-500">unequip</div>
+                <div className="text-sm">{t("operatorTabs.common.none")}</div>
+                <div className="text-xs text-zinc-500">
+                  {t("operatorTabs.common.unequip")}
+                </div>
               </div>
             </button>
 
@@ -685,6 +763,7 @@ function GearPicker({
                   )}
 
                   <button
+                    type="button"
                     className={
                       "flex items-center gap-3 rounded-lg border p-2 text-left transition-colors " +
                       (active
@@ -708,7 +787,7 @@ function GearPicker({
                         {gear.id}
                       </div>
                       <div className="truncate text-[10px] text-zinc-400">
-                        {entry.setLabel ?? "No set bonus"}
+                        {entry.setLabel ?? t("operatorTabs.gears.noSetBonus")}
                       </div>
                     </div>
                   </button>

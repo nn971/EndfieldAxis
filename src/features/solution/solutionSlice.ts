@@ -166,12 +166,12 @@ export const solutionSlice = createSlice({
     simDamageCacheReplaced(state, action: PayloadAction<SimDamageCache>) {
       state.simDamageCache = action.payload;
     },
-    damageWatchAdded(state) {
+    damageWatchAdded(state, action: PayloadAction<{ name?: string } | undefined>) {
       const id = makeId("dw_");
       const defaultSourceId = state.controlledOperatorId || null;
       state.damageWatches.push({
         id,
-        name: `Watch ${state.damageWatches.length + 1}`,
+        name: action.payload?.name ?? `Watch ${state.damageWatches.length + 1}`,
         filter: {
           sourceId: defaultSourceId,
           skillType: null,

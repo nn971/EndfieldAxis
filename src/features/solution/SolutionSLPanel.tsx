@@ -1,10 +1,20 @@
 import { useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { selectSolution } from "./selectors";
 import { solutionReplaced } from "./solutionSlice";
-import { deserializeSolution, serializeSolution } from "./solutionSL";
+import {
+  deserializeSolution,
+  serializeSolution,
+  type DeserializeSolutionError,
+} from "./solutionSL";
 
 export default function SolutionSLPanel() {
+  const { t } = useTranslation();
+  const translate = t as unknown as (
+    key: string,
+    options?: Record<string, unknown>,
+  ) => string;
   const dispatch = useAppDispatch();
   const solution = useAppSelector(selectSolution);
 
@@ -16,6 +26,10 @@ export default function SolutionSLPanel() {
 
   const exported = useMemo(() => serializeSolution(solution), [solution]);
 
+  const getDeserializeErrorMessage = (error: DeserializeSolutionError) => {
+    return translate(`solutionSL.errors.${error.code}`, error.meta);
+  };
+
   const onExportToText = () => {
     setError("");
     setText(exported);
@@ -25,7 +39,7 @@ export default function SolutionSLPanel() {
     setError("");
     const parsed = deserializeSolution(text);
     if (!parsed.ok) {
-      setError(parsed.error);
+      setError(getDeserializeErrorMessage(parsed));
       return;
     }
     dispatch(solutionReplaced(parsed.solution));
@@ -47,7 +61,7 @@ export default function SolutionSLPanel() {
     try {
       localStorage.setItem(STORAGE_KEY, exported);
     } catch {
-      setError("Failed to write to localStorage.");
+      setError(t("solutionSL.errors.failedWriteLocalStorage"));
     }
   };
 
@@ -57,17 +71,17 @@ export default function SolutionSLPanel() {
     try {
       content = localStorage.getItem(STORAGE_KEY);
     } catch {
-      setError("Failed to read from localStorage.");
+      setError(t("solutionSL.errors.failedReadLocalStorage"));
       return;
     }
     if (!content) {
-      setError("No saved solution found in localStorage.");
+      setError(t("solutionSL.errors.noSavedSolutionLocalStorage"));
       return;
     }
     setText(content);
     const parsed = deserializeSolution(content);
     if (!parsed.ok) {
-      setError(parsed.error);
+      setError(getDeserializeErrorMessage(parsed));
       return;
     }
     dispatch(solutionReplaced(parsed.solution));
@@ -90,23 +104,24 @@ export default function SolutionSLPanel() {
       setText(content);
       const parsed = deserializeSolution(content);
       if (!parsed.ok) {
-        setError(parsed.error);
+        setError(getDeserializeErrorMessage(parsed));
         return;
       }
       dispatch(solutionReplaced(parsed.solution));
     } catch {
-      setError("Failed to read file.");
+      setError(t("solutionSL.errors.failedReadFile"));
     }
   };
 
   return (
-    <div className="mt-4 p-4 border border-zinc-700 rounded bg-zinc-900">
+    <div
+      className="mt-4 p-4 border border-zinc-700 rounded bg-zinc-900"
+      data-testid="panel-solution-sl"
+    >
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Solution Save / Load</h2>
-          <div className="text-xs text-zinc-400">
-            Export / import a serializable <code>solution</code> JSON.
-          </div>
+          <h2 className="text-lg font-semibold">{t("solutionSL.heading")}</h2>
+          <div className="text-xs text-zinc-400">{t("solutionSL.helperText")}</div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -115,30 +130,30 @@ export default function SolutionSLPanel() {
             className="px-3 py-1 text-xs rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700"
             onClick={onExportToText}
           >
-            Export to Text
+            {t("solutionSL.exportToText")}
           </button>
           <button
             type="button"
             className="px-3 py-1 text-xs rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700"
             onClick={onLoadFromText}
             disabled={!text.trim()}
-            title={text.trim() ? "" : "Paste JSON first"}
+            title={text.trim() ? "" : t("solutionSL.pasteJsonFirst")}
           >
-            Load from Text
+            {t("solutionSL.loadFromText")}
           </button>
           <button
             type="button"
             className="px-3 py-1 text-xs rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700"
             onClick={onDownload}
           >
-            Download .json
+            {t("solutionSL.downloadJson")}
           </button>
           <button
             type="button"
             className="px-3 py-1 text-xs rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700"
             onClick={onPickFile}
           >
-            Upload .json
+            {t("solutionSL.uploadJson")}
           </button>
 
           <div className="w-px h-4 bg-zinc-700 mx-1" />
@@ -148,14 +163,14 @@ export default function SolutionSLPanel() {
             className="px-3 py-1 text-xs rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700"
             onClick={onSaveToBrowser}
           >
-            Save to Browser
+            {t("solutionSL.saveToBrowser")}
           </button>
           <button
             type="button"
             className="px-3 py-1 text-xs rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700"
             onClick={onLoadFromBrowser}
           >
-            Load from Browser
+            {t("solutionSL.loadFromBrowser")}
           </button>
           <input
             ref={fileInputRef}
@@ -168,13 +183,15 @@ export default function SolutionSLPanel() {
       </div>
 
       {error ? (
-        <div className="mt-2 text-xs text-red-300">Error: {error}</div>
+        <div className="mt-2 text-xs text-red-300">
+          {t("solutionSL.errorPrefix")} {error}
+        </div>
       ) : null}
 
       <div className="mt-3">
         <textarea
           className="w-full h-[220px] rounded border border-zinc-800 bg-black/40 p-3 text-xs leading-5 font-mono"
-          placeholder="Click 'Export to Text' or paste a solution JSON here..."
+          placeholder={t("solutionSL.textareaPlaceholder")}
           value={text}
           onChange={e => setText(e.target.value)}
         />

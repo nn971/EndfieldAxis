@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type {
   SimRenderBar,
   SimRenderMarker,
@@ -48,11 +49,11 @@ function buildLineAndAreaPath(params: {
   };
 }
 
-const SKILL_TABS: { key: SkillType; label: string }[] = [
-  { key: "normalAttack", label: "Normal Attack" },
-  { key: "normalSkill", label: "Normal Skill" },
-  { key: "comboSkill", label: "Combo Skill" },
-  { key: "ultimate", label: "Ultimate" },
+const SKILL_TABS: SkillType[] = [
+  "normalAttack",
+  "normalSkill",
+  "comboSkill",
+  "ultimate",
 ];
 
 type Props = {
@@ -88,6 +89,8 @@ export default function AxisEditor({
   onAddSkillBox,
   onDeleteSkillBox,
 }: Props) {
+  const { t } = useTranslation();
+
   const LEFT_GUTTER_WIDTH = 150;
   const AXIS_LENTH_IN_FRAMES = 3600;
   const UPPER_GUTTER_HEIGHT = 20;
@@ -482,27 +485,30 @@ export default function AxisEditor({
     return rows;
   }, [simRenderCache.markers, laneIndexByOwnerId]);
 
+  const getSkillTypeLabel = (skillType: SkillType) =>
+    t(`axis.skillTabs.${skillType}`);
+
   return (
     <div className="p-4 border border-zinc-700 rounded bg-zinc-900">
-      <h2 className="text-lg font-semibold mb-2">Axis Editor</h2>
+      <h2 className="text-lg font-semibold mb-2">{t("axis.title")}</h2>
       <p className="text-sm text-zinc-300">
-        This is a placeholder for the Axis Editor component.
+        {t("axis.placeholder")}
       </p>
 
       <div className="mt-3 flex gap-2">
-        {SKILL_TABS.map(t => (
+        {SKILL_TABS.map(skillType => (
           <button
-            key={t.key}
+            key={skillType}
             type="button"
             className="px-3 py-1 text-xs rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700
                  select-none touch-none cursor-grab active:cursor-grabbing"
-            onPointerDown={e => onSkillTypePointerDown(e, t.key)}
+            onPointerDown={e => onSkillTypePointerDown(e, skillType)}
             onPointerMove={onSkillTypePointerMove}
             onPointerUp={onSkillTypePointerUp}
             onPointerCancel={onSkillTypePointerCancel}
-            title="Drag into the axis to add a skill box"
+            title={t("axis.addSkillTooltip")}
           >
-            {t.label}
+            {getSkillTypeLabel(skillType)}
           </button>
         ))}
       </div>
@@ -530,7 +536,7 @@ export default function AxisEditor({
               const opId = laneLabels[laneIndex];
               const name =
                 laneIndex === ENEMY_LANE_INDEX
-                  ? "Enemy"
+                  ? t("axis.enemyLane")
                   : (operatorsData[opId]?.name ?? opId ?? "—");
 
               return (
@@ -560,7 +566,7 @@ export default function AxisEditor({
                         <span className="truncate text-left">{name}</span>
                         {opId === controlledOperatorId && (
                           <span className="shrink-0 rounded border border-emerald-400/80 bg-emerald-700/30 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-100">
-                            CTRL
+                            {t("axis.controlledBadge")}
                           </span>
                         )}
                       </div>
@@ -884,7 +890,7 @@ export default function AxisEditor({
                   }}
                 >
                   <div className="p-1 text-xs text-zinc-100/90 truncate">
-                    {String(addSkillDrag.skillType)}
+                    {getSkillTypeLabel(addSkillDrag.skillType)}
                   </div>
                 </div>
               )}
@@ -918,7 +924,7 @@ export default function AxisEditor({
                   onContextMenu={e => openSkillBoxMenu(e, box.id)}
                 >
                   <div className="p-1 text-xs text-white truncate">
-                    {String(box.skillType)}
+                    {getSkillTypeLabel(box.skillType)}
                   </div>
                 </div>
               );
@@ -951,7 +957,7 @@ export default function AxisEditor({
                 setSkillBoxMenu(null);
               }}
             >
-              Delete
+              {t("axis.delete")}
             </button>
           </div>
         </div>

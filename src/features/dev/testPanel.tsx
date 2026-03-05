@@ -1,88 +1,98 @@
-import { useMemo, useRef, useState } from "react";
-import { useAppSelector } from "../../app/hooks";
-import { selectSolution } from "../solution/selectors";
-import { runSolutionSim } from "../sim/runSolutionSim";
+import { useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { useAppSelector } from '../../app/hooks';
+import { runSolutionSim } from '../sim/runSolutionSim';
+import { selectSolution } from '../solution/selectors';
 import {
   compareSimTestCase,
   createSimTestCase,
   deserializeSimTestCase,
   type SimTestCompareMode,
   serializeSimTestCase,
-} from "./testCaseSL";
+} from './testCaseSL';
 
 export default function TestPanel() {
+  const { t } = useTranslation();
   const solution = useAppSelector(selectSolution);
 
-  const [text, setText] = useState<string>("");
-  const [mode, setMode] = useState<SimTestCompareMode>("eventTypes");
-  const [error, setError] = useState<string>("");
-  const [result, setResult] = useState<string>("");
+  const [text, setText] = useState<string>('');
+  const [mode, setMode] = useState<SimTestCompareMode>('eventTypes');
+  const [error, setError] = useState<string>('');
+  const [result, setResult] = useState<string>('');
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const STORAGE_KEY = "endfieldaxis.dev.simTestCase.v2";
+  const STORAGE_KEY = 'endfieldaxis.dev.simTestCase.v2';
 
   const hasText = useMemo(() => text.trim().length > 0, [text]);
 
+  const formatDevTestError = (code: string, meta?: Record<string, unknown>): string =>
+    t(`devTest.errors.${code}`, meta);
+
   const onGenerate = () => {
-    setError("");
-    setResult("");
+    setError('');
+    setResult('');
     try {
       const simResult = runSolutionSim(solution);
       const testCase = createSimTestCase(solution, simResult);
       setText(serializeSimTestCase(testCase));
       setResult(
-        `Generated standard: ${testCase.expected.eventTypes.length} events, ${testCase.expected.hitDamageBuckets.length} hit snapshots, ${testCase.expected.enemyStaggerSeries.length} stagger points.`,
+        t('devTest.resultGeneratedStandard', {
+          events: testCase.expected.eventTypes.length,
+          hitSnapshots: testCase.expected.hitDamageBuckets.length,
+          staggerPoints: testCase.expected.enemyStaggerSeries.length,
+        }),
       );
     } catch {
-      setError("Failed to generate test case from current solution.");
+      setError(t('devTest.errorFailedGenerateFromSolution'));
     }
   };
 
   const onCompare = () => {
-    setError("");
-    setResult("");
+    setError('');
+    setResult('');
 
     const parsed = deserializeSimTestCase(text);
     if (!parsed.ok) {
-      setError(parsed.error);
+      setError(formatDevTestError(parsed.code, parsed.meta));
       return;
     }
 
     try {
       const simResult = runSolutionSim(parsed.testCase.solution);
       const compared = compareSimTestCase(parsed.testCase, simResult, mode);
-      setResult(compared.message);
+      setResult(formatDevTestError(compared.code, compared.meta));
     } catch {
-      setError("Failed to run simulation for comparison.");
+      setError(t('devTest.errorFailedRunSimulationForComparison'));
     }
   };
 
   const onDownload = () => {
-    setError("");
-    setResult("");
+    setError('');
+    setResult('');
     if (!hasText) {
-      setError("No test case text to download.");
+      setError(t('devTest.errorNoTextToDownload'));
       return;
     }
-    const blob = new Blob([text], { type: "application/json" });
+    const blob = new Blob([text], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
+    const a = document.createElement('a');
     a.href = url;
-    a.download = "sim-test-case.json";
+    a.download = t('devTest.downloadFilename');
     a.click();
     URL.revokeObjectURL(url);
   };
 
   const onPickFile = () => {
-    setError("");
+    setError('');
     fileInputRef.current?.click();
   };
 
   const onFileChosen: React.ChangeEventHandler<HTMLInputElement> = async e => {
-    setError("");
-    setResult("");
+    setError('');
+    setResult('');
     const file = e.target.files?.[0];
-    e.target.value = "";
+    e.target.value = '';
     if (!file) return;
 
     try {
@@ -90,61 +100,64 @@ export default function TestPanel() {
       setText(content);
       const parsed = deserializeSimTestCase(content);
       if (!parsed.ok) {
-        setError(parsed.error);
+        setError(formatDevTestError(parsed.code, parsed.meta));
         return;
       }
-      setResult("Loaded test case from file.");
+      setResult(t('devTest.resultLoadedFromFile'));
     } catch {
-      setError("Failed to read file.");
+      setError(t('devTest.errorFailedReadFile'));
     }
   };
 
   const onSaveToBrowser = () => {
-    setError("");
-    setResult("");
+    setError('');
+    setResult('');
     if (!hasText) {
-      setError("No test case text to save.");
+      setError(t('devTest.errorNoTextToSave'));
       return;
     }
     try {
       localStorage.setItem(STORAGE_KEY, text);
-      setResult("Saved test case to localStorage.");
+      setResult(t('devTest.resultSavedToLocalStorage'));
     } catch {
-      setError("Failed to write to localStorage.");
+      setError(t('devTest.errorFailedWriteLocalStorage'));
     }
   };
 
   const onLoadFromBrowser = () => {
-    setError("");
-    setResult("");
+    setError('');
+    setResult('');
     let content: string | null = null;
     try {
       content = localStorage.getItem(STORAGE_KEY);
     } catch {
-      setError("Failed to read from localStorage.");
+      setError(t('devTest.errorFailedReadLocalStorage'));
       return;
     }
     if (!content) {
-      setError("No saved test case found in localStorage.");
+      setError(t('devTest.errorNoSavedInLocalStorage'));
       return;
     }
 
     setText(content);
     const parsed = deserializeSimTestCase(content);
     if (!parsed.ok) {
-      setError(parsed.error);
+      setError(formatDevTestError(parsed.code, parsed.meta));
       return;
     }
-    setResult("Loaded test case from localStorage.");
+    setResult(t('devTest.resultLoadedFromLocalStorage'));
   };
 
   return (
-    <div className="mt-4 p-4 border border-zinc-700 rounded bg-zinc-900">
+    <div
+      className="mt-4 p-4 border border-zinc-700 rounded bg-zinc-900"
+      data-testid="panel-dev-test"
+    >
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Dev Test Panel</h2>
+          <h2 className="text-lg font-semibold">{t('devTest.heading')}</h2>
           <div className="text-xs text-zinc-400">
-            Generate and compare simulator standards from current solution.
+            {t('devTest.helperText')}
           </div>
         </div>
 
@@ -154,16 +167,16 @@ export default function TestPanel() {
             className="px-3 py-1 text-xs rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700"
             onClick={onGenerate}
           >
-            Generate Standard
+            {t('devTest.generateStandard')}
           </button>
           <button
             type="button"
             className="px-3 py-1 text-xs rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700"
             onClick={onCompare}
             disabled={!hasText}
-            title={hasText ? "" : "Generate or paste test case JSON first"}
+            title={hasText ? undefined : t('devTest.tooltipNeedJson')}
           >
-            Compare Current
+            {t('devTest.compareCurrent')}
           </button>
 
           <button
@@ -171,14 +184,14 @@ export default function TestPanel() {
             className="px-3 py-1 text-xs rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700"
             onClick={onDownload}
           >
-            Download .json
+            {t('devTest.downloadJson')}
           </button>
           <button
             type="button"
             className="px-3 py-1 text-xs rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700"
             onClick={onPickFile}
           >
-            Upload .json
+            {t('devTest.uploadJson')}
           </button>
 
           <div className="w-px h-4 bg-zinc-700 mx-1" />
@@ -188,14 +201,14 @@ export default function TestPanel() {
             className="px-3 py-1 text-xs rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700"
             onClick={onSaveToBrowser}
           >
-            Save to Browser
+            {t('devTest.saveToBrowser')}
           </button>
           <button
             type="button"
             className="px-3 py-1 text-xs rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700"
             onClick={onLoadFromBrowser}
           >
-            Load from Browser
+            {t('devTest.loadFromBrowser')}
           </button>
 
           <input
@@ -209,49 +222,53 @@ export default function TestPanel() {
       </div>
 
       <div className="mt-3 flex items-center gap-2 text-xs">
-        <span className="text-zinc-300">Compare mode:</span>
+        <span className="text-zinc-300">{t('devTest.compareModeLabel')}</span>
         <button
           type="button"
           className={`px-2 py-1 rounded border ${
-            mode === "eventTypes"
-              ? "border-zinc-500 bg-zinc-700"
-              : "border-zinc-700 bg-zinc-800 hover:bg-zinc-700"
+            mode === 'eventTypes'
+              ? 'border-zinc-500 bg-zinc-700'
+              : 'border-zinc-700 bg-zinc-800 hover:bg-zinc-700'
           }`}
-          onClick={() => setMode("eventTypes")}
+          onClick={() => setMode('eventTypes')}
         >
-          Event Types
+          {t('devTest.modeEventTypes')}
         </button>
         <button
           type="button"
           className={`px-2 py-1 rounded border ${
-            mode === "hitDamageBuckets"
-              ? "border-zinc-500 bg-zinc-700"
-              : "border-zinc-700 bg-zinc-800 hover:bg-zinc-700"
+            mode === 'hitDamageBuckets'
+              ? 'border-zinc-500 bg-zinc-700'
+              : 'border-zinc-700 bg-zinc-800 hover:bg-zinc-700'
           }`}
-          onClick={() => setMode("hitDamageBuckets")}
+          onClick={() => setMode('hitDamageBuckets')}
         >
-          Hit Damage Buckets
+          {t('devTest.modeHitDamage')}
         </button>
         <button
           type="button"
           className={`px-2 py-1 rounded border ${
-            mode === "enemyStaggerSeries"
-              ? "border-zinc-500 bg-zinc-700"
-              : "border-zinc-700 bg-zinc-800 hover:bg-zinc-700"
+            mode === 'enemyStaggerSeries'
+              ? 'border-zinc-500 bg-zinc-700'
+              : 'border-zinc-700 bg-zinc-800 hover:bg-zinc-700'
           }`}
-          onClick={() => setMode("enemyStaggerSeries")}
+          onClick={() => setMode('enemyStaggerSeries')}
         >
-          Enemy Stagger Series
+          {t('devTest.modeStagger')}
         </button>
       </div>
 
-      {error ? <div className="mt-2 text-xs text-red-300">Error: {error}</div> : null}
+      {error ? (
+        <div className="mt-2 text-xs text-red-300">
+          {t('devTest.errorLabel')}: {error}
+        </div>
+      ) : null}
       {result ? <div className="mt-2 text-xs text-emerald-300">{result}</div> : null}
 
       <div className="mt-3">
         <textarea
           className="w-full h-[220px] rounded border border-zinc-800 bg-black/40 p-3 text-xs leading-5 font-mono"
-          placeholder="Generate a standard or paste test case JSON here..."
+          placeholder={t('devTest.textareaPlaceholder')}
           value={text}
           onChange={e => setText(e.target.value)}
         />

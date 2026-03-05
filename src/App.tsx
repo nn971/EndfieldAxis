@@ -22,6 +22,7 @@ import {
 import SolutionSLPanel from "./features/solution/SolutionSLPanel";
 import TestPanel from "./features/dev/testPanel";
 import DamageStatisticPanel from "./features/sim/DamageStatisticPanel";
+import LanguageSwitcher from "./shared/components/LanguageSwitcher";
 
 function remapSelectedLane(
   selectedLane: number | null,
@@ -55,6 +56,10 @@ export default function App() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <div className="mx-auto max-w-7xl p-4">
+        <div className="mb-3 flex justify-end">
+          <LanguageSwitcher />
+        </div>
+
         <div className="flex flex-col gap-4 lg:flex-row">
           <div className="w-full lg:w-[300px] lg:shrink-0">
             <OperatorEditor

@@ -35,8 +35,28 @@ export type SimTestCase = {
 
 type CompareResult = {
   ok: boolean;
-  message: string;
+  code: CompareCode;
+  meta?: Record<string, unknown>;
 };
+
+type DeserializeErrorCode =
+  | "invalid_json"
+  | "not_object"
+  | "unsupported_version"
+  | "missing_solution"
+  | "missing_expected"
+  | "invalid_eventTypes"
+  | "invalid_hitBuckets"
+  | "invalid_staggerSeries";
+
+type CompareCode =
+  | "event_count_mismatch"
+  | "event_mismatch"
+  | "hit_count_mismatch"
+  | "hit_mismatch"
+  | "stagger_count_mismatch"
+  | "stagger_mismatch"
+  | "pass";
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -118,33 +138,39 @@ export function serializeSimTestCase(testCase: SimTestCase): string {
 
 export function deserializeSimTestCase(
   text: string,
-): { ok: true; testCase: SimTestCase } | { ok: false; error: string } {
+):
+  | { ok: true; testCase: SimTestCase }
+  | { ok: false; code: DeserializeErrorCode; meta?: Record<string, unknown> } {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
   } catch {
-    return { ok: false, error: "Invalid JSON (parse failed)." };
+    return { ok: false, code: "invalid_json" };
   }
 
   if (!isPlainObject(raw)) {
-    return { ok: false, error: "Test case must be a JSON object." };
+    return { ok: false, code: "not_object" };
   }
   if (raw.version !== 2) {
     return {
       ok: false,
-      error: `Unsupported test case version ${String(raw.version)} (expected 2).`,
+      code: "unsupported_version",
+      meta: {
+        version: raw.version,
+        expectedVersion: CURRENT_SIM_TEST_CASE_VERSION,
+      },
     };
   }
   if (!isPlainObject(raw.solution)) {
-    return { ok: false, error: "Test case solution is missing or invalid." };
+    return { ok: false, code: "missing_solution" };
   }
   if (!isPlainObject(raw.expected)) {
-    return { ok: false, error: "Test case expected section is missing." };
+    return { ok: false, code: "missing_expected" };
   }
 
   const eventTypes = raw.expected.eventTypes;
   if (!Array.isArray(eventTypes) || !eventTypes.every(v => typeof v === "string")) {
-    return { ok: false, error: "Expected eventTypes must be an array of strings." };
+    return { ok: false, code: "invalid_eventTypes" };
   }
 
   const hitDamageBuckets = raw.expected.hitDamageBuckets;
@@ -154,8 +180,7 @@ export function deserializeSimTestCase(
   ) {
     return {
       ok: false,
-      error:
-        "Expected hitDamageBuckets must be an array of hit snapshots with complete bucket values.",
+      code: "invalid_hitBuckets",
     };
   }
 
@@ -166,8 +191,7 @@ export function deserializeSimTestCase(
   ) {
     return {
       ok: false,
-      error:
-        "Expected enemyStaggerSeries must be an array of points with frame, seq, and value.",
+      code: "invalid_staggerSeries",
     };
   }
 
@@ -186,7 +210,8 @@ export function compareSimTestCase(
     if (expected.length !== actual.length) {
       return {
         ok: false,
-        message: `Event count mismatch: expected ${expected.length}, got ${actual.length}.`,
+        code: "event_count_mismatch",
+        meta: { expected: expected.length, actual: actual.length },
       };
     }
 
@@ -194,14 +219,20 @@ export function compareSimTestCase(
       if (expected[i] !== actual[i]) {
         return {
           ok: false,
-          message: `Event mismatch at index ${i}: expected ${expected[i]}, got ${actual[i]}.`,
+          code: "event_mismatch",
+          meta: {
+            index: i,
+            expected: expected[i],
+            actual: actual[i],
+          },
         };
       }
     }
 
     return {
       ok: true,
-      message: `Pass: ${actual.length} events match by type.`,
+      code: "pass",
+      meta: { mode, count: actual.length },
     };
   }
 
@@ -211,7 +242,8 @@ export function compareSimTestCase(
     if (expectedHits.length !== actualHits.length) {
       return {
         ok: false,
-        message: `Hit count mismatch: expected ${expectedHits.length}, got ${actualHits.length}.`,
+        code: "hit_count_mismatch",
+        meta: { expected: expectedHits.length, actual: actualHits.length },
       };
     }
 
@@ -228,10 +260,27 @@ export function compareSimTestCase(
       ) {
         return {
           ok: false,
-          message:
-            `Hit mismatch at index ${i}: ` +
-            `expected [frame=${expected.frame}, seq=${expected.seq}, source=${expected.sourceId}, target=${expected.targetId}, type=${expected.damageType}], ` +
-            `got [frame=${actual.frame}, seq=${actual.seq}, source=${actual.sourceId}, target=${actual.targetId}, type=${actual.damageType}].`,
+          code: "hit_mismatch",
+          meta: {
+            index: i,
+            field: "identity",
+            expected:
+              `frame=${expected.frame}, seq=${expected.seq}, source=${expected.sourceId}, ` +
+              `target=${expected.targetId}, type=${expected.damageType}`,
+            actual:
+              `frame=${actual.frame}, seq=${actual.seq}, source=${actual.sourceId}, ` +
+              `target=${actual.targetId}, type=${actual.damageType}`,
+            expectedFrame: expected.frame,
+            actualFrame: actual.frame,
+            expectedSeq: expected.seq,
+            actualSeq: actual.seq,
+            expectedSource: expected.sourceId,
+            actualSource: actual.sourceId,
+            expectedTarget: expected.targetId,
+            actualTarget: actual.targetId,
+            expectedType: expected.damageType,
+            actualType: actual.damageType,
+          },
         };
       }
 
@@ -241,9 +290,14 @@ export function compareSimTestCase(
         if (!numberEq(expectedValue, actualValue)) {
           return {
             ok: false,
-            message:
-              `Bucket mismatch at hit index ${i} (${bucket}): ` +
-              `expected ${expectedValue}, got ${actualValue}.`,
+            code: "hit_mismatch",
+            meta: {
+              index: i,
+              field: "bucket",
+              bucket,
+              expected: expectedValue,
+              actual: actualValue,
+            },
           };
         }
       }
@@ -251,7 +305,8 @@ export function compareSimTestCase(
 
     return {
       ok: true,
-      message: `Pass: ${actualHits.length} hit events match all damage buckets.`,
+      code: "pass",
+      meta: { mode, count: actualHits.length },
     };
   }
 
@@ -260,7 +315,8 @@ export function compareSimTestCase(
   if (expectedStagger.length !== actualStagger.length) {
     return {
       ok: false,
-      message: `Enemy stagger point count mismatch: expected ${expectedStagger.length}, got ${actualStagger.length}.`,
+      code: "stagger_count_mismatch",
+      meta: { expected: expectedStagger.length, actual: actualStagger.length },
     };
   }
 
@@ -270,24 +326,44 @@ export function compareSimTestCase(
     if (expected.frame !== actual.frame || expected.seq !== actual.seq) {
       return {
         ok: false,
-        message:
-          `Enemy stagger point mismatch at index ${i}: ` +
-          `expected [frame=${expected.frame}, seq=${expected.seq}], ` +
-          `got [frame=${actual.frame}, seq=${actual.seq}].`,
+        code: "stagger_mismatch",
+        meta: {
+          index: i,
+          field: "identity",
+          expected: `frame=${expected.frame}, seq=${expected.seq}`,
+          actual: `frame=${actual.frame}, seq=${actual.seq}`,
+          expectedFrame: expected.frame,
+          actualFrame: actual.frame,
+          expectedSeq: expected.seq,
+          actualSeq: actual.seq,
+          expectedValue: expected.value,
+          actualValue: actual.value,
+        },
       };
     }
     if (!numberEq(expected.value, actual.value)) {
       return {
         ok: false,
-        message:
-          `Enemy stagger value mismatch at index ${i}: ` +
-          `expected ${expected.value}, got ${actual.value}.`,
+        code: "stagger_mismatch",
+        meta: {
+          index: i,
+          field: "value",
+          expected: expected.value,
+          actual: actual.value,
+          expectedFrame: expected.frame,
+          actualFrame: actual.frame,
+          expectedSeq: expected.seq,
+          actualSeq: actual.seq,
+          expectedValue: expected.value,
+          actualValue: actual.value,
+        },
       };
     }
   }
 
   return {
     ok: true,
-    message: `Pass: ${actualStagger.length} enemy stagger points match.`,
+    code: "pass",
+    meta: { mode, count: actualStagger.length },
   };
 }

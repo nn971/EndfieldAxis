@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { summarizeLog } from "../../simulator/log";
 import { makeEmptySimRenderCache } from "../../types/editor";
@@ -16,6 +17,7 @@ import {
 import { runSolutionSim } from "./runSolutionSim";
 
 export default function SimPanel() {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const [logText, setLogText] = useState("");
   const teamOperatorIds = useAppSelector(selectTeamOperatorIds);
@@ -47,23 +49,28 @@ export default function SimPanel() {
         true,
       ) +
         "\n\n" +
-        `Final world state:\n${finalWorldDescription}`,
+        `${t("sim.finalWorldState")}\n${finalWorldDescription}`,
     );
   };
 
   return (
-    <div className="mt-4 p-4 border border-zinc-700 rounded bg-zinc-900">
+    <div
+      className="mt-4 p-4 border border-zinc-700 rounded bg-zinc-900"
+      data-testid="panel-sim"
+    >
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Simulator</h2>
+          <h2 className="text-lg font-semibold">{t("sim.heading")}</h2>
           <div className="text-xs text-zinc-400">
-            Console-style simulation log
+            {t("sim.consoleStyleLog")}
           </div>
         </div>
 
         <div className="text-xs text-zinc-400 mt-1">
-          Axis: {skillBoxes.length} skill boxes | Team:{" "}
-          {teamOperatorIds.join(", ")}
+          {t("sim.status", {
+            skillBoxes: skillBoxes.length,
+            team: teamOperatorIds.join(", "),
+          })}
         </div>
 
         <div className="flex items-center gap-2">
@@ -76,21 +83,22 @@ export default function SimPanel() {
               dispatch(simDamageCacheReplaced(makeEmptySimDamageCache()));
             }}
           >
-            Clear
+            {t("sim.clear")}
           </button>
           <button
             type="button"
             className="px-3 py-1 text-xs rounded border border-zinc-600 bg-zinc-100 text-zinc-900 hover:bg-white"
             onClick={run}
+            data-testid="sim-run"
           >
-            Run
+            {t("sim.run")}
           </button>
         </div>
       </div>
 
       <div className="mt-3">
         <pre className="h-[260px] overflow-auto rounded border border-zinc-800 bg-black/40 p-3 text-xs leading-5 whitespace-pre-wrap font-mono">
-          {logText || "(click Run)"}
+          {logText || t("sim.clickRun")}
         </pre>
       </div>
     </div>
