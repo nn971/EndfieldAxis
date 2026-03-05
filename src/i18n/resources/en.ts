@@ -1,8 +1,15 @@
+import { enContent } from './content/enContent';
+
 export const en = {
   translation: {
+    common: {
+      replace: 'Replace',
+      newTab: 'New Tab',
+    },
     app: {
       title: 'EndfieldAxis',
     },
+    content: enContent,
     axis: {
       title: 'Axis Editor',
       placeholder: 'This is a placeholder for the Axis Editor component.',

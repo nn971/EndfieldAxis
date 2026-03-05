@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import operatorsData from '../../data/operators';
+import { tOperatorName } from '../../i18n/content';
 import type { SkillType } from '../../data/operators/OperatorDef';
 import type { DamageWatchEntry } from '../../types/editor';
 import { DAMAGE_TYPE_LIST } from '../../types/operator';
@@ -210,7 +211,7 @@ function WatchRow({
           <option value="">{t('damageStats.anyOperator')}</option>
           {operatorOptions.map(opId => (
             <option key={opId} value={opId}>
-              {operatorsData[opId]?.name ?? opId}
+              {tOperatorName(t, opId, operatorsData[opId]?.name ?? opId)}
             </option>
           ))}
         </select>

@@ -8,6 +8,7 @@ import type {
 } from "../../types/editor";
 import type { SkillType } from "../../data/operators/OperatorDef";
 import operatorsData from "../../data/operators";
+import { tOperatorName } from "../../i18n/content";
 import { moveItem } from "../../shared/lib/utils";
 import placeholderImg from "../../assets/default/placeholder.jpg";
 
@@ -534,10 +535,13 @@ export default function AxisEditor({
           >
             {[0, 1, 2, 3, 4].map(laneIndex => {
               const opId = laneLabels[laneIndex];
+              const fallbackName = operatorsData[opId]?.name ?? opId ?? "—";
               const name =
                 laneIndex === ENEMY_LANE_INDEX
                   ? t("axis.enemyLane")
-                  : (operatorsData[opId]?.name ?? opId ?? "—");
+                  : opId
+                    ? tOperatorName(t, opId, fallbackName)
+                    : fallbackName;
 
               return (
                 <div
@@ -556,6 +560,7 @@ export default function AxisEditor({
                   ) : (
                     <button
                       type="button"
+                      data-testid={`axis-lane-label-${laneIndex}`}
                       className="h-full w-full px-2 text-xs bg-zinc-800 hover:bg-zinc-700 select-none touch-none cursor-grab active:cursor-grabbing"
                       onPointerDown={e => onLanePointerDown(e, laneIndex)}
                       onPointerMove={onLanePointerMove}

@@ -19,6 +19,14 @@ import {
   BASE_WEAPON_SKILL_LABEL,
   THIRD_WEAPON_SKILL_CAT_LABEL,
 } from "../../data/weapons/WeaponDef";
+import {
+  tBaseWeaponSkillLabel,
+  tGearName,
+  tGearSetName,
+  tThirdWeaponSkillCatLabel,
+  tThirdWeaponSkillName,
+  tWeaponName,
+} from "../../i18n/content";
 
 type TabProps = {
   operatorId: OperatorId;
@@ -26,11 +34,11 @@ type TabProps = {
   onCommit: (operatorId: OperatorId, patch: Partial<OperatorBuild>) => void;
 };
 
-const gearSetNamesById = Object.values(gearsSetData).reduce(
+const gearSetIdsByGearId = Object.values(gearsSetData).reduce(
   (acc, set) => {
     for (const gearId of set.gearIds) {
       if (!acc[gearId]) acc[gearId] = [];
-      acc[gearId].push(set.name);
+      acc[gearId].push(set.id);
     }
     return acc;
   },
@@ -148,6 +156,10 @@ export function WeaponTab({ operatorId, build, onCommit }: TabProps) {
   );
 
   const weaponType = operatorsData[operatorId].weaponType;
+  const weaponName =
+    weaponDef == null
+      ? null
+      : tWeaponName(t, weaponDef.id, weaponDef.name);
 
   // if (!build.weapon) {
   //   return (
@@ -196,13 +208,13 @@ export function WeaponTab({ operatorId, build, onCommit }: TabProps) {
           <img
             className="w-full h-full object-cover"
             src={placeholderUrl}
-            alt={weaponDef?.name ?? t("operatorTabs.weapon.noWeapon")}
+            alt={weaponName ?? t("operatorTabs.weapon.noWeapon")}
           />
         </div>
         <div className="text-left">
           <div className="text-sm text-zinc-300">{t("operatorTabs.weapon.tab")}</div>
           <div className="text-base font-medium">
-            {weaponDef?.name ?? t("operatorTabs.weapon.none")}
+            {weaponName ?? t("operatorTabs.weapon.none")}
           </div>
           <div className="text-xs text-zinc-500">
             {weaponBuild?.id ?? t("operatorTabs.weapon.noWeaponEquipped")}
@@ -238,8 +250,22 @@ export function WeaponTab({ operatorId, build, onCommit }: TabProps) {
             const skillId = (spec as { id: WeaponId }).id;
             const skillName =
               n === "s3"
-                ? `${THIRD_WEAPON_SKILL_CAT_LABEL[(spec as { id: string; cat: ThirdWeaponSkillCat; name: string }).cat]}: ${(spec as { id: string; cat: string; name: string }).name}`
-                : `${BASE_WEAPON_SKILL_LABEL[skillId as BaseWeaponSkillId]} ${(spec as { id: BaseWeaponSkillId; size: string }).size}`;
+                ? `${tThirdWeaponSkillCatLabel(
+                    t,
+                    (spec as { id: string; cat: ThirdWeaponSkillCat; name: string }).cat,
+                    THIRD_WEAPON_SKILL_CAT_LABEL[
+                      (spec as { id: string; cat: ThirdWeaponSkillCat; name: string }).cat
+                    ],
+                  )}: ${tThirdWeaponSkillName(
+                    t,
+                    (spec as { id: string; cat: ThirdWeaponSkillCat; name: string }).id,
+                    (spec as { id: string; cat: ThirdWeaponSkillCat; name: string }).name,
+                  )}`
+                : `${tBaseWeaponSkillLabel(
+                    t,
+                    skillId as BaseWeaponSkillId,
+                    BASE_WEAPON_SKILL_LABEL[skillId as BaseWeaponSkillId],
+                  )} ${(spec as { id: BaseWeaponSkillId; size: string }).size}`;
             return (
               <PreviewSlider
                 key={skillId}
@@ -314,10 +340,29 @@ function WeaponPicker({
   onClear,
   onClose,
 }: WeaponPickerProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+  const weaponEntries = useMemo(
+    () =>
+      Object.values(weaponsData)
+        .filter(w => w.type === weaponType)
+        .map(weapon => ({
+          weapon,
+          name: tWeaponName(t, weapon.id, weapon.name),
+        }))
+        .sort((a, b) => {
+          const nameCmp = a.name.localeCompare(b.name, i18n.language);
+          if (nameCmp !== 0) return nameCmp;
+          return a.weapon.id.localeCompare(b.weapon.id);
+        }),
+    [i18n.language, t, weaponType],
+  );
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-3 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-3 backdrop-blur-sm"
+      data-testid="weapon-picker"
+    >
       <div className="w-[560px] max-w-[95vw] rounded-xl border border-zinc-700/90 bg-zinc-900/95 p-3 shadow-2xl shadow-black/60">
         <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2">
           <div>
@@ -360,31 +405,30 @@ function WeaponPicker({
               </div>
             </button>
 
-            {Object.values(weaponsData).map(w => {
-              if (w.type !== weaponType) return null;
-              const active = w.id === currentId;
+            {weaponEntries.map(({ weapon, name }) => {
+              const active = weapon.id === currentId;
               return (
                 <button
                   type="button"
-                  key={w.id}
+                  key={weapon.id}
                   className={
                     "flex items-center gap-3 rounded-lg border p-2 text-left transition-colors " +
                     (active
                       ? "border-emerald-500/80 bg-emerald-900/20 "
                       : "border-zinc-800 bg-zinc-950/40 hover:border-zinc-600 hover:bg-zinc-800/50 ")
                   }
-                  onClick={() => onPick(w.id)}
+                  onClick={() => onPick(weapon.id)}
                 >
                   <div className="w-10 h-10 rounded bg-zinc-800 overflow-hidden shrink-0">
                     <img
                       className="w-full h-full object-cover"
                       src={placeholderUrl}
-                      alt={w.name}
+                      alt={name}
                     />
                   </div>
                   <div className="text-left">
-                    <div className="text-sm">{w.name}</div>
-                    <div className="text-xs text-zinc-500">{w.id}</div>
+                    <div className="text-sm">{name}</div>
+                    <div className="text-xs text-zinc-500">{weapon.id}</div>
                   </div>
                 </button>
               );
@@ -458,6 +502,8 @@ function GearSlotEditor({
   const [isPicking, setIsPicking] = useState(false);
   const slot = build.gears[slotKey];
   const gear = slot.gearId ? gearsData[slot.gearId] : null;
+  const gearName =
+    gear == null ? null : tGearName(t, gear.id, gear.name);
 
   const gearsTypeLabelByType: Record<GearsType, string> = {
     armor: t("operatorTabs.gearTypes.armor"),
@@ -501,13 +547,13 @@ function GearSlotEditor({
           <img
             className="w-full h-full object-cover"
             src={placeholderUrl}
-            alt={gear?.name ?? t("operatorTabs.gears.gear")}
+            alt={gearName ?? t("operatorTabs.gears.gear")}
           />
         </div>
         <div className="text-left">
           <div className="text-sm text-zinc-300">{t("operatorTabs.gears.gear")}</div>
           <div className="text-base font-medium">
-            {gear?.name ?? t("operatorTabs.common.none")}
+            {gearName ?? t("operatorTabs.common.none")}
           </div>
           <div className="text-xs text-zinc-500">
             {slot.gearId ?? t("operatorTabs.gears.noGearEquipped")}
@@ -661,21 +707,33 @@ function GearPicker({
   onClear,
   onClose,
 }: GearPickerProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const gearEntries = useMemo(
     () =>
       Object.values(gearsData)
         .filter(g => g.type === type)
         .map(gear => {
-          const sortedSetNames = [...(gearSetNamesById[gear.id] ?? [])].sort(
-            (a, b) => a.localeCompare(b),
+          const gearName = tGearName(t, gear.id, gear.name);
+          const sortedSetIds = [...(gearSetIdsByGearId[gear.id] ?? [])].sort(
+            (a, b) => {
+              const aName = tGearSetName(t, a, a);
+              const bName = tGearSetName(t, b, b);
+              const nameCmp = aName.localeCompare(bName, i18n.language);
+              if (nameCmp !== 0) return nameCmp;
+              return a.localeCompare(b);
+            },
+          );
+          const sortedSetNames = sortedSetIds.map(setId =>
+            tGearSetName(t, setId, setId),
           );
 
           return {
             gear,
+            gearName,
             setLabel: sortedSetNames.length ? sortedSetNames.join(", ") : null,
             primarySetName: sortedSetNames[0] ?? t("operatorTabs.gears.noSet"),
+            primarySetId: sortedSetIds[0] ?? null,
           };
         })
         .sort((a, b) => {
@@ -683,15 +741,24 @@ function GearPicker({
           const bHasSet = b.setLabel != null;
           if (aHasSet !== bHasSet) return aHasSet ? -1 : 1;
 
-          const setCmp = a.primarySetName.localeCompare(b.primarySetName);
+          const setCmp = a.primarySetName.localeCompare(
+            b.primarySetName,
+            i18n.language,
+          );
           if (setCmp !== 0) return setCmp;
+          if (a.primarySetId !== b.primarySetId) {
+            if (a.primarySetId == null) return 1;
+            if (b.primarySetId == null) return -1;
+            const setIdCmp = a.primarySetId.localeCompare(b.primarySetId);
+            if (setIdCmp !== 0) return setIdCmp;
+          }
 
-          const nameCmp = a.gear.name.localeCompare(b.gear.name);
+          const nameCmp = a.gearName.localeCompare(b.gearName, i18n.language);
           if (nameCmp !== 0) return nameCmp;
 
           return a.gear.id.localeCompare(b.gear.id);
         }),
-    [t, type],
+    [i18n.language, t, type],
   );
 
   const gearsTypeLabelByType: Record<GearsType, string> = {
@@ -702,7 +769,11 @@ function GearPicker({
   const gearsTypeLabel = gearsTypeLabelByType[type];
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-3 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-3 backdrop-blur-sm"
+      data-testid="gear-picker"
+      data-gear-type={type}
+    >
       <div className="w-[560px] max-w-[95vw] rounded-xl border border-zinc-700/90 bg-zinc-900/95 p-3 shadow-2xl shadow-black/60">
         <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2">
           <div>
@@ -776,12 +847,12 @@ function GearPicker({
                       <img
                         className="h-full w-full object-cover"
                         src={placeholderUrl}
-                        alt={gear.name}
+                        alt={entry.gearName}
                       />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium text-zinc-100">
-                        {gear.name}
+                        {entry.gearName}
                       </div>
                       <div className="truncate text-[11px] text-zinc-500">
                         {gear.id}

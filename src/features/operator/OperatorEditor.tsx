@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import operatorsData from "../../data/operators";
 import { getAvatarUrl } from "../../shared/imgRegistry/imgRegistry";
+import { tOperatorName } from "../../i18n/content";
 // import PreviewSlider from "../../shared/components/PreviewSlider";
 import type { OperatorBuild } from "../../types/operator";
 // import type { OperatorDef } from "../../data/operators/OperatorDef";
@@ -149,19 +150,30 @@ function OperatorPicker({
   onPick,
   onClose,
 }: OperatorPickerProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const operatorEntries = useMemo(
-    () =>
-      Object.values(operatorsData).sort((a, b) => {
-        const nameCmp = a.name.localeCompare(b.name);
-        if (nameCmp !== 0) return nameCmp;
-        return a.id.localeCompare(b.id);
-      }),
-    [],
+    () => {
+      const collator = new Intl.Collator(i18n.language);
+
+      return Object.values(operatorsData)
+        .map(op => ({
+          ...op,
+          displayName: tOperatorName(t, op.id, op.name),
+        }))
+        .sort((a, b) => {
+          const nameCmp = collator.compare(a.displayName, b.displayName);
+          if (nameCmp !== 0) return nameCmp;
+          return a.id.localeCompare(b.id);
+        });
+    },
+    [i18n.language, t],
   );
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-3 backdrop-blur-sm">
+    <div
+      data-testid="operator-picker"
+      className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-3 backdrop-blur-sm"
+    >
       <div className="w-[560px] max-w-[95vw] rounded-xl border border-zinc-700/90 bg-zinc-900/95 p-3 shadow-2xl shadow-black/60">
         <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2">
           <div>
@@ -184,6 +196,7 @@ function OperatorPicker({
             {operatorEntries.map(op => {
               const url = getAvatarUrl(op.avatar);
               const active = op.id === currentId;
+              const displayName = op.displayName;
 
               const usedLane = teamOperatorIds.findIndex(id => id === op.id);
               const disabled = usedLane !== -1 && op.id !== currentId;
@@ -212,13 +225,13 @@ function OperatorPicker({
                       <img
                         className="h-full w-full object-cover"
                         src={url}
-                        alt={op.name}
+                        alt={displayName}
                       />
                     ) : null}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium text-zinc-100">
-                      {op.name}
+                      {displayName}
                     </div>
                     <div className="truncate text-[11px] text-zinc-500">
                       {op.id}
@@ -296,10 +309,14 @@ export default function OperatorEditor({
   }
 
   const avatarUrl = getAvatarUrl(operator.avatar);
+  const operatorName = tOperatorName(t, operator.id, operator.name);
   const isControlled = operatorId === controlledOperatorId;
 
   return (
-    <div className="h-full p-4 border border-zinc-700 rounded bg-zinc-900">
+    <div
+      data-testid="panel-operator"
+      className="h-full p-4 border border-zinc-700 rounded bg-zinc-900"
+    >
       {/* Tab Switching Buttons */}
       <div className="mt-4 flex gap-2">
         {tabs.map(t => (
@@ -320,7 +337,7 @@ export default function OperatorEditor({
       </div>
 
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">{operator.name}</h2>
+        <h2 className="text-lg font-semibold">{operatorName}</h2>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -358,7 +375,7 @@ export default function OperatorEditor({
             <img
               className="w-full h-full object-cover"
               src={avatarUrl}
-              alt={operator.name}
+              alt={operatorName}
             />
           ) : (
             <div className="w-full h-full grid place-items-center text-xs text-zinc-400">
@@ -368,7 +385,7 @@ export default function OperatorEditor({
         </div>
         <div className="text-left">
           <div className="text-sm text-zinc-300">{t("operator.operator")}</div>
-          <div className="text-base font-medium">{operator.name}</div>
+          <div className="text-base font-medium">{operatorName}</div>
           <div className="text-xs text-zinc-500">{t("operator.clickAvatarToChange")}</div>
         </div>
       </button>
