@@ -21,7 +21,13 @@ import type {
   DamageContext,
   DamageModel,
 } from "./damage/damageModel";
-import { pushLog, type SimLog, type SimLogEntryCat } from "./log";
+import {
+  pushLog,
+  type SimLog,
+  type SimLogEntryCat,
+  type SimLogMessage,
+} from "./log";
+import { logMsg } from "./logMessages";
 import { SimRegistry } from "./listeners/registry";
 import { makeSimEventId } from "../shared/lib/utils";
 
@@ -98,7 +104,7 @@ export type SimOps = {
   /** Append a log entry (includes frame + env reference). */
   log: (
     cat: SimLogEntryCat,
-    message: string,
+    message: string | SimLogMessage,
     ctx?: DamageContext,
     breakdown?: DamageBreakdown,
     amount?: number,
@@ -638,7 +644,7 @@ export class SimWorld {
   // ----- Log -----
   private appendLog(
     cat: SimLogEntryCat,
-    message: string,
+    message: string | SimLogMessage,
     ctx?: DamageContext,
     breakdown?: DamageBreakdown,
     amount?: number,
@@ -764,13 +770,13 @@ export class SimWorld {
   public runSim(maxSteps: number = 10000) {
     // const session = { world, registry, damageModel };
 
-    this.ops.log("sim", "SIM start");
+    this.ops.log("sim", logMsg.simStart());
 
     let steps = 0;
 
     while (true) {
       if (steps++ > maxSteps) {
-        this.ops.log("sim", `ABORT: exceeded maxSteps=${maxSteps}`);
+        this.ops.log("sim", logMsg.simAbortMaxSteps(maxSteps));
         break;
       }
 
@@ -803,7 +809,11 @@ export class SimWorld {
       if (!whenValidation.isValid) {
         this.ops.log(
           "dev",
-          `dismiss event ${ev.type} id=${ev.id}: when mismatch (${whenValidation.reason ?? "unknown reason"})`,
+          logMsg.devDismissEventWhenMismatch({
+            eventType: ev.type,
+            eventId: ev.id,
+            reason: whenValidation.reason ?? "unknown reason",
+          }),
         );
         continue;
       }
@@ -874,7 +884,11 @@ export class SimWorld {
           this.ops.removeBuff(ev.targetId, ev.buffKey ?? ev.buffId);
           this.ops.log(
             "buff",
-            `BUFF ${ev.buffId} removed (entity=${(owner as any).name})`,
+            logMsg.buffRemoved({
+              buffId: ev.buffId,
+              targetId: ev.targetId,
+              targetName: (owner as any)?.name,
+            }),
           );
 
           const spawned = this.registry.runOnBuffConsumed({
@@ -961,7 +975,7 @@ export class SimWorld {
         default: {
           // Exhaustiveness guard (runtime)
           const _never: never = ev as never;
-          this.ops.log("dev", `WARN: unknown event ${(_never as any)?.type}`);
+          this.ops.log("dev", logMsg.devWarnUnknownEvent((_never as any)?.type));
         }
       }
 
@@ -969,6 +983,6 @@ export class SimWorld {
       this.captureResourceSample(ev.frame, ev.seq);
     }
 
-    this.ops.log("sim", "SIM end");
+    this.ops.log("sim", logMsg.simEnd());
   }
 }

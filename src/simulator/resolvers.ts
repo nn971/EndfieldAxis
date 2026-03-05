@@ -54,6 +54,7 @@ import operatorsData from "../data/operators";
 import type { SkillType } from "../data/operators/OperatorDef";
 import { SimEventWhen } from "../types/simulator/when";
 import { STAGGER_DURATION_FRAMES } from "../types/simulator/stagger";
+import { logMsg } from "./logMessages";
 
 // TODO: come up with a way to configure this
 export const DEFAULT_INFLICTION_DURATION_FRAMES = 1800;
@@ -524,7 +525,12 @@ export function resolveCastStart(
   if (!comboLegal) {
     self.ops.log(
       "act",
-      `"${source?.name}" failed to cast "${ev.skillType}" (${comboReason ?? "illegal combo cast"})`,
+      logMsg.actCastIllegalCombo({
+        sourceId: ev.sourceId,
+        sourceName: source?.name,
+        skillType: ev.skillType,
+        reason: comboReason ?? "illegal combo cast",
+      }),
     );
   }
 
@@ -538,7 +544,12 @@ export function resolveCastStart(
     if (!spendRes.isLegal) {
       self.ops.log(
         "act",
-        `"${source?.name}" normal skill cast with insufficient SP (spent ${spendRes.spent.toFixed(2)}/100)`,
+        logMsg.actCastInsufficientSp({
+          sourceId: ev.sourceId,
+          sourceName: source?.name,
+          spent: spendRes.spent,
+          cost: 100,
+        }),
       );
     }
   }
@@ -548,14 +559,25 @@ export function resolveCastStart(
     if (!spendRes.isLegal) {
       self.ops.log(
         "act",
-        `"${source?.name}" ultimate cast with insufficient ultimate energy (spent ${spendRes.spent.toFixed(2)}/${spendRes.cost.toFixed(2)})`,
+        logMsg.actCastInsufficientUltimate({
+          sourceId: ev.sourceId,
+          sourceName: source?.name,
+          spent: spendRes.spent,
+          cost: spendRes.cost,
+        }),
       );
     }
   }
 
   self.ops.log(
     "act",
-    `"${source?.name}" cast "${ev.skillType}" on "${target?.name}"`,
+    logMsg.actCastStart({
+      sourceId: ev.sourceId,
+      sourceName: source?.name,
+      targetId: ev.targetId ?? "unknown",
+      targetName: target?.name,
+      skillType: ev.skillType,
+    }),
   );
 
   const spawned = self.registry.runOnCastStart({
@@ -580,7 +602,13 @@ export function resolveCastEnd(
     : null;
   self.ops.log(
     "act",
-    `"${source?.name}" finished casting "${ev.skillType}" on "${target?.name}"`,
+    logMsg.actCastEnd({
+      sourceId: ev.sourceId,
+      sourceName: source?.name,
+      targetId: ev.targetId ?? "unknown",
+      targetName: target?.name,
+      skillType: ev.skillType,
+    }),
   );
 
   const spawned = self.registry.runOnCastEnd({
@@ -654,7 +682,14 @@ export function resolveHit(
 
   self.ops.log(
     "dmg",
-    `"${source.name}" hit "${target.name}" for ${res.amount} damage (hp left: ${(targetAfter as any).hp})`,
+    logMsg.dmgHit({
+      sourceId: source.id,
+      sourceName: source.name,
+      targetId: target.id,
+      targetName: target.name,
+      amount: res.amount,
+      hpLeft: Number((targetAfter as any)?.hp ?? 0),
+    }),
     ctx,
     res.breakdown,
     res.amount,
@@ -669,7 +704,11 @@ export function resolveHit(
     if (gained > 0) {
       self.ops.log(
         "act",
-        `"${source.name}" gained ${gained.toFixed(2)} ultimate energy from combo hit`,
+        logMsg.actUltimateGainComboHit({
+          sourceId: source.id,
+          sourceName: source.name,
+          gained,
+        }),
       );
     }
   }
@@ -700,7 +739,10 @@ export function resolveHit(
         if (totalGained > 0) {
           self.ops.log(
             "act",
-            `team gained ${totalGained.toFixed(2)} ultimate energy from normal skill final hit (real SP ratio ${(realSpRatio * 100).toFixed(1)}%)`,
+            logMsg.actTeamUltimateGainNormalSkillFinalHit({
+              gained: totalGained,
+              realSpRatio,
+            }),
           );
         }
       }
@@ -878,7 +920,12 @@ export function resolveStatusApplication(
 
     self.ops.log(
       "buff",
-      `${statusType}: vulnerable consumed=${current} (target=${(target as any).name})`,
+      logMsg.buffVulnerableConsumed({
+        statusType,
+        consumed: current,
+        targetId,
+        targetName: (target as any).name,
+      }),
     );
   }
 }
@@ -921,7 +968,21 @@ export function resolveBuffApplication(
     scheduleBuffExpire(self, targetId, buffId, buffKey, expiresAtFrame);
     self.ops.log(
       "buff",
-      `BUFF ${buffId} ${had ? "refresh" : "apply"} (source=${(source as any)?.name ?? "system"} target=${(target as any).name})`,
+      had
+        ? logMsg.buffRefresh({
+            buffId,
+            sourceId: source?.id,
+            sourceName: (source as any)?.name,
+            targetId,
+            targetName: (target as any).name,
+          })
+        : logMsg.buffApply({
+            buffId,
+            sourceId: source?.id,
+            sourceName: (source as any)?.name,
+            targetId,
+            targetName: (target as any).name,
+          }),
     );
     return true;
   }
@@ -975,12 +1036,34 @@ export function resolveBuffApplication(
   if (maxStacks > 1) {
     self.ops.log(
       "buff",
-      `BUFF ${buffId} stacks ${beforeStacks} -> ${afterStacks} (source=${(source as any)?.name ?? "system"} target=${(target as any).name})`,
+      logMsg.buffStackChange({
+        buffId,
+        before: beforeStacks,
+        after: afterStacks,
+        sourceId: source?.id,
+        sourceName: (source as any)?.name,
+        targetId,
+        targetName: (target as any).name,
+      }),
     );
   } else {
     self.ops.log(
       "buff",
-      `BUFF ${buffId} ${had ? "refresh" : "apply"} (source=${(source as any)?.name ?? "system"} target=${(target as any).name})`,
+      had
+        ? logMsg.buffRefresh({
+            buffId,
+            sourceId: source?.id,
+            sourceName: (source as any)?.name,
+            targetId,
+            targetName: (target as any).name,
+          })
+        : logMsg.buffApply({
+            buffId,
+            sourceId: source?.id,
+            sourceName: (source as any)?.name,
+            targetId,
+            targetName: (target as any).name,
+          }),
     );
   }
   return true;
@@ -1005,7 +1088,14 @@ export function resolveBuffExpiration(
   if (expiresAtFrame !== ev.frame) return false;
   if (self.read.nowInFrames >= expiresAtFrame) {
     self.ops.removeBuff(ent.id, buffKey);
-    self.ops.log("buff", `BUFF ${buffId} expire (entity=${(ent as any).name})`);
+    self.ops.log(
+      "buff",
+      logMsg.buffExpire({
+        buffId,
+        targetId: ent.id,
+        targetName: (ent as any).name,
+      }),
+    );
     return true;
   }
 
@@ -1122,11 +1212,21 @@ export function resolveInflictionApplication(
 
       self.ops.log(
         "buff",
-        `${reactionBuffId} triggered on ${(owner as any).name}: consumed arts stacks=${consumedArtsStacks}`,
+        logMsg.reactionTriggered({
+          reactionBuffId,
+          targetId: owner.id,
+          targetName: (owner as any).name,
+          consumedArtsStacks,
+        }),
       );
       self.ops.log(
         "buff",
-        `Arts Reaction consumed inflictions on ${(owner as any).name}`,
+        logMsg.reactionConsumedInflictions({
+          reactionBuffId,
+          targetId: owner.id,
+          targetName: (owner as any).name,
+          consumedArtsStacks,
+        }),
       );
 
       return;
@@ -1137,7 +1237,13 @@ export function resolveInflictionApplication(
     const after = owner.inflictions[ev.inflictionType].stacks;
     self.ops.log(
       "buff",
-      `${ev.inflictionType} infliction stacks ${current} -> ${after} (target=${(owner as any).name})`,
+      logMsg.inflictionStackChange({
+        inflictionType: ev.inflictionType,
+        before: current,
+        after,
+        targetId: owner.id,
+        targetName: (owner as any).name,
+      }),
     );
 
     const isBurstTrigger = current > 0;
@@ -1165,7 +1271,13 @@ export function resolveInflictionApplication(
     const after = owner.inflictions[ev.inflictionType].stacks;
     self.ops.log(
       "buff",
-      `${ev.inflictionType} infliction stacks ${current} -> ${after} (target=${(owner as any).name})`,
+      logMsg.inflictionStackChange({
+        inflictionType: ev.inflictionType,
+        before: current,
+        after,
+        targetId: owner.id,
+        targetName: (owner as any).name,
+      }),
     );
   }
 
@@ -1210,7 +1322,11 @@ export function resolveInflictionExpiration(
     scheduleInflictionRemove(self, ent.id, inflictionType, ev.id);
     self.ops.log(
       "buff",
-      `INFLICTION ${inflictionType} expire (entity=${(ent as any).name})`,
+      logMsg.inflictionExpire({
+        inflictionType,
+        targetId: ent.id,
+        targetName: (ent as any).name,
+      }),
     );
     return true;
   }
@@ -1290,7 +1406,10 @@ export function resolveComboTriggered(
   if (!accepted) return;
 
   scheduleComboTriggerElapse(self, sourceId, ev.id, ev.frame);
-  self.ops.log("act", `"${sourceEnt.name}" combo triggered`);
+  self.ops.log(
+    "act",
+    logMsg.actComboTriggered({ sourceId: sourceEnt.id, sourceName: sourceEnt.name }),
+  );
 }
 
 export function resolveComboTriggerElapse(
@@ -1310,7 +1429,10 @@ export function resolveComboTriggerElapse(
   combo.pending = false;
   combo.availableUntilFrame = -1;
   self.removeFromComboQueue(sourceId);
-  self.ops.log("act", `"${sourceEnt.name}" combo trigger elapsed`);
+  self.ops.log(
+    "act",
+    logMsg.actComboElapsed({ sourceId: sourceEnt.id, sourceName: sourceEnt.name }),
+  );
 }
 
 export function resolveComboCooldownEnd(
@@ -1335,7 +1457,12 @@ export function resolveSpRecover(
 
   self.ops.log(
     "act",
-    `team SP recover ${gained.toFixed(2)} from ${ev.sourceId} (real=${self.env.resources.teamSp.real.toFixed(2)}, fake=${self.env.resources.teamSp.fake.toFixed(2)})`,
+    logMsg.actTeamSpRecover({
+      sourceId: ev.sourceId,
+      gained,
+      real: self.env.resources.teamSp.real,
+      fake: self.env.resources.teamSp.fake,
+    }),
   );
 }
 
@@ -1347,7 +1474,12 @@ export function resolveSpReturn(
 
   self.ops.log(
     "act",
-    `team SP return ${gained.toFixed(2)} from ${ev.sourceId} (real=${self.env.resources.teamSp.real.toFixed(2)}, fake=${self.env.resources.teamSp.fake.toFixed(2)})`,
+    logMsg.actTeamSpReturn({
+      sourceId: ev.sourceId,
+      gained,
+      real: self.env.resources.teamSp.real,
+      fake: self.env.resources.teamSp.fake,
+    }),
   );
 }
 

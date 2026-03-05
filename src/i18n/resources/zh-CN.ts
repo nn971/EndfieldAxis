@@ -179,5 +179,56 @@ export const zhCN = {
       clickRun: "（点击 Run）",
       finalWorldState: "最终世界状态：",
     },
+    simLog: {
+      sim_start: "模拟开始。",
+      sim_end: "模拟结束。",
+      sim_abort_max_steps: "模拟已中止：达到最大步数（{{maxSteps}}）。",
+      dev_dismiss_event_when_mismatch:
+        "丢弃事件 {{eventType}}（{{eventId}}）：{{reason}}。",
+      dev_warn_unknown_event: "未知事件类型：{{eventType}}。",
+      act_cast_illegal_combo:
+        "{{sourceDisplayName}} 无法施放 {{skillType}}（连携非法）：{{reason}}。",
+      act_cast_start:
+        "{{sourceDisplayName}} 开始施放 {{skillType}}，目标 {{targetDisplayName}}。",
+      act_cast_end:
+        "{{sourceDisplayName}} 结束施放 {{skillType}}，目标 {{targetDisplayName}}。",
+      act_cast_insufficient_sp:
+        "{{sourceDisplayName}} SP 不足（已消耗 {{spent}} / 需求 {{cost}}）。",
+      act_cast_insufficient_ultimate:
+        "{{sourceDisplayName}} 终结能量不足（已消耗 {{spent}} / 需求 {{cost}}）。",
+      act_combo_triggered: "{{sourceDisplayName}} 触发连携状态。",
+      act_combo_elapsed: "{{sourceDisplayName}} 连携状态结束。",
+      act_team_sp_recover:
+        "{{sourceDisplayName}} 恢复队伍 SP +{{gained}}（真实 {{real}}，虚值 {{fake}}）。",
+      act_team_sp_return:
+        "{{sourceDisplayName}} 返还队伍 SP +{{gained}}（真实 {{real}}，虚值 {{fake}}）。",
+      act_ultimate_gain_combo_hit:
+        "{{sourceDisplayName}} 因连携命中获得终结能量 +{{gained}}。",
+      act_team_ultimate_gain_normal_skill_final_hit:
+        "队伍因战技终击获得终结能量 +{{gained}}（realSpRatio={{realSpRatio}}）。",
+      dmg_hit:
+        "{{sourceDisplayName}} 对 {{targetDisplayName}} 造成 {{amount}} 伤害（剩余 HP {{hpLeft}}）。",
+      buff_apply: "对 {{targetDisplayName}} 施加 Buff {{buffId}}。",
+      buff_refresh: "刷新 {{targetDisplayName}} 的 Buff {{buffId}}。",
+      buff_stack_change:
+        "{{targetDisplayName}} 的 Buff {{buffId}} 层数变化：{{before}} -> {{after}}。",
+      buff_expire: "{{targetDisplayName}} 的 Buff {{buffId}} 到期。",
+      buff_removed: "{{targetDisplayName}} 的 Buff {{buffId}} 被移除。",
+      buff_vulnerable_consumed:
+        "{{targetDisplayName}} 的 {{statusType}} 消耗 {{consumed}} 层。",
+      infliction_stack_change:
+        "{{targetDisplayName}} 的异常 {{inflictionType}} 层数变化：{{before}} -> {{after}}。",
+      infliction_expire:
+        "{{targetDisplayName}} 的异常 {{inflictionType}} 到期。",
+      reaction_triggered:
+        "{{targetDisplayName}} 触发反应 {{reactionBuffId}}（消耗术蚀层数：{{consumedArtsStacks}}）。",
+      reaction_consumed_inflictions:
+        "{{targetDisplayName}} 的反应 {{reactionBuffId}} 消耗异常（消耗术蚀层数：{{consumedArtsStacks}}）。",
+      dmg_breakdown_attack:
+        "基础攻击 {{baseAttack}} + 武器 {{weaponAttack}}，攻击加成 {{atkIncRatio}}，属性加成 {{attributeBonusRatio}}，最终攻击 {{atkFinal}}。",
+      dmg_breakdown_raw: "原始输出 {{rawOutcoming}}，原始伤害 {{rawDamage}}。",
+      dmg_breakdown_multiplier_header: "最终乘区 {{dmgFinalMultiplier}}，来源如下：",
+      dmg_breakdown_bonus_line: "bucket={{bucket}}，+{{addValue}}，{{note}}",
+    },
   },
 } as const;
