@@ -415,6 +415,12 @@ function toMilli(value: number): number {
   return Math.floor(Math.max(0, numeric) * 1000);
 }
 
+function clamp01(value: number): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.min(1, Math.max(0, numeric));
+}
+
 function tryGainStaggerAndCheckStaggeredTrigger(
   self: SimWorld,
   sourceId: SimEntityId,
@@ -551,6 +557,62 @@ export function resolveCastStart(
         }),
       );
     }
+  }
+
+  if (ev.skillType === "comboSkill") {
+    const combo = source?.combo;
+    if (!combo) {
+      console.warn(
+        `comboSkill castStart sourceId=${ev.sourceId} has no combo state`,
+      );
+      return;
+    }
+
+    if (combo.cooldown > 0) {
+      const reason = `combo cooldown active (${combo.cooldown}f remaining)`;
+      self.ops.log(
+        "act",
+        logMsg.actCastIllegalCombo({
+          sourceId: ev.sourceId,
+          sourceName: source?.name,
+          skillType: ev.skillType,
+          reason,
+        }),
+      );
+      console.warn(
+        `Rejected comboSkill castStart sourceId=${ev.sourceId}: ${reason}`,
+      );
+      return;
+    }
+
+    const build = self.read.getBuild(ev.sourceId);
+    const opDef = operatorsData[ev.sourceId];
+    const cooldownByRank = opDef?.getComboCooldownSecondsByRank(
+      build?.potentialRank,
+    );
+
+    let cooldownFrames = 0;
+    if (cooldownByRank && cooldownByRank.length > 0) {
+      const rawRank = Number(build?.potentialRank ?? 0);
+      const rank = Number.isFinite(rawRank) ? Math.floor(rawRank) : 0;
+      const clampedRank = Math.min(
+        cooldownByRank.length - 1,
+        Math.max(0, rank),
+      );
+      const baseSeconds = Number(
+        cooldownByRank[clampedRank] ?? cooldownByRank[0] ?? 0,
+      );
+      const safeBaseSeconds = Number.isFinite(baseSeconds)
+        ? Math.max(0, baseSeconds)
+        : 0;
+      const reduction = clamp01(
+        Number(build?.restStat?.comboCooldownReduction ?? 0),
+      );
+      const effectiveSeconds = safeBaseSeconds * (1 - reduction);
+      cooldownFrames = Math.max(0, Math.round(effectiveSeconds * 60));
+    }
+
+    combo.cooldown = cooldownFrames;
   }
 
   self.ops.log(
