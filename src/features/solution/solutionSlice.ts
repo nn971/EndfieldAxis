@@ -140,7 +140,11 @@ type SolutionWorkspaceState = {
 
 function cloneSolutionState(solution: SolutionState): SolutionState {
   if (typeof structuredClone === "function") {
-    return structuredClone(solution);
+    try {
+      return structuredClone(solution);
+    } catch {
+      // Fallback to JSON method if structuredClone fails
+    }
   }
   return JSON.parse(JSON.stringify(solution)) as SolutionState;
 }

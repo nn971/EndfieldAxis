@@ -7,6 +7,8 @@ export const en = {
       new: 'New',
       replace: 'Replace',
       newTab: 'New Tab',
+      rename: 'Rename',
+      clone: 'Clone',
     },
     app: {
       title: 'EndfieldAxis',

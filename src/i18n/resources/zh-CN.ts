@@ -7,6 +7,8 @@ export const zhCN = {
       new: "新建",
       replace: "替换",
       newTab: "新建标签页",
+      rename: "重命名",
+      clone: "克隆",
     },
     app: {
       title: "终末地轴",

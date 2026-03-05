@@ -533,7 +533,7 @@ export default function SolutionTabsArea() {
             }}
             className="flex w-full items-center px-3 py-2 text-left text-sm text-zinc-300 transition-colors hover:bg-zinc-900 hover:text-zinc-100"
           >
-            Rename
+            {t('common.rename')}
           </button>
           <button
             type="button"
@@ -541,7 +541,7 @@ export default function SolutionTabsArea() {
             onClick={() => handleCloneClick(contextMenu.tabId)}
             className="flex w-full items-center px-3 py-2 text-left text-sm text-zinc-300 transition-colors hover:bg-zinc-900 hover:text-zinc-100"
           >
-            Clone
+            {t('common.clone')}
           </button>
         </div>
       )}
