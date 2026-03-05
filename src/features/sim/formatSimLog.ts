@@ -1,3 +1,5 @@
+import operatorsData from "../../data/operators";
+import { tOperatorName } from "../../i18n/content";
 import type { SimEnv } from "../../types/simulator/simulator";
 import type { SimLogEntry, SimLogMessage } from "../../simulator/log";
 
@@ -20,6 +22,7 @@ function readNumber(v: unknown): number | undefined {
 }
 
 function resolveEntityDisplayName(
+  t: Translate,
   env: SimEnv,
   meta: Record<string, unknown>,
   idKey: string,
@@ -27,6 +30,9 @@ function resolveEntityDisplayName(
 ): string | undefined {
   const id = readString(meta[idKey]);
   if (!id) return undefined;
+  if (env.entitiesById[id]?.type === "operator") {
+    return tOperatorName(t, id, operatorsData[id]?.name ?? id);
+  }
   const nameFromMeta = readString(meta[nameKey]);
   if (nameFromMeta) return nameFromMeta;
   return env.entitiesById[id]?.name ?? id;
@@ -63,6 +69,7 @@ export function formatSimLog({
       }
 
       const sourceName = resolveEntityDisplayName(
+        t,
         env,
         meta,
         "sourceId",
@@ -74,6 +81,7 @@ export function formatSimLog({
       }
 
       const targetName = resolveEntityDisplayName(
+        t,
         env,
         meta,
         "targetId",

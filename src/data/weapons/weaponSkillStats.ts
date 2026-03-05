@@ -1,5 +1,5 @@
 import weaponsData from ".";
-import { RestBonusEntry, RestStatBonusBucket } from "../../types/operator";
+import type { RestBonusEntry, RestStatBonusBucket } from "../../types/operator";
 import { BaseWeaponSkillId, Size, WeaponId } from "./WeaponDef";
 
 // export type WeaponSkillRestBonus = {
@@ -114,99 +114,76 @@ export function getWeaponSkillRestBonus(
 ): RestBonusEntry | null {
   const r = clampRank(rank);
 
-  if (skill != "s3") {
+  const makeWeaponSkillEntry = (
+    bucket: RestStatBonusBucket,
+    addValue: number,
+    skillId: string,
+  ): RestBonusEntry => ({
+    source: "weapon",
+    bucket,
+    addValue,
+    log: {
+      code: "weapon_skill_bonus",
+      meta: {
+        weaponId,
+        skill,
+        skillId,
+        rank: r,
+      },
+    },
+  });
+
+  if (skill !== "s3") {
     const skillDef = weaponsData[weaponId][skill];
     const s = (skillDef as { size: Size }).size;
     switch ((skillDef as { id: WeaponId }).id) {
       case "agilityboost": {
         const addValue = evalSkillBoostValues("agilityboost", s, r);
-        return {
-          source: "weapon",
-          bucket: "agility",
-          addValue,
-          log: `Weapon ${weaponId} ${skill} agilityboost (rank ${r})`,
-        };
+        return makeWeaponSkillEntry("agility", addValue, "agilityboost");
       }
       case "attackboost": {
         const addValue = evalSkillBoostValues("attackboost", s, r, true);
-        return {
-          source: "weapon",
-          bucket: "atkIncRatio",
-          addValue,
-          log: `Weapon ${weaponId} ${skill} attackboost (rank ${r})`,
-        };
+        return makeWeaponSkillEntry("atkIncRatio", addValue, "attackboost");
       }
       case "physicaldmgboost": {
         const addValue = evalSkillBoostValues("physicaldmgboost", s, r, true);
-        return {
-          source: "weapon",
-          bucket: "physicalDmgIncRatio",
+        return makeWeaponSkillEntry(
+          "physicalDmgIncRatio",
           addValue,
-          log: `Weapon ${weaponId} ${skill} physicaldmgboost (rank ${r})`,
-        };
+          "physicaldmgboost",
+        );
       }
       case "strengthboost": {
         const addValue = evalSkillBoostValues("strengthboost", s, r);
-        return {
-          source: "weapon",
-          bucket: "strength",
-          addValue,
-          log: `Weapon ${weaponId} ${skill} strengthboost (rank ${r})`,
-        };
+        return makeWeaponSkillEntry("strength", addValue, "strengthboost");
       }
       case "intellectboost": {
         const addValue = evalSkillBoostValues("intellectboost", s, r);
-        return {
-          source: "weapon",
-          bucket: "intellect",
-          addValue,
-          log: `Weapon ${weaponId} ${skill} intellectboost (rank ${r})`,
-        };
+        return makeWeaponSkillEntry("intellect", addValue, "intellectboost");
       }
       case "willboost": {
         const addValue = evalSkillBoostValues("willboost", s, r);
-        return {
-          source: "weapon",
-          bucket: "will",
-          addValue,
-          log: `Weapon ${weaponId} ${skill} willboost (rank ${r})`,
-        };
+        return makeWeaponSkillEntry("will", addValue, "willboost");
       }
       case "artsdmgboost": {
         const addValue = evalSkillBoostValues("artsdmgboost", s, r, true);
-        return {
-          source: "weapon",
-          bucket: "artsDmgIncRatio",
-          addValue,
-          log: `Weapon ${weaponId} ${skill} artsdmgboost (rank ${r})`,
-        };
+        return makeWeaponSkillEntry("artsDmgIncRatio", addValue, "artsdmgboost");
       }
       case "naturedmgboost": {
         const addValue = evalSkillBoostValues("naturedmgboost", s, r, true);
-        return {
-          source: "weapon",
-          bucket: "natureDmgIncRatio",
+        return makeWeaponSkillEntry(
+          "natureDmgIncRatio",
           addValue,
-          log: `Weapon ${weaponId} ${skill} naturedmgboost (rank ${r})`,
-        };
+          "naturedmgboost",
+        );
       }
       case "cryodmgboost": {
         const addValue = evalSkillBoostValues("cryodmgboost", s, r, true);
-        return {
-          source: "weapon",
-          bucket: "cryoDmgIncRatio",
-          addValue,
-          log: `Weapon ${weaponId} ${skill} cryodmgboost (rank ${r})`,
-        };
+        return makeWeaponSkillEntry("cryoDmgIncRatio", addValue, "cryodmgboost");
       }
       case "criticalrateboost": {
         const addValue = evalSkillBoostValues("criticalrateboost", s, r, true);
-        return {
-          source: "weapon",
-          bucket: "criticalRate",
-          addValue,
-          log: `Weapon ${weaponId} ${skill} criticalrateboost (rank ${r})`,
-        };
+        return makeWeaponSkillEntry("criticalRate", addValue, "criticalrateboost");
       }
       case "ultimategainefficiencyboost": {
         const addValue = evalSkillBoostValues(
@@ -215,12 +192,11 @@ export function getWeaponSkillRestBonus(
           r,
           true,
         );
-        return {
-          source: "weapon",
-          bucket: "ultimateGainEfficiency",
+        return makeWeaponSkillEntry(
+          "ultimateGainEfficiency",
           addValue,
-          log: `Weapon ${weaponId} ${skill} ultimategainefficiencyboost (rank ${r})`,
-        };
+          "ultimategainefficiencyboost",
+        );
       }
       default:
         console.warn(
@@ -236,9 +212,15 @@ export function getWeaponSkillRestBonus(
       source: "weapon",
       bucket,
       addValue,
-      log:
-        `Weapon ${weaponId} s3 ${String((skillDef as any).id ?? "")}`.trim() +
-        ` (rank ${r})`,
+      log: {
+        code: "weapon_s3_bonus",
+        meta: {
+          weaponId,
+          skill: "s3",
+          skillId: String((skillDef as any).id ?? "") || undefined,
+          rank: r,
+        },
+      },
     };
   }
 }

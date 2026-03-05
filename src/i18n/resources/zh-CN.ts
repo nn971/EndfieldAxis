@@ -177,6 +177,20 @@ export const zhCN = {
       operator: "角色",
       clickAvatarToChange: "点击头像更换",
     },
+    restLog: {
+      operator_base_atk_level: "{{operatorName}} 基础攻击（等级 {{level}}）",
+      operator_attribute_level:
+        "{{operatorName}} 基础 {{attribute}}（等级 {{level}}）",
+      trust_attribute_bonus: "信赖等级 {{rank}}（+{{addValue}} {{attribute}}）",
+      potential_attribute_bonus: "潜能等级 {{rank}}（+{{addValue}} {{attribute}}）",
+      weapon_base_atk_level: "{{weaponName}} 基础攻击（等级 {{level}}）",
+      weapon_skill_bonus:
+        "{{weaponName}} {{skill}} {{skillId}}（等级 {{rank}}）",
+      weapon_s3_bonus: "{{weaponName}} s3 {{skillId}}（等级 {{rank}}）",
+      gear_slot_bonus:
+        "{{gearName}} {{slotKey}} {{bonusKey}}（等级 {{rank}}）",
+      gear_set_bonus: "{{gearSetName}} {{pieceCount}} 件套效果",
+    },
     sim: {
       heading: "模拟器",
       consoleStyleLog: "控制台风格模拟日志",

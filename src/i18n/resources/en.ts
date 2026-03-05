@@ -250,6 +250,22 @@ export const en = {
         will: 'will',
       },
     },
+    restLog: {
+      operator_base_atk_level: '{{operatorName}} base ATK (lv {{level}})',
+      operator_attribute_level:
+        '{{operatorName}} base {{attribute}} (lv {{level}})',
+      trust_attribute_bonus:
+        'Trust rank {{rank}} (+{{addValue}} {{attribute}})',
+      potential_attribute_bonus:
+        'Potential rank {{rank}} (+{{addValue}} {{attribute}})',
+      weapon_base_atk_level: '{{weaponName}} base ATK (lv {{level}})',
+      weapon_skill_bonus:
+        '{{weaponName}} {{skill}} {{skillId}} (rank {{rank}})',
+      weapon_s3_bonus: '{{weaponName}} s3 {{skillId}} (rank {{rank}})',
+      gear_slot_bonus:
+        '{{gearName}} {{slotKey}} {{bonusKey}} (rank {{rank}})',
+      gear_set_bonus: '{{gearSetName}} {{pieceCount}}-piece bonus',
+    },
     sim: {
       heading: 'Simulator',
       consoleStyleLog: 'Console-style simulation log',

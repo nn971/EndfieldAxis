@@ -147,7 +147,13 @@ export function computeRestStat(build: OperatorBuild): RestStatSnapshot {
     source: "level",
     bucket: "baseAtk",
     addValue: snapshot.operatorAttack,
-    log: `Operator ${build.id} base ATK (lv ${clampLevel(build.level)})`,
+    log: {
+      code: "operator_base_atk_level",
+      meta: {
+        operatorId: build.id,
+        level: clampLevel(build.level),
+      },
+    },
   });
 
   for (const attr of Object.keys(
@@ -164,7 +170,14 @@ export function computeRestStat(build: OperatorBuild): RestStatSnapshot {
         source: "level",
         bucket: attr,
         addValue: v,
-        log: `Operator ${build.id} base ${attr} (lv ${clampLevel(build.level)})`,
+        log: {
+          code: "operator_attribute_level",
+          meta: {
+            operatorId: build.id,
+            attribute: attr,
+            level: clampLevel(build.level),
+          },
+        },
       });
     }
   }
@@ -184,7 +197,14 @@ export function computeRestStat(build: OperatorBuild): RestStatSnapshot {
       source: "trust",
       bucket: opDef.attributes.main,
       addValue: trustBonus,
-      log: `Trust rank ${build.trustRank} (+${trustBonus} ${opDef.attributes.main})`,
+      log: {
+        code: "trust_attribute_bonus",
+        meta: {
+          operatorId: build.id,
+          attribute: opDef.attributes.main,
+          rank: build.trustRank,
+        },
+      },
     });
   }
 
@@ -203,7 +223,14 @@ export function computeRestStat(build: OperatorBuild): RestStatSnapshot {
       source: "potential",
       bucket: attr,
       addValue,
-      log: `Potential rank ${build.potentialRank} (+${addValue} ${attr})`,
+      log: {
+        code: "potential_attribute_bonus",
+        meta: {
+          operatorId: build.id,
+          attribute: attr,
+          rank: build.potentialRank,
+        },
+      },
     });
   }
 
@@ -223,7 +250,13 @@ export function computeRestStat(build: OperatorBuild): RestStatSnapshot {
         source: "weapon",
         bucket: "baseAtk",
         addValue: snapshot.weaponAttack,
-        log: `Weapon ${build.weapon.id} base ATK (lv ${clampLevel(build.weapon.level)})`,
+        log: {
+          code: "weapon_base_atk_level",
+          meta: {
+            weaponId: build.weapon.id,
+            level: clampLevel(build.weapon.level),
+          },
+        },
       });
 
       for (const k of ["s1", "s2", "s3"] as const) {
@@ -260,7 +293,14 @@ export function computeRestStat(build: OperatorBuild): RestStatSnapshot {
         source: "gear" as const,
         bucket: b.bucket,
         addValue: b.addValue,
-        log: b.log,
+        log: {
+          code: "gear_set_bonus" as const,
+          meta: {
+            gearSetId: set.id,
+            pieceCount: pieces,
+            bucket: b.bucket,
+          },
+        },
       })),
     );
   }

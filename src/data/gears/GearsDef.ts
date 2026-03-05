@@ -1,5 +1,5 @@
 import { SimRegistry } from "../../simulator/listeners/registry";
-import { RestBonusEntry, RestStatBonusBucket } from "../../types/operator";
+import type { RestBonusEntry, RestStatBonusBucket } from "../../types/operator";
 // import { OperatorAttributeType } from "../operators/OperatorDef";
 
 export type GearsId = string;
@@ -109,7 +109,15 @@ export class GearsDef {
         source: "gear" as const,
         bucket: b.bucket,
         addValue: b.addValue,
-        log: `${this.name}${slotKey ? ` (${slotKey})` : ""} ${b.key} (rank ${b.rank})`,
+        log: {
+          code: "gear_slot_bonus",
+          meta: {
+            gearId: this.id,
+            slotKey,
+            bonusKey: b.key,
+            rank: b.rank,
+          },
+        },
       }));
   }
 }

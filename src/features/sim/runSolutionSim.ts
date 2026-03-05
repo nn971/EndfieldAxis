@@ -371,7 +371,7 @@ export function runSolutionSim(
   const entities: SimEntity[] = [
     ...Array.from(allOperatorIds).map(operatorId => ({
       id: operatorId,
-      name: operatorsData[operatorId]?.name ?? operatorId,
+      name: operatorId,
       type: "operator" as const,
       hp: 999999,
       inflictions: getEmptyInfliction(),

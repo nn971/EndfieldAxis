@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import operatorsData from "../../data/operators";
 import { getAvatarUrl } from "../../shared/imgRegistry/imgRegistry";
 import { tOperatorName } from "../../i18n/content";
+import { formatRestBonusLog } from "./formatRestBonusLog";
 // import PreviewSlider from "../../shared/components/PreviewSlider";
 import type { OperatorBuild } from "../../types/operator";
 // import type { OperatorDef } from "../../data/operators/OperatorDef";
@@ -10,7 +11,7 @@ import { OperatorBuildTab, WeaponTab, GearsTab } from "./Tabs";
 import { OperatorId } from "../../data/operators/OperatorDef";
 
 function RestStatPreview({ build }: { build: OperatorBuild }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
   const rest = build.restStat;
   if (!rest) return null;
@@ -29,6 +30,7 @@ function RestStatPreview({ build }: { build: OperatorBuild }) {
       <div className="flex items-center justify-between">
         <div className="text-sm font-semibold">{t("operator.buildPreview")}</div>
         <button
+          data-testid="rest-stat-toggle"
           type="button"
           className="text-[11px] px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700"
           onClick={() => setOpen(v => !v)}
@@ -99,11 +101,17 @@ function RestStatPreview({ build }: { build: OperatorBuild }) {
             <div className="mt-1 max-h-56 overflow-auto rounded border border-zinc-800 bg-zinc-950 p-2">
               {rest.log?.length ? (
                 <div className="space-y-1">
-                  {rest.log.map(e => (
-                    <div
-                      key={`${e.source}:${e.bucket}:${e.log}`}
-                      className="text-[11px] leading-4 text-zinc-300"
-                    >
+                  {rest.log.map(e => {
+                    const logKey =
+                      typeof e.log === "string"
+                        ? e.log
+                        : `${e.log.code}:${JSON.stringify(e.log.meta ?? {})}`;
+
+                    return (
+                      <div
+                        key={`${e.source}:${e.bucket}:${logKey}`}
+                        className="text-[11px] leading-4 text-zinc-300"
+                      >
                       <span className="text-zinc-500">[{e.source}]</span>{" "}
                       <span className="text-zinc-400">{e.bucket}</span>{" "}
                       {e.addValue != null ? (
@@ -119,10 +127,19 @@ function RestStatPreview({ build }: { build: OperatorBuild }) {
                         )
                       ) : null}
                       {e.log ? (
-                        <span className="text-zinc-500"> — {e.log}</span>
+                        <span className="text-zinc-500">
+                          {" "}
+                          —{" "}
+                          {formatRestBonusLog({
+                            t,
+                            language: i18n.language,
+                            entry: e,
+                          })}
+                        </span>
                       ) : null}
-                    </div>
-                  ))}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-[11px] text-zinc-500">{t("operator.noEntries")}</div>
@@ -366,6 +383,7 @@ export default function OperatorEditor({
 
       <button
         type="button"
+        data-testid="operator-change-button"
         className="mt-4 w-full rounded border border-zinc-700 hover:border-zinc-500 p-3 flex items-center gap-3"
         onClick={() => setIsPicking(true)}
         title={t("operator.clickToChangeOperator")}

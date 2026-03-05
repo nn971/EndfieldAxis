@@ -42,6 +42,36 @@ export type RestStatBonusBucket =
   | "ultimateDmgIncRatio"
   | "criticalRate";
 
+export type RestLogCode =
+  | "operator_base_atk_level"
+  | "operator_attribute_level"
+  | "trust_attribute_bonus"
+  | "potential_attribute_bonus"
+  | "weapon_base_atk_level"
+  | "weapon_skill_bonus"
+  | "weapon_s3_bonus"
+  | "gear_slot_bonus"
+  | "gear_set_bonus";
+
+export type RestLogMessage = {
+  code: RestLogCode;
+  meta?: {
+    operatorId?: OperatorId;
+    weaponId?: WeaponId;
+    gearId?: GearsId;
+    gearSetId?: string;
+    attribute?: OperatorAttributeType;
+    bucket?: RestStatBonusBucket;
+    skill?: "s1" | "s2" | "s3";
+    skillId?: string;
+    level?: number;
+    rank?: number;
+    slotKey?: string;
+    bonusKey?: "s1" | "s2" | "s3";
+    pieceCount?: number;
+  };
+};
+
 /**
  * A single atom of build-static rest-stat bonus.
  *
@@ -60,7 +90,7 @@ export type RestBonusEntry = {
   bucket: RestStatBonusBucket;
   addValue: number;
   // addRatio: number;
-  log: string;
+  log: string | RestLogMessage;
 };
 
 export type RestStatSnapshot = {
