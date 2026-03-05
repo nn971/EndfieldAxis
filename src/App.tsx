@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AxisEditor from "./features/axis/AxisEditor";
 import OperatorEditor from "./features/operator/OperatorEditor";
 import SimPanel from "./features/sim/SimPanel";
@@ -13,16 +13,16 @@ import {
   skillBoxDeleted,
 } from "./features/solution/solutionSlice";
 import {
+  selectActiveSolutionId,
   selectBuildByOperatorId,
   selectControlledOperatorId,
   selectSimRenderCache,
   selectSkillBoxes,
   selectTeamOperatorIds,
 } from "./features/solution/selectors";
-import SolutionSLPanel from "./features/solution/SolutionSLPanel";
 import TestPanel from "./features/dev/testPanel";
 import DamageStatisticPanel from "./features/sim/DamageStatisticPanel";
-import LanguageSwitcher from "./shared/components/LanguageSwitcher";
+import TopBar from "./shared/components/TopBar";
 
 function remapSelectedLane(
   selectedLane: number | null,
@@ -41,6 +41,7 @@ function remapSelectedLane(
 export default function App() {
   const dispatch = useAppDispatch();
 
+  const activeSolutionId = useAppSelector(selectActiveSolutionId);
   const teamOperatorIds = useAppSelector(selectTeamOperatorIds);
   const controlledOperatorId = useAppSelector(selectControlledOperatorId);
   const skillBoxes = useAppSelector(selectSkillBoxes);
@@ -49,6 +50,11 @@ export default function App() {
 
   const [selectedLane, setSelectedLane] = useState<number | null>(null);
 
+  useEffect(() => {
+    void activeSolutionId;
+    setSelectedLane(null);
+  }, [activeSolutionId]);
+
   const operatorId =
     selectedLane == null ? null : (teamOperatorIds[selectedLane] ?? null);
   const operatorBuild = operatorId ? buildByOperatorId[operatorId] : null;
@@ -56,13 +62,12 @@ export default function App() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <div className="mx-auto max-w-7xl p-4">
-        <div className="mb-3 flex justify-end">
-          <LanguageSwitcher />
-        </div>
+        <TopBar />
 
         <div className="flex flex-col gap-4 lg:flex-row">
           <div className="w-full lg:w-[300px] lg:shrink-0">
             <OperatorEditor
+              key={activeSolutionId}
               laneIndex={selectedLane}
               operatorId={operatorId}
               operatorBuild={operatorBuild}
@@ -83,6 +88,7 @@ export default function App() {
 
           <div className="min-w-0 flex-1">
             <AxisEditor
+              key={activeSolutionId}
               teamOperatorIds={teamOperatorIds}
               controlledOperatorId={controlledOperatorId}
               skillBoxes={skillBoxes}
@@ -100,7 +106,6 @@ export default function App() {
             />
 
             <SimPanel />
-            <SolutionSLPanel />
             <TestPanel />
           </div>
 

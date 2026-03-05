@@ -3,6 +3,15 @@ export const en = {
     app: {
       title: 'EndfieldAxis',
     },
+    common: {
+      close: 'Close',
+      new: 'New',
+      replace: 'Replace',
+      newTab: 'New Tab',
+    },
+    workspace: {
+      defaultTabName: 'Tab {{index}}',
+    },
     axis: {
       title: 'Axis Editor',
       placeholder: 'This is a placeholder for the Axis Editor component.',

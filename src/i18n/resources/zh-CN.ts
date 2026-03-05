@@ -3,6 +3,15 @@ export const zhCN = {
     app: {
       title: "终末地轴",
     },
+    common: {
+      close: "关闭",
+      new: "新建",
+      replace: "替换",
+      newTab: "新建标签页",
+    },
+    workspace: {
+      defaultTabName: "标签页 {{index}}",
+    },
     axis: {
       title: "轴编辑器",
       placeholder: "这是 Axis 编辑器组件的占位内容。",
