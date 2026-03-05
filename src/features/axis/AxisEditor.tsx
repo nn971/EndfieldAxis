@@ -11,6 +11,8 @@ import operatorsData from "../../data/operators";
 import { tOperatorName } from "../../i18n/content";
 import { moveItem } from "../../shared/lib/utils";
 import placeholderImg from "../../assets/default/placeholder.jpg";
+import { buildFreezeTimeline } from "../../shared/simTime/freezeTimeline";
+import { getCastStartFreezeFrames } from "../../shared/simTime/freezeConfig";
 
 type SeriesPoint = { frame: number; value: number };
 
@@ -207,22 +209,28 @@ export default function AxisEditor({
       addSkillDrag.laneIndex != null &&
       addSkillDrag.startFrame != null
     ) {
-      // respect lane reorder preview if it is active
-      const effectiveTeamOperatorIds = laneDragState
-        ? moveItem(
-            laneDragState.originIds,
-            laneDragState.from,
-            laneDragState.to,
-          )
-        : teamOperatorIds;
+      const isIllegal = isIllegalPlacement(
+        addSkillDrag.startFrame,
+        addSkillDrag.skillType,
+      );
 
-      const operatorId = effectiveTeamOperatorIds[addSkillDrag.laneIndex];
-      if (operatorId) {
-        onAddSkillBox?.({
-          operatorId,
-          skillType: addSkillDrag.skillType,
-          startFrame: addSkillDrag.startFrame,
-        });
+      if (!isIllegal) {
+        const effectiveTeamOperatorIds = laneDragState
+          ? moveItem(
+              laneDragState.originIds,
+              laneDragState.from,
+              laneDragState.to,
+            )
+          : teamOperatorIds;
+
+        const operatorId = effectiveTeamOperatorIds[addSkillDrag.laneIndex];
+        if (operatorId) {
+          onAddSkillBox?.({
+            operatorId,
+            skillType: addSkillDrag.skillType,
+            startFrame: addSkillDrag.startFrame,
+          });
+        }
       }
     }
 
@@ -314,9 +322,18 @@ export default function AxisEditor({
     e.preventDefault();
     e.currentTarget.releasePointerCapture(skillBoxDragState.pointerId);
 
-    onCommitSkillBoxPatch?.(skillBoxDragState.id, {
-      startFrame: skillBoxDragState.previewStartFrame,
-    });
+    const draggedBox = skillBoxes.find(b => b.id === skillBoxDragState.id);
+    if (draggedBox) {
+      const isIllegal = isIllegalPlacement(
+        skillBoxDragState.previewStartFrame,
+        draggedBox.skillType,
+      );
+      if (!isIllegal) {
+        onCommitSkillBoxPatch?.(skillBoxDragState.id, {
+          startFrame: skillBoxDragState.previewStartFrame,
+        });
+      }
+    }
 
     setSkillBoxDragState(null);
   }
@@ -429,6 +446,40 @@ export default function AxisEditor({
   const toLaneIndex = (targetId: string): number =>
     laneIndexByOwnerId.get(targetId) ?? ENEMY_LANE_INDEX;
 
+  const freezeTimeline = useMemo(() => {
+    return buildFreezeTimeline(skillBoxes, getCastStartFreezeFrames);
+  }, [skillBoxes]);
+
+  const { freezeWindows, illegalCastStartIds, realToGame, gameToRealAtOrAfter } =
+    freezeTimeline;
+
+  const computeBoxWidth = (box: SkillBox): number => {
+    const startReal = box.startFrame;
+    const startGame = realToGame(startReal);
+    const endGame = startGame + box.durationFrames;
+    const endReal = gameToRealAtOrAfter(endGame, startReal);
+    return endReal - startReal;
+  };
+
+  const isIllegalPlacement = (
+    startFrame: number,
+    skillType: SkillType,
+  ): boolean => {
+    for (const window of freezeWindows) {
+      if (startFrame >= window.startReal && startFrame < window.endReal) {
+        if (window.kind === "ultimate") {
+          return true;
+        }
+        if (window.kind === "combo") {
+          if (skillType !== "comboSkill" && skillType !== "ultimate") {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  };
+
   const barRowById = useMemo(() => {
     const byLane: Record<number, number[]> = {};
     const rows = new Map<string, number>();
@@ -501,6 +552,7 @@ export default function AxisEditor({
           <button
             key={skillType}
             type="button"
+            data-testid={`axis-skilltab-${skillType}`}
             className="px-3 py-1 text-xs rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700
                  select-none touch-none cursor-grab active:cursor-grabbing"
             onPointerDown={e => onSkillTypePointerDown(e, skillType)}
@@ -614,6 +666,19 @@ export default function AxisEditor({
               </div>
             );
           })}
+
+          {freezeWindows.map(window => (
+            <div
+              key={`freeze-${window.castStartId}`}
+              data-testid="axis-freeze"
+              data-kind={window.kind}
+              className={`absolute top-0 h-full ${window.kind === "ultimate" ? "bg-rose-500/15" : "bg-sky-500/15"}`}
+              style={{
+                left: window.startReal,
+                width: window.endReal - window.startReal,
+              }}
+            />
+          ))}
 
           <div
             className="absolute border-y border-zinc-700/70 bg-zinc-800/40"
@@ -878,12 +943,12 @@ export default function AxisEditor({
               );
             })}
 
-            {/* adding skill box preview */}
             {addSkillDrag?.overAxis &&
               addSkillDrag.laneIndex != null &&
               addSkillDrag.startFrame != null && (
                 <div
-                  className="absolute border border-dashed border-zinc-300 bg-zinc-200/20 pointer-events-none"
+                  data-testid="axis-drop"
+                  className={`absolute border border-dashed pointer-events-none ${isIllegalPlacement(addSkillDrag.startFrame, addSkillDrag.skillType) ? "border-red-500 bg-red-500/20" : "border-zinc-300 bg-zinc-200/20"}`}
                   style={{
                     left: addSkillDrag.startFrame,
                     width: ghostDurationFrames,
@@ -908,14 +973,19 @@ export default function AxisEditor({
               const startFrame = isActive
                 ? skillBoxDragState!.previewStartFrame
                 : box.startFrame;
+              const width = computeBoxWidth({ ...box, startFrame });
+              const isIllegal = illegalCastStartIds.has(box.id);
 
               return (
                 <div
                   key={box.id}
-                  className="absolute bg-gray-500/75 border border-gray-300/80"
+                  data-testid="axis-skillbox"
+                  data-skill-type={box.skillType}
+                  data-operator-id={box.operatorId}
+                  className={`absolute bg-gray-500/75 border ${isIllegal ? "border-red-500" : "border-gray-300/80"}`}
                   style={{
                     left: startFrame,
-                    width: box.durationFrames,
+                    width,
                     height: SKILL_BOX_HEIGHT,
                     top:
                       laneIndex * LANE_HEIGHT +
