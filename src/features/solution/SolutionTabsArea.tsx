@@ -12,6 +12,8 @@ import {
   workspaceTabClose,
   workspaceTabOpened,
   solutionReplaced,
+  workspaceTabRename,
+  workspaceTabClone,
 } from "./solutionSlice";
 import {
   deserializeSolution,
@@ -26,6 +28,14 @@ type UploadMode = "replace" | "new";
 type TextModalState =
   | { open: false }
   | { open: true; errorMessage: string; prefillContent: string };
+
+type ContextMenuState =
+  | { open: false }
+  | { open: true; tabId: string; x: number; y: number };
+
+type InlineRenameState =
+  | { active: false }
+  | { active: true; tabId: string; value: string };
 
 function deriveNameFromFilename(filename: string): string | undefined {
   const base = filename.replace(/\.json$/i, "").trim();
@@ -48,9 +58,13 @@ export default function SolutionTabsArea() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [uploadMode, setUploadMode] = useState<UploadMode>("replace");
   const [textModal, setTextModal] = useState<TextModalState>({ open: false });
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>({ open: false });
+  const [inlineRename, setInlineRename] = useState<InlineRenameState>({ active: false });
   const menuRef = useRef<HTMLDivElement | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement | null>(null);
+  const inlineRenameInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -80,11 +94,94 @@ export default function SolutionTabsArea() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [menuOpen]);
 
+  useEffect(() => {
+    if (!contextMenu.open) return;
+    const onDocClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        contextMenuRef.current &&
+        !contextMenuRef.current.contains(target)
+      ) {
+        setContextMenu({ open: false });
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [contextMenu.open]);
+
+  useEffect(() => {
+    if (!contextMenu.open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setContextMenu({ open: false });
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [contextMenu.open]);
+
+  useEffect(() => {
+    if (inlineRename.active && inlineRenameInputRef.current) {
+      inlineRenameInputRef.current.focus();
+      inlineRenameInputRef.current.select();
+    }
+  }, [inlineRename]);
+
   const getDeserializeErrorMessage = useCallback(
     (error: DeserializeSolutionError) => {
       return translate(`solutionSL.errors.${error.code}`, error.meta);
     },
     [translate],
+  );
+
+  const handleTabContextMenu = useCallback(
+    (e: React.MouseEvent, tabId: string) => {
+      e.preventDefault();
+      setContextMenu({
+        open: true,
+        tabId,
+        x: e.clientX,
+        y: e.clientY,
+      });
+    },
+    [],
+  );
+
+  const handleRenameClick = useCallback((tabId: string, currentName: string) => {
+    setContextMenu({ open: false });
+    setInlineRename({ active: true, tabId, value: currentName });
+  }, []);
+
+  const handleCloneClick = useCallback(
+    (tabId: string) => {
+      setContextMenu({ open: false });
+      dispatch(workspaceTabClone({ id: tabId }));
+    },
+    [dispatch],
+  );
+
+  const submitInlineRename = useCallback(() => {
+    if (!inlineRename.active) return;
+    const trimmed = inlineRename.value.trim();
+    if (trimmed) {
+      dispatch(workspaceTabRename({ id: inlineRename.tabId, name: trimmed }));
+    }
+    setInlineRename({ active: false });
+  }, [inlineRename, dispatch]);
+
+  const cancelInlineRename = useCallback(() => {
+    setInlineRename({ active: false });
+  }, []);
+
+  const handleInlineRenameKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter") {
+        submitInlineRename();
+      } else if (e.key === "Escape") {
+        cancelInlineRename();
+      }
+    },
+    [submitInlineRename, cancelInlineRename],
   );
 
   const handleDownload = () => {
@@ -236,6 +333,8 @@ export default function SolutionTabsArea() {
             tab.name.trim() ||
             t("workspace.defaultTabName", { index: index + 1 });
 
+          const isRenaming = inlineRename.active && inlineRename.tabId === tab.id;
+
           return (
             <div
               key={tab.id}
@@ -246,18 +345,38 @@ export default function SolutionTabsArea() {
                   : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200",
               ].join(" ")}
             >
-              <button
-                type="button"
-                data-testid={`solution-tab-${tab.id}`}
-                title={displayName}
-                onClick={() => dispatch(workspaceTabSetActive({ id: tab.id }))}
-                className={[
-                  "flex flex-1 items-center truncate rounded-md px-2.5 py-1.5 text-left transition-colors",
-                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950",
-                ].join(" ")}
-              >
-                <span className="truncate">{displayName}</span>
-              </button>
+              {isRenaming ? (
+                <input
+                  ref={inlineRenameInputRef}
+                  type="text"
+                  value={inlineRename.value}
+                  onChange={(e) =>
+                    setInlineRename({
+                      active: true,
+                      tabId: tab.id,
+                      value: e.target.value,
+                    })
+                  }
+                  onKeyDown={handleInlineRenameKeyDown}
+                  onBlur={submitInlineRename}
+                  className="flex-1 rounded-md bg-zinc-700 px-2 py-1 text-zinc-100 outline-none ring-1 ring-zinc-500"
+                  data-testid={`solution-tab-rename-input-${tab.id}`}
+                />
+              ) : (
+                <button
+                  type="button"
+                  data-testid={`solution-tab-${tab.id}`}
+                  title={displayName}
+                  onClick={() => dispatch(workspaceTabSetActive({ id: tab.id }))}
+                  onContextMenu={(e) => handleTabContextMenu(e, tab.id)}
+                  className={[
+                    "flex flex-1 items-center truncate rounded-md px-2.5 py-1.5 text-left transition-colors",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-950",
+                  ].join(" ")}
+                >
+                  <span className="truncate">{displayName}</span>
+                </button>
+              )}
               {canClose && (
                 <button
                   type="button"
@@ -397,6 +516,35 @@ export default function SolutionTabsArea() {
           </div>
         )}
       </div>
+
+      {contextMenu.open && (
+        <div
+          ref={contextMenuRef}
+          data-testid="solution-tab-context-menu"
+          className="fixed z-50 min-w-[8rem] rounded-md border border-zinc-800 bg-zinc-950 py-1 shadow-lg"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            type="button"
+            data-testid="solution-tab-context-rename"
+            onClick={() => {
+              const entity = tabs.find((t) => t.id === contextMenu.tabId);
+              handleRenameClick(contextMenu.tabId, entity?.name ?? "");
+            }}
+            className="flex w-full items-center px-3 py-2 text-left text-sm text-zinc-300 transition-colors hover:bg-zinc-900 hover:text-zinc-100"
+          >
+            Rename
+          </button>
+          <button
+            type="button"
+            data-testid="solution-tab-context-clone"
+            onClick={() => handleCloneClick(contextMenu.tabId)}
+            className="flex w-full items-center px-3 py-2 text-left text-sm text-zinc-300 transition-colors hover:bg-zinc-900 hover:text-zinc-100"
+          >
+            Clone
+          </button>
+        </div>
+      )}
 
       {/* Hidden file input */}
       <input
