@@ -109,7 +109,7 @@ export function buildFreezeTimeline(
       if (activeWindow.kind === "ultimate") {
         illegalCastStartIds.add(castStart.id);
         const reasons = illegalCastStartReasonById.get(castStart.id) ?? [];
-        reasons.push("strict.inside_ultimate");
+        reasons.push("strict:ultimate-freeze");
         illegalCastStartReasonById.set(castStart.id, reasons);
         continue;
       }
@@ -119,14 +119,12 @@ export function buildFreezeTimeline(
       if (!canInterrupt) {
         illegalCastStartIds.add(castStart.id);
         const reasons = illegalCastStartReasonById.get(castStart.id) ?? [];
-        reasons.push("strict.inside_combo_non_interruptible");
+        reasons.push("strict:combo-freeze");
         illegalCastStartReasonById.set(castStart.id, reasons);
         continue;
       }
 
-      activeWindow.endReal = castStartReal;
-      activeFreezeWindow = null;
-      currentChainEndReal = castStartReal;
+
     }
 
     const kind = toFreezeWindowKind(castStart.skillType);
