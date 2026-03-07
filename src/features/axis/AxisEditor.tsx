@@ -519,7 +519,7 @@ export default function AxisEditor({
 
     for (const [operatorId, boxes] of boxesByOperator) {
       const build = buildByOperatorId?.[operatorId];
-      const cdrPercent = build?.cooldownReductionPercent ?? 0;
+      const cdrPercent = (build?.restStat?.comboCooldownReduction ?? 0) * 100;
       const cdrMultiplier = 1 - cdrPercent / 100;
       const opDef = operatorsData[operatorId];
       const cooldownByRank = opDef?.getComboCooldownSecondsByRank(
