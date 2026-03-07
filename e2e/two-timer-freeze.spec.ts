@@ -63,10 +63,6 @@ async function tryAddSkillBox(params: {
         getCastStartFreezeFrames,
       );
 
-      if (freezeTimeline.illegalCastStartIds.has(probeId)) {
-        return false;
-      }
-
       store.dispatch(
         skillBoxAdded({
           operatorId,
@@ -112,14 +108,21 @@ test.describe("freeze mechanics e2e", () => {
     await expect(ultimateBoxes).toHaveCount(initialUltimateCount + 1);
 
     const initialNormalAttackCount = await normalAttackBoxes.count();
-    const didAddNormalAttack = await tryAddSkillBox({
+    await tryAddSkillBox({
       page,
       skillType: "normalAttack",
       frame: 100,
       laneIndex: 0,
     });
-    expect(didAddNormalAttack).toBe(false);
-    await expect(normalAttackBoxes).toHaveCount(initialNormalAttackCount);
+    // Box is added but marked as strict invalid
+    await expect(normalAttackBoxes).toHaveCount(initialNormalAttackCount + 1);
+    const invalidNormalAttack = normalAttackBoxes.locator('[data-invalid-kind="strict"]').first();
+    await expect(invalidNormalAttack).toBeVisible();
+
+    // Run simulation and verify the invalid cast is dismissed (no ACT log)
+    await page.getByTestId("sim-run").click();
+    const simLogText = (await page.getByTestId("sim-log").textContent()) ?? "";
+    expect(simLogText).not.toMatch(/\n\s*100\s+\[ACT\].*normalAttack/i);
 
     const freezeWindows = await readFreezeWindows(page);
     const ultimateWindow = freezeWindows.find(window => window.kind === "ultimate");
@@ -152,14 +155,15 @@ test.describe("freeze mechanics e2e", () => {
     await expect(ultimateBoxes).toHaveCount(initialUltimateCount + 1);
 
     const initialNormalSkillCount = await normalSkillBoxes.count();
-    const didAddNormalSkill = await tryAddSkillBox({
+    await tryAddSkillBox({
       page,
       skillType: "normalSkill",
       frame: 160,
       laneIndex: 0,
     });
-    expect(didAddNormalSkill).toBe(false);
-    await expect(normalSkillBoxes).toHaveCount(initialNormalSkillCount);
+    await expect(normalSkillBoxes).toHaveCount(initialNormalSkillCount + 1);
+    const invalidNormalSkill = normalSkillBoxes.locator('[data-invalid-kind="strict"]').first();
+    await expect(invalidNormalSkill).toBeVisible();
 
     const freezeWindows = await readFreezeWindows(page);
     expect(freezeWindows).toEqual([
@@ -242,5 +246,23 @@ test.describe("freeze mechanics e2e", () => {
     });
 
     expect(extendedBars.length).toBeGreaterThan(0);
+  });
+
+  test("soft invalid shows after running simulation", async ({ page }) => {
+    await page.goto("/");
+    await setEnglish(page);
+
+    const ultimateBoxes = page.locator('[data-testid="axis-skillbox"][data-skill-type="ultimate"]');
+
+    await tryAddSkillBox({ page, skillType: "ultimate", frame: 0, laneIndex: 0 });
+    await expect(ultimateBoxes).toHaveCount(1);
+
+    await page.getByTestId("sim-run").click();
+
+    const invalidUltimate = ultimateBoxes.locator('[data-invalid-kind="soft"]').first();
+    await expect(invalidUltimate).toBeVisible();
+
+    const reasons = await invalidUltimate.getAttribute("data-invalid-reasons");
+    expect(reasons).toContain("soft:insufficient-ultimate-energy");
   });
 });
