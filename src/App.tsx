@@ -91,6 +91,7 @@ export default function App() {
               teamOperatorIds={teamOperatorIds}
               controlledOperatorId={controlledOperatorId}
               skillBoxes={skillBoxes}
+              buildByOperatorId={buildByOperatorId}
               simRenderCache={simRenderCache}
               onLaneLabelClick={laneIndex => setSelectedLane(laneIndex)}
               onCommitLaneReorder={(from, to) => {

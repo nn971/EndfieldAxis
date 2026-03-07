@@ -510,6 +510,12 @@ export function resolveCastStart(
   self: SimWorld,
   ev: Extract<SimEvent, { type: "castStart" }>,
 ) {
+  const appendSoftInvalidReason = (reason: string) => {
+    ev.softInvalidReasons ??= [];
+    if (!ev.softInvalidReasons.includes(reason)) {
+      ev.softInvalidReasons.push(reason);
+    }
+  };
   const source = ev.sourceId
     ? (self.read.getEntity(ev.sourceId) as SimEntity)
     : null;
@@ -538,6 +544,7 @@ export function resolveCastStart(
       fakeSpent: spendRes.fakeSpent,
     });
     if (!spendRes.isLegal) {
+      appendSoftInvalidReason("soft:insufficient-team-sp");
       self.ops.log(
         "act",
         logMsg.actCastInsufficientSp({
@@ -553,6 +560,7 @@ export function resolveCastStart(
   if (ev.skillType === "ultimate") {
     const spendRes = self.spendUltimateEnergy(ev.sourceId);
     if (!spendRes.isLegal) {
+      appendSoftInvalidReason("soft:insufficient-ultimate-energy");
       self.ops.log(
         "act",
         logMsg.actCastInsufficientUltimate({
@@ -575,6 +583,7 @@ export function resolveCastStart(
     }
 
     if (combo.cooldown > 0) {
+      appendSoftInvalidReason("soft:combo-cooldown");
       const reason = `combo cooldown active (${combo.cooldown}f remaining)`;
       self.ops.log(
         "act",
@@ -586,9 +595,8 @@ export function resolveCastStart(
         }),
       );
       console.warn(
-        `Rejected comboSkill castStart sourceId=${ev.sourceId}: ${reason}`,
+        `Soft-invalid comboSkill castStart sourceId=${ev.sourceId}: ${reason}`,
       );
-      return;
     }
 
     const build = self.read.getBuild(ev.sourceId);

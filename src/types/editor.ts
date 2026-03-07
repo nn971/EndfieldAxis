@@ -46,6 +46,13 @@ export interface SimRenderCache {
   ultimateEnergySeriesByOperatorId: Record<string, SimRenderSeriesPoint[]>;
   ultimateEnergyMaxByOperatorId: Record<string, number>;
   simEndFrame: number;
+  invalidSkillBoxById: Record<
+    string,
+    {
+      kind: "strict" | "soft";
+      reasons: string[];
+    }
+  >;
 }
 
 export function makeEmptySimRenderCache(): SimRenderCache {
@@ -61,6 +68,7 @@ export function makeEmptySimRenderCache(): SimRenderCache {
     ultimateEnergySeriesByOperatorId: {},
     ultimateEnergyMaxByOperatorId: {},
     simEndFrame: 0,
+    invalidSkillBoxById: {},
   };
 }
 

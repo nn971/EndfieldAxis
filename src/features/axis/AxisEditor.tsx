@@ -63,8 +63,11 @@ type Props = {
   teamOperatorIds: string[];
   controlledOperatorId: string;
   skillBoxes: SkillBox[];
+  buildByOperatorId: Record<
+    string,
+    import("../../types/operator").OperatorBuild
+  >;
   simRenderCache: SimRenderCache;
-  buildByOperatorId?: Record<string, { potentialRank?: number; cooldownReductionPercent?: number }>;
   onLaneLabelClick?: (laneIndex: number) => void;
   onCommitLaneReorder?: (from: number, to: number) => void;
   onCommitSkillBoxPatch?: (
@@ -86,8 +89,8 @@ export default function AxisEditor({
   teamOperatorIds,
   controlledOperatorId,
   skillBoxes,
-  simRenderCache,
   buildByOperatorId,
+  simRenderCache,
   onLaneLabelClick,
   onCommitLaneReorder,
   onCommitSkillBoxPatch,
@@ -432,10 +435,11 @@ export default function AxisEditor({
   const toLaneIndex = (targetId: string): number =>
     laneIndexByOwnerId.get(targetId) ?? ENEMY_LANE_INDEX;
 
-  const previewSkillBoxes = useMemo<SkillBox[]>(() => {
+  const previewSkillBoxes = useMemo(() => {
     let boxes = [...skillBoxes];
 
-    if (skillBoxDragState) {
+    // If dragging a box, update its position in the preview
+    if (skillBoxDragState?.id) {
       boxes = boxes.map(box =>
         box.id === skillBoxDragState.id
           ? { ...box, startFrame: skillBoxDragState.previewStartFrame }
@@ -443,24 +447,32 @@ export default function AxisEditor({
       );
     }
 
+    // If add-skill ghost is active, append ghost box
     if (
       addSkillDrag?.overAxis &&
-      addSkillDrag.laneIndex != null &&
-      addSkillDrag.startFrame != null &&
-      ghostOperatorId != null
+      addSkillDrag.laneIndex !== null &&
+      addSkillDrag.startFrame !== null
     ) {
-      const ghostBox: SkillBox = {
-        id: "sb_ghost_preview",
-        operatorId: ghostOperatorId,
-        skillType: addSkillDrag.skillType,
-        startFrame: addSkillDrag.startFrame,
-        durationFrames: ghostDurationFrames,
-      };
-      boxes = [...boxes, ghostBox];
+      const operatorId = effectiveTeamOperatorIds[addSkillDrag.laneIndex];
+      if (operatorId) {
+        boxes.push({
+          id: "sb_ghost_preview",
+          operatorId,
+          skillType: addSkillDrag.skillType,
+          startFrame: addSkillDrag.startFrame,
+          durationFrames: ghostDurationFrames,
+        });
+      }
     }
 
     return boxes;
-  }, [skillBoxes, skillBoxDragState, addSkillDrag, ghostOperatorId, ghostDurationFrames]);
+  }, [
+    skillBoxes,
+    skillBoxDragState,
+    addSkillDrag,
+    effectiveTeamOperatorIds,
+    ghostDurationFrames,
+  ]);
 
   const freezeTimeline = useMemo(() => {
     return buildFreezeTimeline(previewSkillBoxes, getCastStartFreezeFrames);
@@ -510,7 +522,9 @@ export default function AxisEditor({
       const cdrPercent = build?.cooldownReductionPercent ?? 0;
       const cdrMultiplier = 1 - cdrPercent / 100;
       const opDef = operatorsData[operatorId];
-      const cooldownByRank = opDef?.getComboCooldownSecondsByRank(build?.potentialRank);
+      const cooldownByRank = opDef?.getComboCooldownSecondsByRank(
+        build?.potentialRank,
+      );
 
       const comboBoxes = boxes.filter(b => b.skillType === "comboSkill");
 
@@ -522,9 +536,16 @@ export default function AxisEditor({
         if (cooldownByRank && cooldownByRank.length > 0) {
           const rawRank = Number(build?.potentialRank ?? 0);
           const rank = Number.isFinite(rawRank) ? Math.floor(rawRank) : 0;
-          const clampedRank = Math.min(cooldownByRank.length - 1, Math.max(0, rank));
-          const baseSeconds = Number(cooldownByRank[clampedRank] ?? cooldownByRank[0] ?? 0);
-          const safeBaseSeconds = Number.isFinite(baseSeconds) ? Math.max(0, baseSeconds) : 0;
+          const clampedRank = Math.min(
+            cooldownByRank.length - 1,
+            Math.max(0, rank),
+          );
+          const baseSeconds = Number(
+            cooldownByRank[clampedRank] ?? cooldownByRank[0] ?? 0,
+          );
+          const safeBaseSeconds = Number.isFinite(baseSeconds)
+            ? Math.max(0, baseSeconds)
+            : 0;
           const effectiveSeconds = safeBaseSeconds * cdrMultiplier;
           cooldownFrames = Math.max(0, Math.round(effectiveSeconds * 60));
         }
@@ -563,7 +584,11 @@ export default function AxisEditor({
     }
 
     return infoById;
-  }, [previewSkillBoxes, illegalCastStartReasonById, softInvalidReasonsByBoxId]);
+  }, [
+    previewSkillBoxes,
+    illegalCastStartReasonById,
+    softInvalidReasonsByBoxId,
+  ]);
 
   const computeBoxWidth = (box: SkillBox): number => {
     const startReal = box.startFrame;
@@ -1064,7 +1089,8 @@ export default function AxisEditor({
                     left: addSkillDrag.startFrame,
                     width: computeBoxWidth({
                       id: "sb_ghost_preview",
-                      operatorId: ghostOperatorId,
+                      operatorId:
+                        effectiveTeamOperatorIds[addSkillDrag.laneIndex]!,
                       skillType: addSkillDrag.skillType,
                       startFrame: addSkillDrag.startFrame,
                       durationFrames: ghostDurationFrames,
@@ -1091,10 +1117,10 @@ export default function AxisEditor({
                 ? skillBoxDragState!.previewStartFrame
                 : box.startFrame;
               const width = computeBoxWidth({ ...box, startFrame });
-              const invalidInfo = invalidInfoByBoxId.get(box.id) ?? { kind: "none", reasons: [] };
-              const isInvalid = invalidInfo.kind !== "none";
-
-              const titleText = invalidInfo.reasons.join("\n");
+              const isIllegal = illegalCastStartIds.has(box.id);
+              const invalidReasons =
+                illegalCastStartReasonById.get(box.id) ?? [];
+              const titleText = invalidReasons.join("\n");
 
               return (
                 <div
@@ -1102,10 +1128,10 @@ export default function AxisEditor({
                   data-testid="axis-skillbox"
                   data-skill-type={box.skillType}
                   data-operator-id={box.operatorId}
-                  data-invalid-kind={invalidInfo.kind}
-                  data-invalid-reasons={invalidInfo.reasons.join(",")}
+                  data-invalid-kind={isIllegal ? "strict" : "none"}
+                  data-invalid-reasons={invalidReasons.join(",")}
                   title={titleText || undefined}
-                  className={`absolute border ${isInvalid ? "bg-red-500/40 border-red-500" : "bg-gray-500/75 border-gray-300/80"}`}
+                  className={`absolute border ${isIllegal ? "bg-red-500/40 border-red-500" : "bg-gray-500/75 border-gray-300/80"}`}
                   style={{
                     left: startFrame,
                     width,
