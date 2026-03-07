@@ -55,6 +55,8 @@ export type SimEvent =
         isLegal: boolean;
         reason?: string;
       };
+      skillBoxId?: string;
+      softInvalidReasons?: string[];
     })
   | (SimEventBase & {
       type: "castScriptStart";
