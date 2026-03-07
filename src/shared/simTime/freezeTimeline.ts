@@ -19,11 +19,21 @@ export type FreezeFrameResolver = (
 
 export type FreezeTimeline = {
   freezeWindows: FreezeWindow[];
+  frozenWindows: { startReal: number; endReal: number }[];
   illegalCastStartIds: Set<string>;
+  illegalCastStartReasonById: Map<string, string[]>;
   scriptStartRealByCastStartId: Map<string, number>;
   realToGame: (real: number) => number;
   gameToRealAtOrAfter: (game: number, minReal: number) => number;
 };
+
+type FrozenInterval = {
+  startReal: number;
+  endReal: number;
+};
+
+const STRICT_ULTIMATE_FREEZE_REASON = "strict:ultimate-freeze";
+const STRICT_COMBO_FREEZE_REASON = "strict:combo-freeze";
 
 function toFreezeWindowKind(skillType: SkillType): FreezeWindowKind | null {
   if (skillType === "comboSkill") return "combo";
@@ -44,11 +54,11 @@ function compareCastStart(a: SkillBox, b: SkillBox): number {
 }
 
 function buildFrozenPrefixResolver(
-  freezeWindows: FreezeWindow[],
+  frozenWindows: FrozenInterval[],
 ): (real: number) => number {
   return real => {
     let frozen = 0;
-    for (const window of freezeWindows) {
+    for (const window of frozenWindows) {
       if (real <= window.startReal) break;
       const overlapEnd = Math.min(real, window.endReal);
       if (overlapEnd <= window.startReal) continue;
@@ -59,15 +69,130 @@ function buildFrozenPrefixResolver(
   };
 }
 
+function normalizeFrozenIntervals(intervals: FrozenInterval[]): FrozenInterval[] {
+  const sorted = intervals
+    .filter(interval => interval.endReal > interval.startReal)
+    .sort((a, b) => {
+      if (a.startReal !== b.startReal) return a.startReal - b.startReal;
+      return a.endReal - b.endReal;
+    });
+
+  if (sorted.length === 0) return [];
+
+  const out: FrozenInterval[] = [];
+  let current: FrozenInterval = { ...sorted[0] };
+
+  for (let i = 1; i < sorted.length; i += 1) {
+    const next = sorted[i];
+    if (next.startReal > current.endReal) {
+      out.push(current);
+      current = { ...next };
+      continue;
+    }
+    current.endReal = Math.max(current.endReal, next.endReal);
+  }
+
+  out.push(current);
+  return out;
+}
+
+function subtractFrozenIntervals(
+  minuend: FrozenInterval[],
+  subtrahend: FrozenInterval[],
+): FrozenInterval[] {
+  if (minuend.length === 0) return [];
+  if (subtrahend.length === 0) return minuend.map(interval => ({ ...interval }));
+
+  const out: FrozenInterval[] = [];
+  let j = 0;
+
+  for (const base of minuend) {
+    let cursor = base.startReal;
+
+    while (j < subtrahend.length && subtrahend[j].endReal <= cursor) {
+      j += 1;
+    }
+
+    let k = j;
+    while (k < subtrahend.length && subtrahend[k].startReal < base.endReal) {
+      const blocker = subtrahend[k];
+
+      if (blocker.startReal > cursor) {
+        out.push({
+          startReal: cursor,
+          endReal: Math.min(blocker.startReal, base.endReal),
+        });
+      }
+
+      cursor = Math.max(cursor, blocker.endReal);
+      if (cursor >= base.endReal) break;
+      k += 1;
+    }
+
+    if (cursor < base.endReal) {
+      out.push({ startReal: cursor, endReal: base.endReal });
+    }
+  }
+
+  return out;
+}
+
+function toOverlayWindows(params: {
+  comboRawIntervals: FrozenInterval[];
+  ultimateRawIntervals: FrozenInterval[];
+}): FreezeWindow[] {
+  const comboUnion = normalizeFrozenIntervals(params.comboRawIntervals);
+  const ultimateUnion = normalizeFrozenIntervals(params.ultimateRawIntervals);
+  const comboOnly = subtractFrozenIntervals(comboUnion, ultimateUnion);
+
+  const comboWindows: FreezeWindow[] = comboOnly.map(segment => ({
+    ...segment,
+    kind: "combo",
+    castStartId: `seg:combo:${segment.startReal}:${segment.endReal}`,
+    operatorId: "",
+  }));
+
+  const ultimateWindows: FreezeWindow[] = ultimateUnion.map(segment => ({
+    ...segment,
+    kind: "ultimate",
+    castStartId: `seg:ultimate:${segment.startReal}:${segment.endReal}`,
+    operatorId: "",
+  }));
+
+  return [...comboWindows, ...ultimateWindows].sort((a, b) => {
+    if (a.startReal !== b.startReal) return a.startReal - b.startReal;
+    if (a.endReal !== b.endReal) return a.endReal - b.endReal;
+    return a.kind.localeCompare(b.kind);
+  });
+}
+
+function addIllegalReason(
+  illegalCastStartReasonById: Map<string, string[]>,
+  castStartId: string,
+  reason: string,
+): void {
+  const existing = illegalCastStartReasonById.get(castStartId);
+  if (!existing) {
+    illegalCastStartReasonById.set(castStartId, [reason]);
+    return;
+  }
+  if (!existing.includes(reason)) {
+    existing.push(reason);
+  }
+}
+
 export function buildFreezeTimeline(
   skillBoxes: SkillBox[],
   resolveFreezeFrames: FreezeFrameResolver = getCastStartFreezeFrames,
 ): FreezeTimeline {
-  const freezeWindows: FreezeWindow[] = [];
+  const rawFreezeWindows: FreezeWindow[] = [];
   const illegalCastStartIds = new Set<string>();
+  const illegalCastStartReasonById = new Map<string, string[]>();
   const scriptStartRealByCastStartId = new Map<string, number>();
 
-  let activeFreezeWindow: FreezeWindow | null = null;
+  const activeFreezeWindows: FreezeWindow[] = [];
+  const comboRawIntervals: FrozenInterval[] = [];
+  const ultimateRawIntervals: FrozenInterval[] = [];
   let currentChainCastStartIds: string[] = [];
   let currentChainEndReal = -1;
 
@@ -80,45 +205,58 @@ export function buildFreezeTimeline(
   for (const castStart of sortedCastStarts) {
     const castStartReal = castStart.startFrame;
 
-    if (activeFreezeWindow && castStartReal >= activeFreezeWindow.endReal) {
-      activeFreezeWindow = null;
-      resetChain();
+    for (let i = activeFreezeWindows.length - 1; i >= 0; i -= 1) {
+      if (activeFreezeWindows[i].endReal <= castStartReal) {
+        activeFreezeWindows.splice(i, 1);
+      }
     }
 
     if (
-      !activeFreezeWindow &&
+      activeFreezeWindows.length === 0 &&
       currentChainCastStartIds.length > 0 &&
       castStartReal >= currentChainEndReal
     ) {
       resetChain();
     }
 
-    const isInsideActiveWindow =
-      activeFreezeWindow !== null &&
-      castStartReal >= activeFreezeWindow.startReal &&
-      castStartReal < activeFreezeWindow.endReal;
+    const hasActiveUltimate = activeFreezeWindows.some(
+      window =>
+        window.kind === "ultimate" &&
+        castStartReal >= window.startReal &&
+        castStartReal < window.endReal,
+    );
 
-    if (isInsideActiveWindow) {
-      const activeWindow = activeFreezeWindow;
-      if (!activeWindow) {
-        throw new Error("Freeze timeline invariant: inside active window with no active window");
-      }
+    const hasActiveCombo = activeFreezeWindows.some(
+      window =>
+        window.kind === "combo" &&
+        castStartReal >= window.startReal &&
+        castStartReal < window.endReal,
+    );
 
-      if (activeWindow.kind === "ultimate") {
-        illegalCastStartIds.add(castStart.id);
-        continue;
-      }
+    let isIllegal = false;
+    if (hasActiveUltimate) {
+      addIllegalReason(
+        illegalCastStartReasonById,
+        castStart.id,
+        STRICT_ULTIMATE_FREEZE_REASON,
+      );
+      isIllegal = true;
+    } else if (
+      hasActiveCombo &&
+      castStart.skillType !== "comboSkill" &&
+      castStart.skillType !== "ultimate"
+    ) {
+      addIllegalReason(
+        illegalCastStartReasonById,
+        castStart.id,
+        STRICT_COMBO_FREEZE_REASON,
+      );
+      isIllegal = true;
+    }
 
-      const canInterrupt =
-        castStart.skillType === "comboSkill" || castStart.skillType === "ultimate";
-      if (!canInterrupt) {
-        illegalCastStartIds.add(castStart.id);
-        continue;
-      }
-
-      activeWindow.endReal = castStartReal;
-      activeFreezeWindow = null;
-      currentChainEndReal = castStartReal;
+    if (isIllegal) {
+      illegalCastStartIds.add(castStart.id);
+      continue;
     }
 
     const kind = toFreezeWindowKind(castStart.skillType);
@@ -146,15 +284,34 @@ export function buildFreezeTimeline(
         castStartId: castStart.id,
         operatorId: castStart.operatorId,
       };
-      freezeWindows.push(nextWindow);
-      activeFreezeWindow = nextWindow;
+      rawFreezeWindows.push(nextWindow);
+      activeFreezeWindows.push(nextWindow);
+
+      if (kind === "combo") {
+        comboRawIntervals.push({
+          startReal: nextWindow.startReal,
+          endReal: nextWindow.endReal,
+        });
+      } else {
+        ultimateRawIntervals.push({
+          startReal: nextWindow.startReal,
+          endReal: nextWindow.endReal,
+        });
+      }
     }
   }
 
-  const normalizedFreezeWindows = freezeWindows.filter(
-    window => window.endReal > window.startReal,
+  const frozenWindows = normalizeFrozenIntervals(
+    rawFreezeWindows.map(window => ({
+      startReal: window.startReal,
+      endReal: window.endReal,
+    })),
   );
-  const frozenPrefix = buildFrozenPrefixResolver(normalizedFreezeWindows);
+  const freezeWindows = toOverlayWindows({
+    comboRawIntervals,
+    ultimateRawIntervals,
+  });
+  const frozenPrefix = buildFrozenPrefixResolver(frozenWindows);
 
   const realToGame = (real: number): number => {
     if (!Number.isFinite(real)) {
@@ -177,7 +334,7 @@ export function buildFreezeTimeline(
       return minReal;
     }
 
-    for (const window of normalizedFreezeWindows) {
+    for (const window of frozenWindows) {
       if (window.endReal <= cursorReal) {
         continue;
       }
@@ -201,8 +358,10 @@ export function buildFreezeTimeline(
   };
 
   return {
-    freezeWindows: normalizedFreezeWindows,
+    freezeWindows,
+    frozenWindows,
     illegalCastStartIds,
+    illegalCastStartReasonById,
     scriptStartRealByCastStartId,
     realToGame,
     gameToRealAtOrAfter,
@@ -211,32 +370,60 @@ export function buildFreezeTimeline(
 
 const debugTimeline = buildFreezeTimeline([
   {
-    id: "dbg_combo_120",
+    id: "dbg_combo_100",
     operatorId: "op.alpha",
     skillType: "comboSkill",
+    startFrame: 100,
+    durationFrames: 1,
+  },
+  {
+    id: "dbg_normal_110",
+    operatorId: "op.gamma",
+    skillType: "normalSkill",
+    startFrame: 110,
+    durationFrames: 1,
+  },
+  {
+    id: "dbg_ultimate_120",
+    operatorId: "op.beta",
+    skillType: "ultimate",
     startFrame: 120,
     durationFrames: 1,
   },
   {
-    id: "dbg_ultimate_150",
-    operatorId: "op.beta",
-    skillType: "ultimate",
-    startFrame: 150,
+    id: "dbg_combo_125",
+    operatorId: "op.delta",
+    skillType: "comboSkill",
+    startFrame: 125,
     durationFrames: 1,
   },
   {
-    id: "dbg_normal_160",
-    operatorId: "op.gamma",
+    id: "dbg_normal_180",
+    operatorId: "op.epsilon",
     skillType: "normalSkill",
-    startFrame: 160,
+    startFrame: 180,
     durationFrames: 1,
   },
 ]);
 
 export const debugExample = {
-  castStartOrder: ["dbg_combo_120", "dbg_ultimate_150", "dbg_normal_160"],
+  castStartOrder: [
+    "dbg_combo_100",
+    "dbg_normal_110",
+    "dbg_ultimate_120",
+    "dbg_combo_125",
+    "dbg_normal_180",
+  ],
   freezeWindows: debugTimeline.freezeWindows,
+  frozenWindows: debugTimeline.frozenWindows,
   illegalCastStartIds: Array.from(debugTimeline.illegalCastStartIds).sort(),
+  illegalCastStartReasonById: Object.fromEntries(
+    Array.from(debugTimeline.illegalCastStartReasonById.entries())
+      .map(([castStartId, reasons]) =>
+        [castStartId, [...reasons].sort()] as const,
+      )
+      .sort(([a], [b]) => a.localeCompare(b)),
+  ),
   scriptStartRealByCastStartId: Object.fromEntries(
     Array.from(debugTimeline.scriptStartRealByCastStartId.entries()).sort(([a], [b]) =>
       a.localeCompare(b),
