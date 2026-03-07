@@ -446,9 +446,39 @@ export default function AxisEditor({
   const toLaneIndex = (targetId: string): number =>
     laneIndexByOwnerId.get(targetId) ?? ENEMY_LANE_INDEX;
 
+  const previewSkillBoxes = useMemo<SkillBox[]>(() => {
+    let boxes = [...skillBoxes];
+
+    if (skillBoxDragState) {
+      boxes = boxes.map(box =>
+        box.id === skillBoxDragState.id
+          ? { ...box, startFrame: skillBoxDragState.previewStartFrame }
+          : box,
+      );
+    }
+
+    if (
+      addSkillDrag?.overAxis &&
+      addSkillDrag.laneIndex != null &&
+      addSkillDrag.startFrame != null &&
+      ghostOperatorId != null
+    ) {
+      const ghostBox: SkillBox = {
+        id: "sb_ghost_preview",
+        operatorId: ghostOperatorId,
+        skillType: addSkillDrag.skillType,
+        startFrame: addSkillDrag.startFrame,
+        durationFrames: ghostDurationFrames,
+      };
+      boxes = [...boxes, ghostBox];
+    }
+
+    return boxes;
+  }, [skillBoxes, skillBoxDragState, addSkillDrag, ghostOperatorId, ghostDurationFrames]);
+
   const freezeTimeline = useMemo(() => {
-    return buildFreezeTimeline(skillBoxes, getCastStartFreezeFrames);
-  }, [skillBoxes]);
+    return buildFreezeTimeline(previewSkillBoxes, getCastStartFreezeFrames);
+  }, [previewSkillBoxes]);
 
   const {
     freezeWindows,
@@ -947,13 +977,20 @@ export default function AxisEditor({
 
             {addSkillDrag?.overAxis &&
               addSkillDrag.laneIndex != null &&
-              addSkillDrag.startFrame != null && (
+              addSkillDrag.startFrame != null &&
+              ghostOperatorId != null && (
                 <div
                   data-testid="axis-drop"
                   className={`absolute border border-dashed pointer-events-none ${isIllegalPlacement(addSkillDrag.startFrame, addSkillDrag.skillType) ? "border-red-500 bg-red-500/20" : "border-zinc-300 bg-zinc-200/20"}`}
                   style={{
                     left: addSkillDrag.startFrame,
-                    width: ghostDurationFrames,
+                    width: computeBoxWidth({
+                      id: "sb_ghost_preview",
+                      operatorId: ghostOperatorId,
+                      skillType: addSkillDrag.skillType,
+                      startFrame: addSkillDrag.startFrame,
+                      durationFrames: ghostDurationFrames,
+                    }),
                     height: SKILL_BOX_HEIGHT,
                     top:
                       addSkillDrag.laneIndex * LANE_HEIGHT +
