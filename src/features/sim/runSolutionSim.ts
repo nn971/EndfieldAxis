@@ -65,6 +65,10 @@ function buildSimRenderCache(
   teamSpCap: number,
   enemyStaggerCapMilli: number,
   ultimateEnergyMaxByOperatorId: Record<string, number>,
+  strictInvalidSkillBoxById: Record<
+    string,
+    { kind: "strict"; reasons: string[] }
+  >,
 ): SimRenderCache {
   const bars: SimRenderBar[] = [];
   const markers: SimRenderMarker[] = [];
@@ -223,6 +227,7 @@ function buildSimRenderCache(
     ultimateEnergySeriesByOperatorId,
     ultimateEnergyMaxByOperatorId,
     simEndFrame,
+    invalidSkillBoxById: strictInvalidSkillBoxById,
   };
 }
 
@@ -279,6 +284,8 @@ function compileSkillCast(params: {
     sourceId,
     targetId,
     skillType,
+    skillBoxId: box.id,
+    softInvalidReasons: [],
   });
 
   const scriptStartReal =
@@ -316,7 +323,10 @@ function compileSkillBoxes(params: {
   freezeTimeline: ReturnType<typeof buildFreezeTimeline>;
   targetId: string;
   nextSeq: () => number;
-}): SimEvent[] {
+}): {
+  events: SimEvent[];
+  strictInvalidSkillBoxById: Record<string, { kind: "strict"; reasons: string[] }>;
+} {
   const { skillBoxes, freezeTimeline, targetId, nextSeq } = params;
 
   const sorted = [...skillBoxes].sort((a, b) => {
@@ -330,10 +340,22 @@ function compileSkillBoxes(params: {
 
   const {
     illegalCastStartIds,
+    illegalCastStartReasonById,
     scriptStartRealByCastStartId,
     realToGame,
     gameToRealAtOrAfter,
   } = freezeTimeline;
+
+  const strictInvalidSkillBoxById: Record<
+    string,
+    { kind: "strict"; reasons: string[] }
+  > = {};
+  for (const [id, reasons] of illegalCastStartReasonById.entries()) {
+    strictInvalidSkillBoxById[id] = {
+      kind: "strict",
+      reasons: [...reasons],
+    };
+  }
 
   const out: SimEvent[] = [];
   for (const box of sorted) {
@@ -349,7 +371,10 @@ function compileSkillBoxes(params: {
     });
     out.push(...evs);
   }
-  return out;
+  return {
+    events: out,
+    strictInvalidSkillBoxById,
+  };
 }
 
 function getEmptyInfliction(): Record<InflictionType, SimInfliction> {
@@ -479,7 +504,7 @@ export function runSolutionSim(
     controlledOperatorId,
   });
 
-  const events = compileSkillBoxes({
+  const { events, strictInvalidSkillBoxById } = compileSkillBoxes({
     skillBoxes,
     freezeTimeline,
     targetId,
@@ -501,6 +526,7 @@ export function runSolutionSim(
     Number(world.env.resources.teamSp.cap),
     Number(world.env.entitiesById[targetId]?.stagger?.capMilli ?? 0),
     ultimateEnergyMaxByOperatorId,
+    strictInvalidSkillBoxById,
   );
   const hitDamageSnapshots = extractHitDamageSnapshots(world.log);
   const totalDamage = hitDamageSnapshots.reduce(
