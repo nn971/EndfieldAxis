@@ -112,10 +112,10 @@ class EndministratorDef extends OperatorDef {
         },
         comboSkill: {
           name: "Sealing Sequence",
-          durationFrames: 46,
+          durationFrames: 16,
           icon: "ENDMINISTRATOR_CS.png",
           script: function* (ctx) {
-            yield delay(45);
+            yield delay(15);
             yield ctx.emit.buffApply({
               buffId: "buff.crystal",
             });
@@ -128,10 +128,11 @@ class EndministratorDef extends OperatorDef {
         },
         ultimate: {
           name: "Bombardment Sequence",
-          durationFrames: 110,
+          durationFrames: 22,
+          freezeFramesOnCastStart: 88,
           icon: "ENDMINISTRATOR_ULT.png",
           script: function* (ctx) {
-            yield delay(55);
+            yield delay(12);
             yield ctx.emit.hit({
               damageType: "physical",
               dmgMultiplier: ctx.byRank!(r => ULT_DMG_MUL[r] ?? 0),

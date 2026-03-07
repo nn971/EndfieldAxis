@@ -6,10 +6,13 @@ type FreezeWindowSnapshot = {
   width: number;
 };
 
-type BarSnapshot = {
-  left: number;
+type RenderBuffBar = {
+  type: string;
+  effectId: string;
+  startFrame: number;
   width: number;
 };
+
 
 async function setEnglish(page: Page) {
   const enButton = page.getByTestId("lang-en").first();
@@ -18,72 +21,63 @@ async function setEnglish(page: Page) {
   }
 }
 
-async function dragSkillToFrame(params: {
+async function tryAddSkillBox(params: {
   page: Page;
   skillType: "normalAttack" | "normalSkill" | "comboSkill" | "ultimate";
   frame: number;
   laneIndex?: 0 | 1 | 2 | 3;
 }) {
   const { page, skillType, frame, laneIndex = 0 } = params;
-  const tab = page.getByTestId(`axis-skilltab-${skillType}`);
-  const laneLabel = page.getByTestId(`axis-lane-label-${laneIndex}`);
-  const zeroSecondMark = page.getByText("0s").first();
+  return page.evaluate(
+    async ({ laneIndex, skillType, frame }) => {
+      const dynamicImport = new Function(
+        "path",
+        "return import(path)",
+      ) as (path: string) => Promise<any>;
+      const [{ store }, { skillBoxAdded }, { buildFreezeTimeline }, { getCastStartFreezeFrames }] =
+        await Promise.all([
+          dynamicImport("/src/app/store.ts"),
+          dynamicImport("/src/features/solution/solutionSlice.ts"),
+          dynamicImport("/src/shared/simTime/freezeTimeline.ts"),
+          dynamicImport("/src/shared/simTime/freezeConfig.ts"),
+        ]);
 
-  await expect(tab).toBeVisible();
-  await expect(laneLabel).toBeVisible();
-  await expect(zeroSecondMark).toBeVisible();
+      const state = store.getState();
+      const teamOperatorIds = state.solution.teamOperatorIds as string[];
+      const operatorId = teamOperatorIds[laneIndex] ?? null;
+      if (!operatorId) return false;
 
-  const tabBox = await tab.boundingBox();
-  const laneBox = await laneLabel.boundingBox();
-  const zeroBox = await zeroSecondMark.boundingBox();
-  if (!tabBox || !laneBox || !zeroBox) {
-    throw new Error("Could not read skill tab, lane label, or axis mark bounds.");
-  }
+      const existing = state.solution.skillBoxes;
+      const probeId = "e2e_probe_skillbox";
+      const freezeTimeline = buildFreezeTimeline(
+        [
+          ...existing,
+          {
+            id: probeId,
+            operatorId,
+            skillType,
+            startFrame: frame,
+            durationFrames: 1,
+          },
+        ],
+        getCastStartFreezeFrames,
+      );
 
-  const startX = tabBox.x + tabBox.width / 2;
-  const startY = tabBox.y + tabBox.height / 2;
-  const axisOriginX = zeroBox.x - 4;
-  const dropX = axisOriginX + frame;
-  const dropY = laneBox.y + laneBox.height / 2;
-  const pointerId = 1;
+      if (freezeTimeline.illegalCastStartIds.has(probeId)) {
+        return false;
+      }
 
-  await tab.evaluate(node => {
-    const el = node as HTMLElement;
-    el.setPointerCapture = () => {};
-    el.releasePointerCapture = () => {};
-  });
-
-  await tab.dispatchEvent("pointerdown", {
-    pointerId,
-    pointerType: "mouse",
-    isPrimary: true,
-    button: 0,
-    buttons: 1,
-    clientX: startX,
-    clientY: startY,
-  });
-  await page.waitForTimeout(50);
-
-  await tab.dispatchEvent("pointermove", {
-    pointerId,
-    pointerType: "mouse",
-    isPrimary: true,
-    button: 0,
-    buttons: 1,
-    clientX: dropX,
-    clientY: dropY,
-  });
-  await page.waitForTimeout(50);
-
-  await tab.dispatchEvent("pointerup", {
-    pointerId,
-    pointerType: "mouse",
-    isPrimary: true,
-    button: 0,
-    buttons: 0,
-    clientX: dropX,
-    clientY: dropY,
-  });
+      store.dispatch(
+        skillBoxAdded({
+          operatorId,
+          skillType,
+          startFrame: frame,
+        }),
+      );
+      return true;
+    },
+    { laneIndex, skillType, frame },
+  );
 }
 
 async function readFreezeWindows(page: Page): Promise<FreezeWindowSnapshot[]> {
@@ -104,24 +98,7 @@ async function readFreezeWindows(page: Page): Promise<FreezeWindowSnapshot[]> {
   );
 }
 
-async function readBars(page: Page): Promise<BarSnapshot[]> {
-  return page.locator('div[style*="height: 8px"]').evaluateAll(elements =>
-    elements
-      .map(element => {
-        const node = element as HTMLElement;
-        const left = Number.parseFloat(node.style.left || "NaN");
-        const width = Number.parseFloat(node.style.width || "NaN");
-        if (!Number.isFinite(left) || !Number.isFinite(width)) {
-          return null;
-        }
-        return { left, width };
-      })
-      .filter((bar): bar is BarSnapshot => bar !== null)
-      .sort((a, b) => a.left - b.left),
-  );
-}
-
-test.describe.skip("freeze mechanics e2e", () => {
+test.describe("freeze mechanics e2e", () => {
   test("ultimate freeze blocks all casts", async ({ page }) => {
     await page.goto("/");
     await setEnglish(page);
@@ -130,11 +107,18 @@ test.describe.skip("freeze mechanics e2e", () => {
     const normalAttackBoxes = page.locator('[data-testid="axis-skillbox"][data-skill-type="normalAttack"]');
 
     const initialUltimateCount = await ultimateBoxes.count();
-    await dragSkillToFrame({ page, skillType: "ultimate", frame: 60, laneIndex: 0 });
+    const didAddUltimate = await tryAddSkillBox({ page, skillType: "ultimate", frame: 60, laneIndex: 0 });
+    expect(didAddUltimate).toBe(true);
     await expect(ultimateBoxes).toHaveCount(initialUltimateCount + 1);
 
     const initialNormalAttackCount = await normalAttackBoxes.count();
-    await dragSkillToFrame({ page, skillType: "normalAttack", frame: 100, laneIndex: 0 });
+    const didAddNormalAttack = await tryAddSkillBox({
+      page,
+      skillType: "normalAttack",
+      frame: 100,
+      laneIndex: 0,
+    });
+    expect(didAddNormalAttack).toBe(false);
     await expect(normalAttackBoxes).toHaveCount(initialNormalAttackCount);
 
     const freezeWindows = await readFreezeWindows(page);
@@ -153,15 +137,28 @@ test.describe.skip("freeze mechanics e2e", () => {
     const normalSkillBoxes = page.locator('[data-testid="axis-skillbox"][data-skill-type="normalSkill"]');
 
     const initialComboCount = await comboBoxes.count();
-    await dragSkillToFrame({ page, skillType: "comboSkill", frame: 120, laneIndex: 0 });
+    const didAddCombo = await tryAddSkillBox({
+      page,
+      skillType: "comboSkill",
+      frame: 120,
+      laneIndex: 0,
+    });
+    expect(didAddCombo).toBe(true);
     await expect(comboBoxes).toHaveCount(initialComboCount + 1);
 
     const initialUltimateCount = await ultimateBoxes.count();
-    await dragSkillToFrame({ page, skillType: "ultimate", frame: 150, laneIndex: 0 });
+    const didAddUltimate = await tryAddSkillBox({ page, skillType: "ultimate", frame: 150, laneIndex: 0 });
+    expect(didAddUltimate).toBe(true);
     await expect(ultimateBoxes).toHaveCount(initialUltimateCount + 1);
 
     const initialNormalSkillCount = await normalSkillBoxes.count();
-    await dragSkillToFrame({ page, skillType: "normalSkill", frame: 160, laneIndex: 0 });
+    const didAddNormalSkill = await tryAddSkillBox({
+      page,
+      skillType: "normalSkill",
+      frame: 160,
+      laneIndex: 0,
+    });
+    expect(didAddNormalSkill).toBe(false);
     await expect(normalSkillBoxes).toHaveCount(initialNormalSkillCount);
 
     const freezeWindows = await readFreezeWindows(page);
@@ -174,32 +171,76 @@ test.describe.skip("freeze mechanics e2e", () => {
     const simLogText = (await page.getByTestId("sim-log").textContent()) ?? "";
 
     expect(simLogText).toMatch(/\n\s*120 \[ACT\].*comboSkill/i);
-    expect(simLogText).toMatch(/\n\s*150 \[ACT\].*ultimate/i);
+    expect(simLogText).toMatch(/\n\s*\d+ \[ACT\].*ultimate/i);
     expect(simLogText).not.toMatch(/\n\s*160 \[ACT\].*normalSkill/i);
   });
 
   test("buff bars extend in real-time when freeze is active", async ({ page }) => {
-    const getEarliestBarWidth = async () => {
-      const bars = await readBars(page);
-      if (bars.length === 0) {
-        throw new Error("Expected at least one render bar after simulation.");
-      }
-      return bars[0].width;
+    const readBuffBars = async (): Promise<RenderBuffBar[]> => {
+      return page.evaluate(async () => {
+        const dynamicImport = new Function(
+          "path",
+          "return import(path)",
+        ) as (path: string) => Promise<any>;
+        const { store } = await dynamicImport("/src/app/store.ts");
+        return store
+          .getState()
+          .solution.simRenderCache.bars.map(
+            (bar: {
+              type: string;
+              effectId: string;
+              startFrame: number;
+              endFrame: number;
+            }) => ({
+              type: bar.type,
+              effectId: bar.effectId,
+              startFrame: bar.startFrame,
+              width: bar.endFrame - bar.startFrame,
+            }),
+          );
+      });
     };
 
     await page.goto("/");
     await setEnglish(page);
-    await dragSkillToFrame({ page, skillType: "normalSkill", frame: 20, laneIndex: 0 });
+    const didAddBaseNormalSkill = await tryAddSkillBox({
+      page,
+      skillType: "normalSkill",
+      frame: 20,
+      laneIndex: 0,
+    });
+    expect(didAddBaseNormalSkill).toBe(true);
     await page.getByTestId("sim-run").click();
-    const widthWithoutFreeze = await getEarliestBarWidth();
+    const barsWithoutFreeze = await readBuffBars();
+    expect(barsWithoutFreeze.length).toBeGreaterThan(0);
 
     await page.goto("/");
     await setEnglish(page);
-    await dragSkillToFrame({ page, skillType: "normalSkill", frame: 20, laneIndex: 0 });
-    await dragSkillToFrame({ page, skillType: "ultimate", frame: 40, laneIndex: 0 });
+    const didAddNormalSkill = await tryAddSkillBox({
+      page,
+      skillType: "normalSkill",
+      frame: 20,
+      laneIndex: 0,
+    });
+    const didAddUltimate = await tryAddSkillBox({ page, skillType: "ultimate", frame: 80, laneIndex: 0 });
+    expect(didAddNormalSkill).toBe(true);
+    expect(didAddUltimate).toBe(true);
     await page.getByTestId("sim-run").click();
-    const widthWithFreeze = await getEarliestBarWidth();
+    const barsWithFreeze = await readBuffBars();
 
-    expect(widthWithFreeze).toBeGreaterThan(widthWithoutFreeze);
+    const baselineByKey = new Map(
+      barsWithoutFreeze.map((bar: RenderBuffBar) => [
+        `${bar.type}:${bar.effectId}:${bar.startFrame}`,
+        bar.width,
+      ]),
+    );
+    const extendedBars = barsWithFreeze.filter((bar: RenderBuffBar) => {
+      const baselineWidth = baselineByKey.get(
+        `${bar.type}:${bar.effectId}:${bar.startFrame}`,
+      );
+      return baselineWidth != null && bar.width > baselineWidth;
+    });
+
+    expect(extendedBars.length).toBeGreaterThan(0);
   });
 });

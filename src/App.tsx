@@ -61,9 +61,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
+      <TopBar />
       <div className="mx-auto max-w-7xl p-4">
-        <TopBar />
-
         <div className="flex flex-col gap-4 lg:flex-row">
           <div className="w-full lg:w-[300px] lg:shrink-0">
             <OperatorEditor

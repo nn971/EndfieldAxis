@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
-import { summarizeLog } from "../../simulator/log";
+import { summarizeLog } from "../../simulator/log/log";
 import { makeEmptySimRenderCache } from "../../types/editor";
 import { makeEmptySimDamageCache } from "../../types/simDamage";
 import {
@@ -34,7 +34,8 @@ export default function SimPanel() {
     return (
       summarizeLog(
         lastRunResult.log,
-        ["sim", "act", "buff", "stat", "dmg", "SP", "dev"],
+        // ["sim", "act", "buff", "stat", "dmg", "SP", "dev"],
+        ["SP", "act"],
         true,
         (message, entry) =>
           formatSimLog({

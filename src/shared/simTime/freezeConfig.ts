@@ -2,7 +2,7 @@ import operatorsData from "../../data/operators";
 import type { SkillType } from "../../data/operators/OperatorDef";
 import type { SkillBox } from "../../types/editor";
 
-export const DEFAULT_COMBO_FREEZE_FRAMES = 60;
+export const DEFAULT_COMBO_FREEZE_FRAMES = 30;
 export const DEFAULT_ULT_FREEZE_FRAMES = 120;
 
 export function getCastStartFreezeFrames(

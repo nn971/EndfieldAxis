@@ -143,10 +143,10 @@ class AleshDef extends OperatorDef {
         },
         comboSkill: {
           name: "Auger Angling",
-          durationFrames: 78,
+          durationFrames: 48,
           icon: "ALESH_CS.png",
           script: function* (ctx) {
-            yield delay(36);
+            yield delay(6);
             const potentialRank = Number(
               ctx.read.getBuild(ctx.sourceId!)?.potentialRank ?? 0,
             );
@@ -181,10 +181,11 @@ class AleshDef extends OperatorDef {
         },
         ultimate: {
           name: "One Monster Catch!",
-          durationFrames: 192,
+          durationFrames: 37,
+          freezeFramesOnCastStart: 155,
           icon: "ALESH_ULT.png",
           script: function* (ctx) {
-            yield delay(180);
+            yield delay(25);
             const potentialRank = Number(
               ctx.read.getBuild(ctx.sourceId!)?.potentialRank ?? 0,
             );

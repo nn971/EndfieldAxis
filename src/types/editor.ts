@@ -78,9 +78,15 @@ export type DamageWatchFilter = {
   damageType: DamageType | null;
 };
 
+export type I18nTextRef = {
+  key: string;
+  params?: Record<string, string | number>;
+};
+
 export type DamageWatchEntry = {
   id: string;
   name: string;
+  nameI18n?: I18nTextRef;
   filter: DamageWatchFilter;
 };
 

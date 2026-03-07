@@ -450,8 +450,12 @@ export default function AxisEditor({
     return buildFreezeTimeline(skillBoxes, getCastStartFreezeFrames);
   }, [skillBoxes]);
 
-  const { freezeWindows, illegalCastStartIds, realToGame, gameToRealAtOrAfter } =
-    freezeTimeline;
+  const {
+    freezeWindows,
+    illegalCastStartIds,
+    realToGame,
+    gameToRealAtOrAfter,
+  } = freezeTimeline;
 
   const computeBoxWidth = (box: SkillBox): number => {
     const startReal = box.startFrame;
@@ -543,9 +547,7 @@ export default function AxisEditor({
   return (
     <div className="p-4 border border-zinc-700 rounded bg-zinc-900">
       <h2 className="text-lg font-semibold mb-2">{t("axis.title")}</h2>
-      <p className="text-sm text-zinc-300">
-        {t("axis.placeholder")}
-      </p>
+      <p className="text-sm text-zinc-300">{t("axis.placeholder")}</p>
 
       <div className="mt-3 flex gap-2">
         {SKILL_TABS.map(skillType => (

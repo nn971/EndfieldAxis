@@ -270,10 +270,16 @@ export const logMsg = {
     targetId: string;
     targetName?: string;
   }) => buildLogMessage("buff_stack_change", meta),
-  buffExpire: (meta: { buffId: string; targetId: string; targetName?: string }) =>
-    buildLogMessage("buff_expire", meta),
-  buffRemoved: (meta: { buffId: string; targetId: string; targetName?: string }) =>
-    buildLogMessage("buff_removed", meta),
+  buffExpire: (meta: {
+    buffId: string;
+    targetId: string;
+    targetName?: string;
+  }) => buildLogMessage("buff_expire", meta),
+  buffRemoved: (meta: {
+    buffId: string;
+    targetId: string;
+    targetName?: string;
+  }) => buildLogMessage("buff_removed", meta),
   buffVulnerableConsumed: (meta: {
     statusType: string;
     consumed: number;

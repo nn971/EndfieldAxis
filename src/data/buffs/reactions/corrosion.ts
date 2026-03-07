@@ -38,7 +38,7 @@ class CorrosionBuffDef extends BuffDef {
 
         const elapsedFrames = Math.max(
           0,
-          read.nowInFrames - buff.lastApplyFrame,
+          read.nowGameInFrames - buff.lastApplyFrame,
         );
         const elapsedSeconds = elapsedFrames / 60;
 

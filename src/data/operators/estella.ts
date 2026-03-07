@@ -114,10 +114,10 @@ class EstellaDef extends OperatorDef {
         },
         comboSkill: {
           name: "Distortion",
-          durationFrames: 52,
+          durationFrames: 22,
           icon: "ESTELLA_CS.png",
           script: function* (ctx) {
-            yield delay(34);
+            yield delay(4);
             yield ctx.emit.statusApply({
               statusType: "lift",
             });
@@ -157,10 +157,10 @@ class EstellaDef extends OperatorDef {
         },
         ultimate: {
           name: "Tremolo",
-          durationFrames: 110,
+          durationFrames: 2,
+          freezeFramesOnCastStart: 108,
           icon: "ESTELLA_ULT.png",
           script: function* (ctx) {
-            yield delay(55);
             yield ctx.emit.hit({
               damageType: "physical",
               dmgMultiplier: ctx.byRank!(r => ULT_DMG_MUL[r] ?? 0),

@@ -327,9 +327,14 @@ export const solutionSlice = createSlice({
       if (!active) return;
       const id = makeId("dw_");
       const defaultSourceId = active.controlledOperatorId || null;
+      const nextIndex = active.damageWatches.length + 1;
       active.damageWatches.push({
         id,
-        name: action.payload?.name ?? `Watch ${active.damageWatches.length + 1}`,
+        name: action.payload?.name ?? "",
+        nameI18n: {
+          key: "damageStats.watchName",
+          params: { index: nextIndex },
+        },
         filter: {
           sourceId: defaultSourceId,
           skillType: null,

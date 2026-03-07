@@ -121,10 +121,10 @@ class ChenQianyuDef extends OperatorDef {
         },
         comboSkill: {
           name: "Soar to the Stars",
-          durationFrames: 46,
+          durationFrames: 16,
           icon: "CHENQIANYU_CS.png",
           script: function* (ctx) {
-            yield delay(34);
+            yield delay(4);
             yield ctx.emit.statusApply({
               statusType: "lift",
             });
@@ -142,7 +142,8 @@ class ChenQianyuDef extends OperatorDef {
         },
         ultimate: {
           name: "Blade Gale",
-          durationFrames: 224,
+          durationFrames: 126,
+          freezeFramesOnCastStart: 98,
           icon: "CHENQIANYU_ULT.png",
           script: function* (ctx) {
             const potentialRank = Number(
@@ -162,7 +163,7 @@ class ChenQianyuDef extends OperatorDef {
               potentialRank >= 3
                 ? finalMultiplierBase * 1.1
                 : finalMultiplierBase;
-            yield delay(32);
+            yield delay(18);
             for (let i = 0; i < 7; i += 1) {
               yield ctx.emit.hit({
                 damageType: "physical",
@@ -170,10 +171,10 @@ class ChenQianyuDef extends OperatorDef {
                 staggerOnHit: i === 0 ? 15 : 0,
               });
               if (i < 6) {
-                yield delay(24);
+                yield delay(10);
               }
             }
-            yield delay(29);
+            yield delay(46);
             yield ctx.emit.hit({
               damageType: "physical",
               dmgMultiplier: finalMultiplier,

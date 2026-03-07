@@ -1,7 +1,7 @@
 import operatorsData from "../../data/operators";
 import { tOperatorName } from "../../i18n/content";
 import type { SimEnv } from "../../types/simulator/simulator";
-import type { SimLogEntry, SimLogMessage } from "../../simulator/log";
+import type { SimLogEntry, SimLogMessage } from "../../simulator/log/log";
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 

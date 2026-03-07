@@ -100,11 +100,7 @@ export default function DamageStatisticPanel() {
             type="button"
             onClick={() =>
               dispatch(
-                damageWatchAdded({
-                  name: t('damageStats.watchName', {
-                    index: damageWatches.length + 1,
-                  }),
-                }),
+                damageWatchAdded(undefined),
               )
             }
             className="rounded border border-zinc-600 bg-zinc-800 px-2 py-1 text-xs hover:bg-zinc-700"
@@ -162,6 +158,9 @@ function WatchRow({
 }) {
   const { t } = useTranslation();
   const [editingName, setEditingName] = useState(watch.name);
+  const defaultName = watch.nameI18n
+    ? t(watch.nameI18n.key, watch.nameI18n.params)
+    : '';
   const numberFormatter = useMemo(() => new Intl.NumberFormat(locale), [locale]);
 
   const handleNameBlur = () => {
@@ -182,7 +181,7 @@ function WatchRow({
       <div className="mb-2 flex items-center gap-2">
         <input
           type="text"
-          value={editingName}
+          value={editingName || watch.name || defaultName}
           onChange={e => setEditingName(e.target.value)}
           onBlur={handleNameBlur}
           onKeyDown={handleNameKeyDown}

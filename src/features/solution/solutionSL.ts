@@ -6,7 +6,7 @@ import {
 import { makeEmptySimDamageCache } from "../../types/simDamage";
 
 // Bump this when you change the serialized shape.
-export const CURRENT_SOLUTION_VERSION = 2;
+export const CURRENT_SOLUTION_VERSION = 3;
 
 export type DeserializeSolutionErrorCode =
   | "invalid_json"
@@ -144,6 +144,20 @@ function migrateToCurrent(
       migrated.controlledOperatorId = rawAny.controlledOperatorId;
     }
     return { ok: true, solution: migrated as SolutionState };
+  }
+
+  if (version === 2) {
+    const rawAny: any = raw as any;
+    const migrated = {
+      ...(raw as unknown as SolutionState),
+      version: CURRENT_SOLUTION_VERSION,
+      simRenderCache: makeEmptySimRenderCache(),
+      simDamageCache: makeEmptySimDamageCache(),
+      damageWatches: Array.isArray(rawAny.damageWatches)
+        ? rawAny.damageWatches
+        : [],
+    };
+    return { ok: true, solution: migrated };
   }
 
   if (version === CURRENT_SOLUTION_VERSION) {

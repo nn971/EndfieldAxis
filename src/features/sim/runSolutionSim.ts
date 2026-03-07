@@ -2,7 +2,7 @@ import operatorsData from "../../data/operators";
 import { createDefaultDamageModel } from "../../simulator/damage/damageModel";
 import type { SkillType } from "../../data/operators/OperatorDef";
 import { loadSimRegistry } from "../../simulator/listeners/registry";
-import type { SimLog } from "../../simulator/log";
+import type { SimLog } from "../../simulator/log/log";
 import { SimWorld, type SimResourceSample } from "../../simulator/simulator";
 import { makeSimEventId } from "../../shared/lib/utils";
 import {
@@ -29,7 +29,10 @@ import {
   type SimDamageCache,
   type SimHitDamageSnapshot,
 } from "../../types/simDamage";
-import { DAMAGE_BUCKETS, type DamageBucket } from "../../simulator/damage/damageBonuses";
+import {
+  DAMAGE_BUCKETS,
+  type DamageBucket,
+} from "../../simulator/damage/damageBonuses";
 import { DEFAULT_STAGGER_CAP_MILLI } from "../../types/simulator/stagger";
 import { getSkillDurationGameFrames } from "../../shared/simTime/freezeConfig";
 import { buildFreezeTimeline } from "../../shared/simTime/freezeTimeline";
@@ -205,6 +208,9 @@ function buildSimRenderCache(
     );
   }
 
+  // console.log(JSON.stringify(teamSpTotalSeries));
+  // console.log(JSON.stringify(teamSpRealSeries));
+
   return {
     bars,
     markers,
@@ -255,7 +261,10 @@ function compileSkillCast(params: {
 
   const events: SimEvent[] = [];
   const operatorSkillDurationFrames = skill.durationFrames;
-  const durationGame = getSkillDurationGameFrames(box, operatorSkillDurationFrames);
+  const durationGame = getSkillDurationGameFrames(
+    box,
+    operatorSkillDurationFrames,
+  );
   const startGame = realToGame(startReal);
   const endGame = startGame + durationGame;
   const endReal = gameToRealAtOrAfter(endGame, startReal);
@@ -376,7 +385,10 @@ function extractHitDamageSnapshots(log: SimLog): SimHitDamageSnapshot[] {
     const sourceId = entry.ctx.source.id;
     const targetId = entry.ctx.target.id;
     const buckets = Object.fromEntries(
-      DAMAGE_BUCKETS.map(bucket => [bucket, Number(entry.ctx.bonuses[bucket] ?? 0)]),
+      DAMAGE_BUCKETS.map(bucket => [
+        bucket,
+        Number(entry.ctx.bonuses[bucket] ?? 0),
+      ]),
     ) as Record<DamageBucket, number>;
     const hitSeq = Number(hitEvent?.seq ?? -1);
 
@@ -384,7 +396,10 @@ function extractHitDamageSnapshots(log: SimLog): SimHitDamageSnapshot[] {
       frame: entry.frame,
       seq: hitSeq,
       hitEventId: typeof hitEvent?.id === "string" ? hitEvent.id : "",
-      castStartEventId: typeof meta?.castStartEventId === "string" ? meta.castStartEventId : null,
+      castStartEventId:
+        typeof meta?.castStartEventId === "string"
+          ? meta.castStartEventId
+          : null,
       castSkillType: toSkillTypeOrNull(meta?.castSkillType),
       sourceId,
       targetId,
@@ -400,11 +415,18 @@ function extractHitDamageSnapshots(log: SimLog): SimHitDamageSnapshot[] {
 export function runSolutionSim(
   solution: Pick<
     SolutionState,
-    "teamOperatorIds" | "controlledOperatorId" | "skillBoxes" | "buildByOperatorId"
+    | "teamOperatorIds"
+    | "controlledOperatorId"
+    | "skillBoxes"
+    | "buildByOperatorId"
   >,
 ): RunSolutionSimResult {
-  const { teamOperatorIds, controlledOperatorId, skillBoxes, buildByOperatorId } =
-    solution;
+  const {
+    teamOperatorIds,
+    controlledOperatorId,
+    skillBoxes,
+    buildByOperatorId,
+  } = solution;
   const targetId = "enemy1";
 
   const allOperatorIds = new Set<string>(teamOperatorIds);
@@ -463,7 +485,7 @@ export function runSolutionSim(
     targetId,
     nextSeq: world.ops.nextSeq,
   });
-  for (const ev of events) world.ops.schedule(ev);
+  for (const ev of events) world.ops.scheduleAtRealFrame(ev);
 
   world.runSim();
 
@@ -481,7 +503,10 @@ export function runSolutionSim(
     ultimateEnergyMaxByOperatorId,
   );
   const hitDamageSnapshots = extractHitDamageSnapshots(world.log);
-  const totalDamage = hitDamageSnapshots.reduce((sum, snapshot) => sum + snapshot.amount, 0);
+  const totalDamage = hitDamageSnapshots.reduce(
+    (sum, snapshot) => sum + snapshot.amount,
+    0,
+  );
   const simDamageCache: SimDamageCache = {
     ...makeEmptySimDamageCache(),
     totalDamage,

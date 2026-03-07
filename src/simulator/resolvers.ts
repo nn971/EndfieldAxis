@@ -18,7 +18,7 @@ import {
   type InflictionType,
 } from "../types/simulator/infliction";
 import { makeSimEventId } from "../shared/lib/utils";
-import { logMsg } from "./logMessages";
+import { logMsg } from "./log/logMessages";
 import { buildDamageContext } from "./damage/damageEngine";
 import operatorsData from "../data/operators";
 import type { SkillType } from "../data/operators/OperatorDef";
@@ -236,17 +236,19 @@ function scheduleApplyVulnerable(
   ref?: string,
 ): void {
   const id = makeSimEventId();
-  world.ops.schedule({
-    id: id,
-    type: "inflictionApply",
-    frame: world.read.nowInFrames,
-    seq: world.ops.nextSeq(),
-    sourceId,
-    targetId: targetId,
-    inflictionType: "vulnerable",
-    inflictionStacks: 1,
-    ref,
-  } as SimEvent);
+  world.ops.scheduleAtGameFrame(
+    {
+      id: id,
+      type: "inflictionApply",
+      seq: world.ops.nextSeq(),
+      sourceId,
+      targetId: targetId,
+      inflictionType: "vulnerable",
+      inflictionStacks: 1,
+      ref,
+    } as SimEvent,
+    world.read.nowGameInFrames,
+  );
 }
 
 function scheduleInflictionRemove(
@@ -255,15 +257,18 @@ function scheduleInflictionRemove(
   inflictionType: InflictionType,
   ref?: string,
 ): void {
-  world.ops.schedule({
-    id: makeSimEventId(),
-    type: "inflictionRemove",
-    frame: world.read.nowInFrames,
-    seq: world.ops.nextSeq(),
-    targetId,
-    inflictionType,
-    ref,
-  } as SimEvent);
+  world.ops.scheduleAtGameFrame(
+    {
+      id: makeSimEventId(),
+      type: "inflictionRemove",
+      frame: world.read.nowRealInFrames,
+      seq: world.ops.nextSeq(),
+      targetId,
+      inflictionType,
+      ref,
+    } as SimEvent,
+    world.read.nowRealInFrames,
+  );
 }
 
 /** compute the special multiplier for physical status */
@@ -430,7 +435,8 @@ function tryGainStaggerAndCheckStaggeredTrigger(
   const target = self.read.getEntity(targetId);
   if (!target?.stagger) return false;
   if (target.stagger.isStaggered) return false;
-  if (target.stagger.pendingApplyFrame === self.read.nowInFrames) return false;
+  if (target.stagger.pendingApplyFrame === self.read.nowGameInFrames)
+    return false;
 
   const baseMilli = toMilli(staggerOnHit);
   if (baseMilli <= 0) return false;
@@ -444,7 +450,7 @@ function tryGainStaggerAndCheckStaggeredTrigger(
   if (target.stagger.currentMilli < target.stagger.capMilli) return false;
 
   target.stagger.currentMilli = target.stagger.capMilli;
-  target.stagger.pendingApplyFrame = self.read.nowInFrames;
+  target.stagger.pendingApplyFrame = self.read.nowGameInFrames;
   return true;
 }
 
@@ -460,7 +466,7 @@ function applyStaggeredStatus(
   target.stagger.isStaggered = true;
   target.stagger.pendingApplyFrame = undefined;
   target.stagger.staggeredExpireFrame =
-    self.read.nowInFrames + STAGGER_DURATION_FRAMES;
+    self.read.nowGameInFrames + STAGGER_DURATION_FRAMES;
 
   self.ops.scheduleAtGameFrame(
     {
@@ -490,7 +496,7 @@ function scheduleComboTriggerElapse(
   triggerEventId: string,
   frame: number,
 ): void {
-  world.ops.schedule({
+  world.ops.scheduleAtRealFrame({
     id: makeSimEventId(),
     type: "comboTriggerElapse",
     frame: frame + COMBO_AVAILABLE_WINDOW_FRAMES,
@@ -634,7 +640,7 @@ export function resolveCastStart(
       sourceId: ev.sourceId,
       targetId: ev.targetId,
     });
-    self.ops.scheduleDraftsGameTime(spawned, {
+    self.ops.scheduleDraftsAtGameFrame(spawned, {
       minRealFrame: self.nowRealInFrames,
     });
   }
@@ -651,7 +657,10 @@ export function resolveCastScriptStart(
     );
   }
 
-  if (castStart.skillType !== "comboSkill" && castStart.skillType !== "ultimate") {
+  if (
+    castStart.skillType !== "comboSkill" &&
+    castStart.skillType !== "ultimate"
+  ) {
     return;
   }
 
@@ -662,7 +671,7 @@ export function resolveCastScriptStart(
     sourceId: castStart.sourceId,
     targetId: castStart.targetId,
   });
-  self.ops.scheduleDraftsGameTime(spawned, {
+  self.ops.scheduleDraftsAtGameFrame(spawned, {
     minRealFrame: self.nowRealInFrames,
   });
 }
@@ -695,7 +704,7 @@ export function resolveCastEnd(
     sourceId: ev.sourceId,
     targetId: ev.targetId,
   });
-  self.ops.scheduleDraftsGameTime(spawned, {
+  self.ops.scheduleDraftsAtGameFrame(spawned, {
     minRealFrame: self.nowRealInFrames,
   });
 }
@@ -835,7 +844,7 @@ export function resolveHit(
     sourceId: source.id,
     targetId: target.id,
   });
-  self.ops.scheduleDraftsGameTime(spawned, {
+  self.ops.scheduleDraftsAtGameFrame(spawned, {
     minRealFrame: self.nowRealInFrames,
   });
 
@@ -878,18 +887,23 @@ export function resolveStatusApplication(
 
       // Has vulnerable: add 1 stack (cap 4) and trigger Lift damage.
       // Schedule Lift damage as a hit event so it can interleave with other same-frame effects.
-      self.ops.schedule({
-        id: makeSimEventId(),
-        type: "hit",
-        frame: self.read.nowInFrames,
-        seq: self.ops.nextSeq(),
-        sourceId,
-        targetId,
-        damageType: "physical",
-        hitTypes: { lift: true },
-        staggerOnHit: inheritedStaggerOnHit,
-        dmgMultiplier: computePhysicalStatusSpecialMul(self, sourceId, "lift"),
-      } as SimEvent);
+      self.ops.scheduleAtGameFrame(
+        {
+          id: makeSimEventId(),
+          type: "hit",
+          seq: self.ops.nextSeq(),
+          sourceId,
+          targetId,
+          damageType: "physical",
+          staggerOnHit: inheritedStaggerOnHit,
+          dmgMultiplier: computePhysicalStatusSpecialMul(
+            self,
+            sourceId,
+            "lift",
+          ),
+        },
+        self.read.nowGameInFrames,
+      );
 
       triggerPlugins();
       break;
@@ -897,22 +911,23 @@ export function resolveStatusApplication(
     case "knockDown": {
       if (current <= 0) break;
 
-      self.ops.schedule({
-        id: makeSimEventId(),
-        type: "hit",
-        frame: self.read.nowInFrames,
-        seq: self.ops.nextSeq(),
-        sourceId,
-        targetId,
-        damageType: "physical",
-        hitTypes: { knockDown: true }, // TODO currently status damages benefits from no other hitTypes.
-        staggerOnHit: inheritedStaggerOnHit,
-        dmgMultiplier: computePhysicalStatusSpecialMul(
-          self,
+      self.ops.scheduleAtGameFrame(
+        {
+          id: makeSimEventId(),
+          type: "hit",
+          seq: self.ops.nextSeq(),
           sourceId,
-          "knockDown",
-        ),
-      } as SimEvent);
+          targetId,
+          damageType: "physical",
+          staggerOnHit: inheritedStaggerOnHit,
+          dmgMultiplier: computePhysicalStatusSpecialMul(
+            self,
+            sourceId,
+            "knockDown",
+          ),
+        },
+        self.read.nowGameInFrames,
+      );
 
       triggerPlugins();
       break;
@@ -928,24 +943,25 @@ export function resolveStatusApplication(
       triggerPlugins();
 
       // Schedule crush burst damage as a hit event so it can interleave with other same-frame effects.
-      self.ops.schedule({
-        id: makeSimEventId(),
-        type: "hit",
-        frame: self.read.nowInFrames,
-        seq: self.ops.nextSeq(),
-        sourceId,
-        targetId,
-        damageType: "physical",
-        hitTypes: { crush: true }, // TODO currently status damages benefits from no other hitTypes.
-        staggerOnHit: inheritedStaggerOnHit,
-        // TEMP: more stacks => larger skill multiplier.
-        dmgMultiplier: computePhysicalStatusSpecialMul(
-          self,
+      self.ops.scheduleAtGameFrame(
+        {
+          id: makeSimEventId(),
+          type: "hit",
+          seq: self.ops.nextSeq(),
           sourceId,
-          "crush",
-          current,
-        ),
-      } as SimEvent);
+          targetId,
+          damageType: "physical",
+          staggerOnHit: inheritedStaggerOnHit,
+          // TEMP: more stacks => larger skill multiplier.
+          dmgMultiplier: computePhysicalStatusSpecialMul(
+            self,
+            sourceId,
+            "crush",
+            current,
+          ),
+        },
+        self.read.nowGameInFrames,
+      );
       break;
     }
 
@@ -960,23 +976,24 @@ export function resolveStatusApplication(
 
       triggerPlugins();
 
-      self.ops.schedule({
-        id: makeSimEventId(),
-        type: "hit",
-        frame: self.read.nowInFrames,
-        seq: self.ops.nextSeq(),
-        sourceId,
-        targetId,
-        damageType: "physical",
-        hitTypes: { breach: true }, // TODO currently status damages benefits from no other hitTypes.
-        staggerOnHit: inheritedStaggerOnHit,
-        dmgMultiplier: computePhysicalStatusSpecialMul(
-          self,
+      self.ops.scheduleAtGameFrame(
+        {
+          id: makeSimEventId(),
+          type: "hit",
+          seq: self.ops.nextSeq(),
           sourceId,
-          "breach",
-          current,
-        ),
-      } as SimEvent);
+          targetId,
+          damageType: "physical",
+          staggerOnHit: inheritedStaggerOnHit,
+          dmgMultiplier: computePhysicalStatusSpecialMul(
+            self,
+            sourceId,
+            "breach",
+            current,
+          ),
+        },
+        self.read.nowGameInFrames,
+      );
 
       // TODO
       console.warn(`TODO breach debuff not handled yet`);
@@ -990,12 +1007,6 @@ export function resolveStatusApplication(
 
   if (shouldAddVulnerable) {
     scheduleApplyVulnerable(self, sourceId, targetId, ref);
-    const after = Math.min(4, current + 1);
-
-    // self.ops.log(
-    //   "buff",
-    //   `${statusType}: vulnerable stacks ${current} -> ${after} (target=${(target as any).name})`,
-    // );
   } else if (shouldRemoveVulnerable) {
     scheduleInflictionRemove(self, targetId, "vulnerable", ev.id);
 
@@ -1037,13 +1048,15 @@ export function resolveBuffApplication(
       durationFramesOverride: eventDurationFrames,
     });
     const expiresAtFrame =
-      durationFrames === null ? null : self.read.nowInFrames + durationFrames;
+      durationFrames === null
+        ? null
+        : self.read.nowGameInFrames + durationFrames;
     self.ops.addBuff(targetId, {
       id: buffId,
       key: buffKey,
       durationFrames,
       expiresAtFrame,
-      lastApplyFrame: self.read.nowInFrames,
+      lastApplyFrame: self.read.nowGameInFrames,
       stacks: 1,
     } as SimBuff);
     scheduleBuffExpire(self, targetId, buffId, buffKey, expiresAtFrame);
@@ -1095,7 +1108,7 @@ export function resolveBuffApplication(
     durationFramesOverride: eventDurationFrames,
   });
   const expiresAtFrame =
-    durationFrames === null ? null : self.read.nowInFrames + durationFrames;
+    durationFrames === null ? null : self.read.nowGameInFrames + durationFrames;
 
   const had = Boolean(existing);
   self.ops.addBuff(targetId, {
@@ -1103,7 +1116,7 @@ export function resolveBuffApplication(
     key: buffKey,
     durationFrames,
     expiresAtFrame,
-    lastApplyFrame: self.read.nowInFrames,
+    lastApplyFrame: self.read.nowGameInFrames,
     stacks: afterStacks,
     mods: ev.mods ?? (existing as SimBuff | undefined)?.mods,
     runtime: ev.runtime ?? (existing as SimBuff | undefined)?.runtime,
@@ -1166,7 +1179,7 @@ export function resolveBuffExpiration(
 
   const expiresAtGameFrame = (buff as SimBuff).expiresAtFrame;
   if (expiresAtGameFrame === null) return false;
-  if (self.read.nowInFrames >= expiresAtGameFrame) {
+  if (self.read.nowGameInFrames >= expiresAtGameFrame) {
     self.ops.removeBuff(ent.id, buffKey);
     self.ops.log(
       "buff",
@@ -1268,7 +1281,7 @@ export function resolveInflictionApplication(
         };
       }
 
-      self.ops.schedule({
+      self.ops.scheduleAtRealFrame({
         id: makeSimEventId(),
         type: "hit",
         frame: self.nowInFrames,
@@ -1290,7 +1303,7 @@ export function resolveInflictionApplication(
         ref: ev.id,
       } as SimEvent);
 
-      self.ops.schedule({
+      self.ops.scheduleAtRealFrame({
         id: makeSimEventId(),
         type: "buffApply",
         frame: ev.frame,
@@ -1340,10 +1353,10 @@ export function resolveInflictionApplication(
 
     const isBurstTrigger = current > 0;
     if (isBurstTrigger) {
-      self.ops.schedule({
+      self.ops.scheduleAtRealFrame({
         id: makeSimEventId(),
         type: "hit",
-        frame: self.read.nowInFrames + ARTS_BURST_DELAY_FRAMES,
+        frame: self.read.nowGameInFrames + ARTS_BURST_DELAY_FRAMES,
         seq: self.ops.nextSeq(),
         sourceId: source.id,
         targetId: owner.id,
@@ -1380,7 +1393,7 @@ export function resolveInflictionApplication(
     sourceId: source.id,
     targetId: owner.id,
   });
-  self.ops.scheduleDraftsGameTime(spawned, {
+  self.ops.scheduleDraftsAtGameFrame(spawned, {
     minRealFrame: self.nowRealInFrames,
   });
 
@@ -1393,7 +1406,7 @@ export function resolveInflictionApplication(
       inflictionType: ev.inflictionType,
       ref: ev.id,
     } as Omit<Extract<SimEvent, { type: "inflictionExpire" }>, "frame">,
-    self.read.nowInFrames + DEFAULT_INFLICTION_DURATION_FRAMES,
+    self.read.nowGameInFrames + DEFAULT_INFLICTION_DURATION_FRAMES,
     self.nowRealInFrames,
   );
 }
@@ -1413,7 +1426,7 @@ export function resolveInflictionExpiration(
 
   // check if expiration event is stale
   if (
-    self.read.nowInFrames >=
+    self.read.nowGameInFrames >=
     inf.lastApplyFrame + DEFAULT_INFLICTION_DURATION_FRAMES
   ) {
     scheduleInflictionRemove(self, ent.id, inflictionType, ev.id);
@@ -1460,7 +1473,7 @@ export function resolveReactionTick(
   );
   if (tickMultiplier > 0) {
     const tickSourceIdTyped = tickSourceId as SimEntityId;
-    self.ops.schedule({
+    self.ops.scheduleAtRealFrame({
       id: makeSimEventId(),
       type: "hit",
       frame: ev.frame,
@@ -1488,7 +1501,7 @@ export function resolveReactionTick(
       reactionBuffId: COMBUSTION_BUFF_ID,
       ref: ev.id,
     } as Omit<Extract<SimEvent, { type: "reactionTick" }>, "frame">,
-    self.read.nowInFrames + COMBUSTION_DOT_INTERVAL_FRAMES,
+    self.read.nowGameInFrames + COMBUSTION_DOT_INTERVAL_FRAMES,
     self.nowRealInFrames,
   );
 }
@@ -1597,7 +1610,7 @@ export function resolveStaggerExpire(
   if (!target?.stagger) return;
 
   if (target.stagger.staggeredExpireFrame === undefined) return;
-  if (self.read.nowInFrames >= target.stagger.staggeredExpireFrame) {
+  if (self.read.nowGameInFrames >= target.stagger.staggeredExpireFrame) {
     target.stagger.currentMilli = 0;
     target.stagger.pendingApplyFrame = undefined;
     target.stagger.isStaggered = false;

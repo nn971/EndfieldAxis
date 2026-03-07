@@ -1,6 +1,6 @@
-import type { SimEnv } from "../types/simulator/simulator";
-import type { DamageBreakdown } from "./damage/damageModel";
-import type { DamageContext } from "./damage/damageModel";
+import type { SimEnv } from "../../types/simulator/simulator";
+import type { DamageBreakdown } from "../damage/damageModel";
+import type { DamageContext } from "../damage/damageModel";
 
 export type SimLogEntryCat =
   | "sim"
