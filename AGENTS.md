@@ -143,6 +143,15 @@ npx tsc -p tsconfig.app.json --noEmit
 - Save/load and migration: `src/features/solution/solutionSL.ts`
 - Sim runtime: `src/simulator/simulator.ts`
 - Sim run panel: `src/features/sim/SimPanel.tsx`
+- Operator build editor: `src/features/operator/OperatorEditor.tsx`
+
+## Subdirectory AGENTS.md
+- `src/data/AGENTS.md` — Content definitions (operators, weapons, gears, buffs)
+- `src/features/axis/AGENTS.md` — Timeline editor UI
+- `src/features/operator/AGENTS.md` — Operator build editor
+- `src/features/solution/AGENTS.md` — Redux state and persistence
+- `src/features/sim/AGENTS.md` — Simulation runner
+- `src/simulator/AGENTS.md` — Combat simulator core
 
 ## Cursor/Copilot rules status
 - `.cursor/rules/`: not present
