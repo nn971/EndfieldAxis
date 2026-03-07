@@ -64,6 +64,7 @@ type Props = {
   controlledOperatorId: string;
   skillBoxes: SkillBox[];
   simRenderCache: SimRenderCache;
+  buildByOperatorId?: Record<string, { potentialRank?: number; cooldownReductionPercent?: number }>;
   onLaneLabelClick?: (laneIndex: number) => void;
   onCommitLaneReorder?: (from: number, to: number) => void;
   onCommitSkillBoxPatch?: (
@@ -86,6 +87,7 @@ export default function AxisEditor({
   controlledOperatorId,
   skillBoxes,
   simRenderCache,
+  buildByOperatorId,
   onLaneLabelClick,
   onCommitLaneReorder,
   onCommitSkillBoxPatch,
@@ -209,28 +211,21 @@ export default function AxisEditor({
       addSkillDrag.laneIndex != null &&
       addSkillDrag.startFrame != null
     ) {
-      const isIllegal = isIllegalPlacement(
-        addSkillDrag.startFrame,
-        addSkillDrag.skillType,
-      );
+      const effectiveTeamOperatorIds = laneDragState
+        ? moveItem(
+            laneDragState.originIds,
+            laneDragState.from,
+            laneDragState.to,
+          )
+        : teamOperatorIds;
 
-      if (!isIllegal) {
-        const effectiveTeamOperatorIds = laneDragState
-          ? moveItem(
-              laneDragState.originIds,
-              laneDragState.from,
-              laneDragState.to,
-            )
-          : teamOperatorIds;
-
-        const operatorId = effectiveTeamOperatorIds[addSkillDrag.laneIndex];
-        if (operatorId) {
-          onAddSkillBox?.({
-            operatorId,
-            skillType: addSkillDrag.skillType,
-            startFrame: addSkillDrag.startFrame,
-          });
-        }
+      const operatorId = effectiveTeamOperatorIds[addSkillDrag.laneIndex];
+      if (operatorId) {
+        onAddSkillBox?.({
+          operatorId,
+          skillType: addSkillDrag.skillType,
+          startFrame: addSkillDrag.startFrame,
+        });
       }
     }
 
@@ -322,18 +317,9 @@ export default function AxisEditor({
     e.preventDefault();
     e.currentTarget.releasePointerCapture(skillBoxDragState.pointerId);
 
-    const draggedBox = skillBoxes.find(b => b.id === skillBoxDragState.id);
-    if (draggedBox) {
-      const isIllegal = isIllegalPlacement(
-        skillBoxDragState.previewStartFrame,
-        draggedBox.skillType,
-      );
-      if (!isIllegal) {
-        onCommitSkillBoxPatch?.(skillBoxDragState.id, {
-          startFrame: skillBoxDragState.previewStartFrame,
-        });
-      }
-    }
+    onCommitSkillBoxPatch?.(skillBoxDragState.id, {
+      startFrame: skillBoxDragState.previewStartFrame,
+    });
 
     setSkillBoxDragState(null);
   }
@@ -483,9 +469,101 @@ export default function AxisEditor({
   const {
     freezeWindows,
     illegalCastStartIds,
+    illegalCastStartReasonById,
     realToGame,
     gameToRealAtOrAfter,
   } = freezeTimeline;
+
+  const softInvalidReasonsByBoxId = useMemo(() => {
+    const reasonsById = new Map<string, string[]>();
+
+    const boxesByOperator = new Map<string, SkillBox[]>();
+    for (const box of previewSkillBoxes) {
+      const list = boxesByOperator.get(box.operatorId) ?? [];
+      list.push(box);
+      boxesByOperator.set(box.operatorId, list);
+    }
+
+    for (const [, boxes] of boxesByOperator) {
+      boxes.sort((a, b) => a.startFrame - b.startFrame);
+    }
+
+    for (const [, boxes] of boxesByOperator) {
+      for (let i = 1; i < boxes.length; i++) {
+        const prevBox = boxes[i - 1];
+        const currBox = boxes[i];
+
+        if (prevBox.skillType === "normalAttack") continue;
+
+        const prevEndReal = prevBox.startFrame + computeBoxWidth(prevBox);
+
+        if (currBox.startFrame < prevEndReal) {
+          const reasons = reasonsById.get(currBox.id) ?? [];
+          reasons.push("soft.overlap");
+          reasonsById.set(currBox.id, reasons);
+        }
+      }
+    }
+
+    for (const [operatorId, boxes] of boxesByOperator) {
+      const build = buildByOperatorId?.[operatorId];
+      const cdrPercent = build?.cooldownReductionPercent ?? 0;
+      const cdrMultiplier = 1 - cdrPercent / 100;
+      const opDef = operatorsData[operatorId];
+      const cooldownByRank = opDef?.getComboCooldownSecondsByRank(build?.potentialRank);
+
+      const comboBoxes = boxes.filter(b => b.skillType === "comboSkill");
+
+      for (let i = 1; i < comboBoxes.length; i++) {
+        const prevBox = comboBoxes[i - 1];
+        const currBox = comboBoxes[i];
+
+        let cooldownFrames = 0;
+        if (cooldownByRank && cooldownByRank.length > 0) {
+          const rawRank = Number(build?.potentialRank ?? 0);
+          const rank = Number.isFinite(rawRank) ? Math.floor(rawRank) : 0;
+          const clampedRank = Math.min(cooldownByRank.length - 1, Math.max(0, rank));
+          const baseSeconds = Number(cooldownByRank[clampedRank] ?? cooldownByRank[0] ?? 0);
+          const safeBaseSeconds = Number.isFinite(baseSeconds) ? Math.max(0, baseSeconds) : 0;
+          const effectiveSeconds = safeBaseSeconds * cdrMultiplier;
+          cooldownFrames = Math.max(0, Math.round(effectiveSeconds * 60));
+        }
+
+        const cooldownUntilReal = prevBox.startFrame + cooldownFrames;
+
+        if (currBox.startFrame < cooldownUntilReal) {
+          const reasons = reasonsById.get(currBox.id) ?? [];
+          reasons.push("soft.cooldown");
+          reasonsById.set(currBox.id, reasons);
+        }
+      }
+    }
+
+    return reasonsById;
+  }, [previewSkillBoxes, buildByOperatorId]);
+
+  // Merge strict and soft reasons for each box
+  const invalidInfoByBoxId = useMemo(() => {
+    const infoById = new Map<
+      string,
+      { kind: "strict" | "soft" | "none"; reasons: string[] }
+    >();
+
+    for (const box of previewSkillBoxes) {
+      const strictReasons = illegalCastStartReasonById.get(box.id) ?? [];
+      const softReasons = softInvalidReasonsByBoxId.get(box.id) ?? [];
+
+      if (strictReasons.length > 0) {
+        infoById.set(box.id, { kind: "strict", reasons: strictReasons });
+      } else if (softReasons.length > 0) {
+        infoById.set(box.id, { kind: "soft", reasons: softReasons });
+      } else {
+        infoById.set(box.id, { kind: "none", reasons: [] });
+      }
+    }
+
+    return infoById;
+  }, [previewSkillBoxes, illegalCastStartReasonById, softInvalidReasonsByBoxId]);
 
   const computeBoxWidth = (box: SkillBox): number => {
     const startReal = box.startFrame;
@@ -1013,7 +1091,10 @@ export default function AxisEditor({
                 ? skillBoxDragState!.previewStartFrame
                 : box.startFrame;
               const width = computeBoxWidth({ ...box, startFrame });
-              const isIllegal = illegalCastStartIds.has(box.id);
+              const invalidInfo = invalidInfoByBoxId.get(box.id) ?? { kind: "none", reasons: [] };
+              const isInvalid = invalidInfo.kind !== "none";
+
+              const titleText = invalidInfo.reasons.join("\n");
 
               return (
                 <div
@@ -1021,7 +1102,10 @@ export default function AxisEditor({
                   data-testid="axis-skillbox"
                   data-skill-type={box.skillType}
                   data-operator-id={box.operatorId}
-                  className={`absolute bg-gray-500/75 border ${isIllegal ? "border-red-500" : "border-gray-300/80"}`}
+                  data-invalid-kind={invalidInfo.kind}
+                  data-invalid-reasons={invalidInfo.reasons.join(",")}
+                  title={titleText || undefined}
+                  className={`absolute border ${isInvalid ? "bg-red-500/40 border-red-500" : "bg-gray-500/75 border-gray-300/80"}`}
                   style={{
                     left: startFrame,
                     width,

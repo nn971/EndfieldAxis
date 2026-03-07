@@ -20,6 +20,7 @@ export type FreezeFrameResolver = (
 export type FreezeTimeline = {
   freezeWindows: FreezeWindow[];
   illegalCastStartIds: Set<string>;
+  illegalCastStartReasonById: Map<string, string[]>;
   scriptStartRealByCastStartId: Map<string, number>;
   realToGame: (real: number) => number;
   gameToRealAtOrAfter: (game: number, minReal: number) => number;
@@ -65,6 +66,7 @@ export function buildFreezeTimeline(
 ): FreezeTimeline {
   const freezeWindows: FreezeWindow[] = [];
   const illegalCastStartIds = new Set<string>();
+  const illegalCastStartReasonById = new Map<string, string[]>();
   const scriptStartRealByCastStartId = new Map<string, number>();
 
   let activeFreezeWindow: FreezeWindow | null = null;
@@ -106,6 +108,9 @@ export function buildFreezeTimeline(
 
       if (activeWindow.kind === "ultimate") {
         illegalCastStartIds.add(castStart.id);
+        const reasons = illegalCastStartReasonById.get(castStart.id) ?? [];
+        reasons.push("strict.inside_ultimate");
+        illegalCastStartReasonById.set(castStart.id, reasons);
         continue;
       }
 
@@ -113,6 +118,9 @@ export function buildFreezeTimeline(
         castStart.skillType === "comboSkill" || castStart.skillType === "ultimate";
       if (!canInterrupt) {
         illegalCastStartIds.add(castStart.id);
+        const reasons = illegalCastStartReasonById.get(castStart.id) ?? [];
+        reasons.push("strict.inside_combo_non_interruptible");
+        illegalCastStartReasonById.set(castStart.id, reasons);
         continue;
       }
 
@@ -203,6 +211,7 @@ export function buildFreezeTimeline(
   return {
     freezeWindows: normalizedFreezeWindows,
     illegalCastStartIds,
+    illegalCastStartReasonById,
     scriptStartRealByCastStartId,
     realToGame,
     gameToRealAtOrAfter,
