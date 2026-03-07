@@ -446,9 +446,48 @@ export default function AxisEditor({
   const toLaneIndex = (targetId: string): number =>
     laneIndexByOwnerId.get(targetId) ?? ENEMY_LANE_INDEX;
 
+  const previewSkillBoxes = useMemo(() => {
+    let boxes = [...skillBoxes];
+
+    // If dragging a box, update its position in the preview
+    if (skillBoxDragState?.id) {
+      boxes = boxes.map(box =>
+        box.id === skillBoxDragState.id
+          ? { ...box, startFrame: skillBoxDragState.previewStartFrame }
+          : box,
+      );
+    }
+
+    // If add-skill ghost is active, append ghost box
+    if (
+      addSkillDrag?.overAxis &&
+      addSkillDrag.laneIndex !== null &&
+      addSkillDrag.startFrame !== null
+    ) {
+      const operatorId = effectiveTeamOperatorIds[addSkillDrag.laneIndex];
+      if (operatorId) {
+        boxes.push({
+          id: "sb_ghost_preview",
+          operatorId,
+          skillType: addSkillDrag.skillType,
+          startFrame: addSkillDrag.startFrame,
+          durationFrames: ghostDurationFrames,
+        });
+      }
+    }
+
+    return boxes;
+  }, [
+    skillBoxes,
+    skillBoxDragState,
+    addSkillDrag,
+    effectiveTeamOperatorIds,
+    ghostDurationFrames,
+  ]);
+
   const freezeTimeline = useMemo(() => {
-    return buildFreezeTimeline(skillBoxes, getCastStartFreezeFrames);
-  }, [skillBoxes]);
+    return buildFreezeTimeline(previewSkillBoxes, getCastStartFreezeFrames);
+  }, [previewSkillBoxes]);
 
   const {
     freezeWindows,
@@ -953,7 +992,13 @@ export default function AxisEditor({
                   className={`absolute border border-dashed pointer-events-none ${isIllegalPlacement(addSkillDrag.startFrame, addSkillDrag.skillType) ? "border-red-500 bg-red-500/20" : "border-zinc-300 bg-zinc-200/20"}`}
                   style={{
                     left: addSkillDrag.startFrame,
-                    width: ghostDurationFrames,
+                    width: computeBoxWidth({
+                      id: "sb_ghost_preview",
+                      operatorId: effectiveTeamOperatorIds[addSkillDrag.laneIndex]!,
+                      skillType: addSkillDrag.skillType,
+                      startFrame: addSkillDrag.startFrame,
+                      durationFrames: ghostDurationFrames,
+                    }),
                     height: SKILL_BOX_HEIGHT,
                     top:
                       addSkillDrag.laneIndex * LANE_HEIGHT +
