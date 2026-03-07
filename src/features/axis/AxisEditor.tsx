@@ -63,6 +63,7 @@ type Props = {
   teamOperatorIds: string[];
   controlledOperatorId: string;
   skillBoxes: SkillBox[];
+  buildByOperatorId: Record<string, import("../../types/operator").OperatorBuild>;
   simRenderCache: SimRenderCache;
   onLaneLabelClick?: (laneIndex: number) => void;
   onCommitLaneReorder?: (from: number, to: number) => void;
@@ -85,6 +86,7 @@ export default function AxisEditor({
   teamOperatorIds,
   controlledOperatorId,
   skillBoxes,
+  buildByOperatorId,
   simRenderCache,
   onLaneLabelClick,
   onCommitLaneReorder,
@@ -209,28 +211,21 @@ export default function AxisEditor({
       addSkillDrag.laneIndex != null &&
       addSkillDrag.startFrame != null
     ) {
-      const isIllegal = isIllegalPlacement(
-        addSkillDrag.startFrame,
-        addSkillDrag.skillType,
-      );
+      const effectiveTeamOperatorIds = laneDragState
+        ? moveItem(
+            laneDragState.originIds,
+            laneDragState.from,
+            laneDragState.to,
+          )
+        : teamOperatorIds;
 
-      if (!isIllegal) {
-        const effectiveTeamOperatorIds = laneDragState
-          ? moveItem(
-              laneDragState.originIds,
-              laneDragState.from,
-              laneDragState.to,
-            )
-          : teamOperatorIds;
-
-        const operatorId = effectiveTeamOperatorIds[addSkillDrag.laneIndex];
-        if (operatorId) {
-          onAddSkillBox?.({
-            operatorId,
-            skillType: addSkillDrag.skillType,
-            startFrame: addSkillDrag.startFrame,
-          });
-        }
+      const operatorId = effectiveTeamOperatorIds[addSkillDrag.laneIndex];
+      if (operatorId) {
+        onAddSkillBox?.({
+          operatorId,
+          skillType: addSkillDrag.skillType,
+          startFrame: addSkillDrag.startFrame,
+        });
       }
     }
 
@@ -322,18 +317,9 @@ export default function AxisEditor({
     e.preventDefault();
     e.currentTarget.releasePointerCapture(skillBoxDragState.pointerId);
 
-    const draggedBox = skillBoxes.find(b => b.id === skillBoxDragState.id);
-    if (draggedBox) {
-      const isIllegal = isIllegalPlacement(
-        skillBoxDragState.previewStartFrame,
-        draggedBox.skillType,
-      );
-      if (!isIllegal) {
-        onCommitSkillBoxPatch?.(skillBoxDragState.id, {
-          startFrame: skillBoxDragState.previewStartFrame,
-        });
-      }
-    }
+    onCommitSkillBoxPatch?.(skillBoxDragState.id, {
+      startFrame: skillBoxDragState.previewStartFrame,
+    });
 
     setSkillBoxDragState(null);
   }
@@ -492,6 +478,7 @@ export default function AxisEditor({
   const {
     freezeWindows,
     illegalCastStartIds,
+    illegalCastStartReasonById,
     realToGame,
     gameToRealAtOrAfter,
   } = freezeTimeline;
@@ -1022,6 +1009,8 @@ export default function AxisEditor({
                 : box.startFrame;
               const width = computeBoxWidth({ ...box, startFrame });
               const isIllegal = illegalCastStartIds.has(box.id);
+              const invalidReasons = illegalCastStartReasonById.get(box.id) ?? [];
+              const titleText = invalidReasons.join("\n");
 
               return (
                 <div
@@ -1029,7 +1018,10 @@ export default function AxisEditor({
                   data-testid="axis-skillbox"
                   data-skill-type={box.skillType}
                   data-operator-id={box.operatorId}
-                  className={`absolute bg-gray-500/75 border ${isIllegal ? "border-red-500" : "border-gray-300/80"}`}
+                  data-invalid-kind={isIllegal ? "strict" : "none"}
+                  data-invalid-reasons={invalidReasons.join(",")}
+                  title={titleText || undefined}
+                  className={`absolute border ${isIllegal ? "bg-red-500/40 border-red-500" : "bg-gray-500/75 border-gray-300/80"}`}
                   style={{
                     left: startFrame,
                     width,
