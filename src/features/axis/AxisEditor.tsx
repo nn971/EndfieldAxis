@@ -486,6 +486,14 @@ export default function AxisEditor({
     gameToRealAtOrAfter,
   } = freezeTimeline;
 
+  const computeBoxWidth = (box: SkillBox): number => {
+    const startReal = box.startFrame;
+    const startGame = realToGame(startReal);
+    const endGame = startGame + box.durationFrames;
+    const endReal = gameToRealAtOrAfter(endGame, startReal);
+    return endReal - startReal;
+  };
+
   const softInvalidReasonsByBoxId = useMemo(() => {
     const reasonsById = new Map<string, string[]>();
 
@@ -589,14 +597,6 @@ export default function AxisEditor({
     illegalCastStartReasonById,
     softInvalidReasonsByBoxId,
   ]);
-
-  const computeBoxWidth = (box: SkillBox): number => {
-    const startReal = box.startFrame;
-    const startGame = realToGame(startReal);
-    const endGame = startGame + box.durationFrames;
-    const endReal = gameToRealAtOrAfter(endGame, startReal);
-    return endReal - startReal;
-  };
 
   const isIllegalPlacement = (
     startFrame: number,
