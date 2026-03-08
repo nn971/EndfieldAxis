@@ -396,10 +396,6 @@ export class SimWorld {
     };
   }
 
-  public get nowInFrames(): number {
-    return this.nowGameInFrames;
-  }
-
   // ----- Read helpers -----
   private getEntityOrThrow(id: SimEntityId): SimEntity {
     const ent = this.env.entitiesById[id];
@@ -772,7 +768,7 @@ export class SimWorld {
     const currentStacks = ent.inflictions[inflictionType].stacks;
     const afterStacks = Math.min(currentStacks + stacks, 4);
     ent.inflictions[inflictionType].stacks = afterStacks;
-    ent.inflictions[inflictionType].lastApplyFrame = this.nowInFrames;
+    ent.inflictions[inflictionType].lastApplyFrame = this.nowGameInFrames;
   }
 
   private removeInfliction(

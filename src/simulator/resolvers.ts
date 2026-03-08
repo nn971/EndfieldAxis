@@ -1289,39 +1289,43 @@ export function resolveInflictionApplication(
         };
       }
 
-      self.ops.scheduleAtRealFrame({
-        id: makeSimEventId(),
-        type: "hit",
-        frame: self.nowInFrames,
-        seq: self.ops.nextSeq(),
-        sourceId: source.id,
-        targetId: owner.id,
-        damageType: artsType,
-        staggerOnHit: getStaggerOnHitFromAncestorEvent(
-          self.read,
-          source.id,
-          ev,
-        ),
-        dmgMultiplier: computeArtsReactionMultiplier(
-          reactionConfig.reactionType,
-          consumedArtsStacks,
-          sourceBuild?.level ?? 1,
-          sourceBuild?.restStat?.artsIntensity ?? 0,
-        ),
-        ref: ev.id,
-      } as SimEvent);
+      self.ops.scheduleAtGameFrame(
+        {
+          id: makeSimEventId(),
+          type: "hit",
+          seq: self.ops.nextSeq(),
+          sourceId: source.id,
+          targetId: owner.id,
+          damageType: artsType,
+          staggerOnHit: getStaggerOnHitFromAncestorEvent(
+            self.read,
+            source.id,
+            ev,
+          ),
+          dmgMultiplier: computeArtsReactionMultiplier(
+            reactionConfig.reactionType,
+            consumedArtsStacks,
+            sourceBuild?.level ?? 1,
+            sourceBuild?.restStat?.artsIntensity ?? 0,
+          ),
+          ref: ev.id,
+        } as SimEvent,
+        self.nowGameInFrames,
+      );
 
-      self.ops.scheduleAtRealFrame({
-        id: makeSimEventId(),
-        type: "buffApply",
-        frame: ev.frame,
-        seq: self.ops.nextSeq(),
-        sourceId: source.id,
-        targetId: owner.id,
-        buffId: reactionBuffId,
-        isForced: false,
-        ref: ev.id,
-      } as Extract<SimEvent, { type: "buffApply" }>);
+      self.ops.scheduleAtGameFrame(
+        {
+          id: makeSimEventId(),
+          type: "buffApply",
+          seq: self.ops.nextSeq(),
+          sourceId: source.id,
+          targetId: owner.id,
+          buffId: reactionBuffId,
+          isForced: false,
+          ref: ev.id,
+        } as Extract<SimEvent, { type: "buffApply" }>,
+        self.nowGameInFrames,
+      );
 
       self.ops.log(
         "buff",
@@ -1361,22 +1365,24 @@ export function resolveInflictionApplication(
 
     const isBurstTrigger = current > 0;
     if (isBurstTrigger) {
-      self.ops.scheduleAtRealFrame({
-        id: makeSimEventId(),
-        type: "hit",
-        frame: self.read.nowGameInFrames + ARTS_BURST_DELAY_FRAMES,
-        seq: self.ops.nextSeq(),
-        sourceId: source.id,
-        targetId: owner.id,
-        damageType: artsType,
-        staggerOnHit: 0,
-        dmgMultiplier: computeArtsBurstMultiplier(
-          after,
-          sourceBuild?.level ?? 1,
-          sourceBuild?.restStat?.artsIntensity ?? 0,
-        ),
-        ref: ev.id,
-      } as SimEvent);
+      self.ops.scheduleAtGameFrame(
+        {
+          id: makeSimEventId(),
+          type: "hit",
+          seq: self.ops.nextSeq(),
+          sourceId: source.id,
+          targetId: owner.id,
+          damageType: artsType,
+          staggerOnHit: 0,
+          dmgMultiplier: computeArtsBurstMultiplier(
+            after,
+            sourceBuild?.level ?? 1,
+            sourceBuild?.restStat?.artsIntensity ?? 0,
+          ),
+          ref: ev.id,
+        } as SimEvent,
+        self.read.nowGameInFrames + ARTS_BURST_DELAY_FRAMES,
+      );
     }
   } else {
     const current = owner.inflictions[ev.inflictionType].stacks;

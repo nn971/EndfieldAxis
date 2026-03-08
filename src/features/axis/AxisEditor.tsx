@@ -921,6 +921,7 @@ export default function AxisEditor({
               height={RENDERED_LANE_COUNT * LANE_HEIGHT}
               viewBox={`0 0 ${AXIS_LENTH_IN_FRAMES} ${RENDERED_LANE_COUNT * LANE_HEIGHT}`}
             >
+              {/* Ultimate Energy */}
               {effectiveTeamOperatorIds.map((operatorId, laneIndex) => {
                 const points =
                   simRenderCache.ultimateEnergySeriesByOperatorId[operatorId];
@@ -1078,6 +1079,7 @@ export default function AxisEditor({
               );
             })}
 
+            {/* Skill Boxes */}
             {addSkillDrag?.overAxis &&
               addSkillDrag.laneIndex != null &&
               addSkillDrag.startFrame != null &&
@@ -1117,10 +1119,15 @@ export default function AxisEditor({
                 ? skillBoxDragState!.previewStartFrame
                 : box.startFrame;
               const width = computeBoxWidth({ ...box, startFrame });
-              const isIllegal = illegalCastStartIds.has(box.id);
-              const invalidReasons =
-                illegalCastStartReasonById.get(box.id) ?? [];
-              const titleText = invalidReasons.join("\n");
+              const invalidInfo = invalidInfoByBoxId.get(box.id);
+
+              // console.log(JSON.stringify(invalidInfo));
+
+              let isIllegal = false;
+              if (invalidInfo && invalidInfo.kind != "none") {
+                isIllegal = true;
+              }
+              const titleText = invalidInfo?.reasons.join(",");
 
               return (
                 <div
@@ -1128,8 +1135,8 @@ export default function AxisEditor({
                   data-testid="axis-skillbox"
                   data-skill-type={box.skillType}
                   data-operator-id={box.operatorId}
-                  data-invalid-kind={isIllegal ? "strict" : "none"}
-                  data-invalid-reasons={invalidReasons.join(",")}
+                  data-invalid-kind={invalidInfo?.kind ?? "none"}
+                  data-invalid-reasons={titleText}
                   title={titleText || undefined}
                   className={`absolute border ${isIllegal ? "bg-red-500/40 border-red-500" : "bg-gray-500/75 border-gray-300/80"}`}
                   style={{

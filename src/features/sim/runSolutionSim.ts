@@ -266,12 +266,18 @@ function getComboCooldownFrames(
     return 0;
   }
 
-  const rank = clampInt(build?.potentialRank ?? 0, 0, cooldownByRank.length - 1);
+  const rank = clampInt(
+    build?.potentialRank ?? 0,
+    0,
+    cooldownByRank.length - 1,
+  );
   const baseSeconds = Number(cooldownByRank[rank] ?? cooldownByRank[0] ?? 0);
   const safeBaseSeconds = Number.isFinite(baseSeconds)
     ? Math.max(0, baseSeconds)
     : 0;
-  const reduction = clamp01(Number(build?.restStat?.comboCooldownReduction ?? 0));
+  const reduction = clamp01(
+    Number(build?.restStat?.comboCooldownReduction ?? 0),
+  );
   const effectiveSeconds = safeBaseSeconds * (1 - reduction);
   return Math.max(0, Math.round(effectiveSeconds * 60));
 }
@@ -311,7 +317,10 @@ function collectCompileSoftReasons(params: {
       }
 
       const startReal = box.startFrame;
-      const durationGame = getSkillDurationGameFrames(box, skill.durationFrames);
+      const durationGame = getSkillDurationGameFrames(
+        box,
+        skill.durationFrames,
+      );
       const startGame = realToGame(startReal);
       const endGame = startGame + durationGame;
       const endReal = gameToRealAtOrAfter(endGame, startReal);
@@ -330,11 +339,21 @@ function collectCompileSoftReasons(params: {
 
       if (box.skillType === "comboSkill") {
         if (startReal < cooldownUntilReal) {
-          appendSoftReason(softReasonBySkillBoxId, box.id, "soft:combo-cooldown");
+          appendSoftReason(
+            softReasonBySkillBoxId,
+            box.id,
+            "soft:combo-cooldown",
+          );
         }
 
-        const cooldownFrames = getComboCooldownFrames(operatorId, buildByOperatorId);
-        cooldownUntilReal = Math.max(cooldownUntilReal, startReal + cooldownFrames);
+        const cooldownFrames = getComboCooldownFrames(
+          operatorId,
+          buildByOperatorId,
+        );
+        cooldownUntilReal = Math.max(
+          cooldownUntilReal,
+          startReal + cooldownFrames,
+        );
       }
     }
   }
@@ -601,7 +620,9 @@ function mergeInvalidSkillBoxes(params: {
     ...strictInvalidSkillBoxById,
   };
 
-  for (const [skillBoxId, softEntry] of Object.entries(softInvalidSkillBoxById)) {
+  for (const [skillBoxId, softEntry] of Object.entries(
+    softInvalidSkillBoxById,
+  )) {
     const strictEntry = merged[skillBoxId];
     const mergedReasons = new Set<string>(strictEntry?.reasons ?? []);
     for (const reason of softEntry.reasons) {
