@@ -851,6 +851,7 @@ export class SimWorld {
     this.ops.log("sim", logMsg.simStart());
 
     let steps = 0;
+    let lastSampledGameFrame = this.nowGameInFrames;
 
     while (true) {
       if (steps++ > maxSteps) {
@@ -861,9 +862,28 @@ export class SimWorld {
       const ev = this.ops.popNextEvent();
       if (!ev) break;
 
-      this.ops.advanceToFrame(ev.frame);
-      this.syncTeamSpRegen(this.nowGameInFrames);
-      this.captureResourceSample(ev.frame, ev.seq + 0.5);
+      const gameFrameBeforeAdvance = this.realToGame(ev.frame);
+
+      if (
+        gameFrameBeforeAdvance === lastSampledGameFrame &&
+        ev.frame > this.nowRealInFrames
+      ) {
+        const freezeStartReal = this.nowRealInFrames;
+        const freezeEndReal = ev.frame;
+
+        this.ops.advanceToFrame(freezeStartReal);
+        this.syncTeamSpRegen(this.nowGameInFrames);
+        this.captureResourceSample(freezeStartReal, this.seqCounter++);
+
+        this.ops.advanceToFrame(freezeEndReal);
+        this.captureResourceSample(freezeEndReal, this.seqCounter++);
+      } else {
+        this.ops.advanceToFrame(ev.frame);
+        this.syncTeamSpRegen(this.nowGameInFrames);
+        this.captureResourceSample(ev.frame, ev.seq + 0.5);
+      }
+
+      lastSampledGameFrame = this.nowGameInFrames;
 
       // console.log(ev.frame, ev.type);
 
