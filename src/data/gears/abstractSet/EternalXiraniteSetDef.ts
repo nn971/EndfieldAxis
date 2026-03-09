@@ -35,11 +35,11 @@ export abstract class EternalXiraniteSetDef extends GearsDef {
       "item_equip_t4_suit_usp02_edc_03",
     ],
     restBonuses: [
-      {
-        bucket: "artsIntensity",
-        addValue: 25,
-        log: "Eternal Xiranite 3-piece: Arts Intensity +25",
-      },
+      // {
+      //   bucket: "artsIntensity",
+      //   addValue: 25,
+      //   log: "Eternal Xiranite 3-piece: Arts Intensity +25",
+      // },
     ],
   };
 

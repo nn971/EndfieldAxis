@@ -444,6 +444,10 @@ export class SimWorld {
       ultimateCurrentByOperatorId[operatorId] = Number(state?.current ?? 0);
     }
 
+    // console.log(
+    //   `frame: ${frame}, SP total: ${this.env.resources.teamSp.real + this.env.resources.teamSp.fake}`,
+    // );
+
     this.resourceSamples.push({
       frame,
       seq,
@@ -986,7 +990,8 @@ export class SimWorld {
             read: this.read,
             ops: this.ops,
             ev,
-            sourceId: ev.targetId,
+            sourceId: ev.sourceId,
+            targetId: ev.targetId,
           });
           this.ops.scheduleDraftsAtGameFrame(spawned, {
             minRealFrame: this.nowRealInFrames,

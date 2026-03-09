@@ -11,12 +11,10 @@ class RedeemerSealDef extends GearsDef {
       bonusBuckets: {
         s1: "intellect",
         s2: "ultimateGainEfficiency",
-        s3: "intellect",
       },
       bonusValuesByRank: {
         s1: [43, 47, 51, 55],
         s2: [25.7, 28.3, 30.9, 33.4],
-        s3: [21, 23, 25, 27],
       },
     });
   }

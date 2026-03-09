@@ -10,13 +10,11 @@ class RedeemerSealT1Def extends GearsDef {
       defend: 21,
       bonusBuckets: {
         s1: "will",
-        s2: "agility",
-        s3: "will",
+        s2: "criticalChance",
       },
       bonusValuesByRank: {
         s1: [43, 47, 51, 55],
         s2: [10.8, 11.9, 13.0, 14.0],
-        s3: [21, 23, 25, 27],
       },
     });
   }

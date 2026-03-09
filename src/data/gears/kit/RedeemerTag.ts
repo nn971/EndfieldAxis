@@ -10,13 +10,13 @@ class RedeemerTagDef extends GearsDef {
       defend: 21,
       bonusBuckets: {
         s1: "strength",
-        s2: "will",
-        s3: "strength",
+        s2: "strength",
       },
       bonusValuesByRank: {
         s1: [43, 47, 51, 55],
-        s2: [17.8, 19.2, 20.6, 21.9],
-        s3: [21, 23, 25, 27],
+        // TODO
+        // s2: [17.8, 19.2, 20.6, 21.9],
+        s2: [0, 0, 0, 0],
       },
     });
   }

@@ -40,7 +40,11 @@ class SusceptibilityBuffDef extends BuffDef {
 
         if (delta === 0) return;
 
-        collector.addValue("rcvDmgIncRatio", delta, `${this.name} (+${Math.round(delta * 100)}%)`);
+        collector.addValue(
+          "rcvDmgAmpRatio",
+          delta,
+          `${this.name} (+${Math.round(delta * 100)}%)`,
+        );
       },
     });
   }

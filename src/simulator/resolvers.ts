@@ -366,9 +366,9 @@ function normalizeBuffDurationFrames(params: {
     return null;
   }
   if (durationFrames <= 0) {
-    console.warn(
-      `BuffId=${buffId} has non-positive durationFrames=${durationFrames}, defaulting to non-expiring`,
-    );
+    // console.warn(
+    //   `BuffId=${buffId} has non-positive durationFrames=${durationFrames}, defaulting to non-expiring`,
+    // );
     return null;
   }
 
@@ -884,6 +884,7 @@ export function resolveStatusApplication(
   let shouldRemoveVulnerable = false;
 
   const current = (target as any).inflictions.vulnerable?.stacks ?? 0;
+  const isForced = ev.isForced === true;
   const inheritedStaggerOnHit = getStaggerOnHitFromAncestorEvent(
     self.read,
     sourceId,
@@ -891,7 +892,7 @@ export function resolveStatusApplication(
   );
   switch (statusType) {
     case "lift": {
-      if (current <= 0) break;
+      if (current <= 0 && !isForced) break;
 
       // Has vulnerable: add 1 stack (cap 4) and trigger Lift damage.
       // Schedule Lift damage as a hit event so it can interleave with other same-frame effects.
@@ -917,7 +918,7 @@ export function resolveStatusApplication(
       break;
     }
     case "knockDown": {
-      if (current <= 0) break;
+      if (current <= 0 && !isForced) break;
 
       self.ops.scheduleAtGameFrame(
         {
@@ -942,7 +943,7 @@ export function resolveStatusApplication(
     }
 
     case "crush": {
-      if (current <= 0) break;
+      if (current <= 0 && !isForced) break;
 
       // Has vulnerable: consume all stacks and trigger crush burst damage.
       shouldAddVulnerable = false;
@@ -976,7 +977,7 @@ export function resolveStatusApplication(
     case "breach": {
       // TODO: Add breached (or other name) debuff to enemy
 
-      if (current <= 0) break;
+      if (current <= 0 && !isForced) break;
 
       // Has vulnerable: consume all stacks and trigger breach burst damage.
       shouldRemoveVulnerable = true;
@@ -1267,27 +1268,27 @@ export function resolveInflictionApplication(
 
       const reactionConfig = reactionTypeMap[artsType];
       const reactionBuffId = reactionConfig.buffId;
-      const buffStacks =
-        reactionConfig.buffStacksOverride ?? consumedArtsStacks;
+      // const buffStacks =
+      //   reactionConfig.buffStacksOverride ?? consumedArtsStacks;
 
-      let buffMeta: Record<string, unknown> | undefined;
-      if (artsType === "heat") {
-        buffMeta = {
-          reactionSourceId: source.id,
-          combustionTickMultiplier:
-            COMBUSTION_DOT_BASE_MUL +
-            consumedArtsStacks * COMBUSTION_DOT_PER_STACK_MUL,
-        };
-      } else if (artsType === "nature") {
-        buffMeta = {
-          corrosionReductionPerSecond:
-            CORROSION_REDUCTION_PER_SECOND_BASE +
-            consumedArtsStacks * CORROSION_REDUCTION_PER_SECOND_PER_STACK,
-          corrosionMinResistanceMul:
-            CORROSION_MIN_RESISTANCE_BASE +
-            consumedArtsStacks * CORROSION_MIN_RESISTANCE_PER_STACK,
-        };
-      }
+      // let buffMeta: Record<string, unknown> | undefined;
+      // if (artsType === "heat") {
+      //   buffMeta = {
+      //     reactionSourceId: source.id,
+      //     combustionTickMultiplier:
+      //       COMBUSTION_DOT_BASE_MUL +
+      //       consumedArtsStacks * COMBUSTION_DOT_PER_STACK_MUL,
+      //   };
+      // } else if (artsType === "nature") {
+      //   buffMeta = {
+      //     corrosionReductionPerSecond:
+      //       CORROSION_REDUCTION_PER_SECOND_BASE +
+      //       consumedArtsStacks * CORROSION_REDUCTION_PER_SECOND_PER_STACK,
+      //     corrosionMinResistanceMul:
+      //       CORROSION_MIN_RESISTANCE_BASE +
+      //       consumedArtsStacks * CORROSION_MIN_RESISTANCE_PER_STACK,
+      //   };
+      // }
 
       self.ops.scheduleAtGameFrame(
         {

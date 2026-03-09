@@ -100,14 +100,9 @@ class EstellaDef extends OperatorDef {
               inflictionType: "cryo",
               inflictionStacks: 1,
             });
-            const dmgMultiplier = ctx.byRank!(r => NS_DMG_MUL[r] ?? 0);
-            const finalMultiplier =
-              ctx.sourcePotentialRank >= 3
-                ? dmgMultiplier + 0.4
-                : dmgMultiplier;
             yield ctx.emit.hit({
               damageType: "cryo",
-              dmgMultiplier: finalMultiplier,
+              dmgMultiplier: ctx.byRank!(r => NS_DMG_MUL[r] ?? 0),
               staggerOnHit: 10,
             });
           },
@@ -118,10 +113,6 @@ class EstellaDef extends OperatorDef {
           icon: "ESTELLA_CS.png",
           script: function* (ctx) {
             yield delay(4);
-            yield ctx.emit.statusApply({
-              statusType: "lift",
-            });
-
             const target = ctx.read.getEntity(ctx.targetId ?? null);
             const isSolidified = Boolean(
               (target as any)?.buffs?.["buff.solidification"],
@@ -133,8 +124,6 @@ class EstellaDef extends OperatorDef {
               );
               const durationFrames = potentialRank >= 1 ? 540 : 360;
               yield ctx.emit.buffApply({
-                sourceId: ctx.sourceId,
-                targetId: ctx.targetId,
                 buffId: "buff.common.susceptibility",
                 buffKey: "buff.estella.combo.physicalSusceptibility",
                 durationFrames,
@@ -146,6 +135,12 @@ class EstellaDef extends OperatorDef {
                 },
               });
             }
+
+            yield ctx.emit.statusApply({
+              statusType: "lift",
+              isForced: true,
+            });
+
             yield ctx.emit.hit({
               damageType: "physical",
               dmgMultiplier: isSolidified
@@ -161,6 +156,25 @@ class EstellaDef extends OperatorDef {
           freezeFramesOnCastStart: 108,
           icon: "ESTELLA_ULT.png",
           script: function* (ctx) {
+            // TODO
+            // const target = ctx.read.getEntity(ctx.targetId ?? null);
+            // console.log(`${JSON.stringify((target as any)?.buffs)}`);
+            // let hasPhysicalSusceptible = false;
+            // ((target as any)?.buffs).foreach((b: any) => {
+            //   if (
+            //     b.id === "buff.common.susceptibility" &&
+            //     b.runtime.damageType === "physical"
+            //   )
+            //     hasPhysicalSusceptible = true;
+            // });
+
+            // if (hasPhysicalSusceptible) {
+            //   yield ctx.emit.statusApply({
+            //     statusType: "lift",
+            //     isForced: true,
+            //   });
+            // }
+
             yield ctx.emit.hit({
               damageType: "physical",
               dmgMultiplier: ctx.byRank!(r => ULT_DMG_MUL[r] ?? 0),
@@ -206,6 +220,28 @@ class EstellaDef extends OperatorDef {
   override registerSimPlugins(registry: SimRegistry): void {
     const selfId = this.id;
 
+    registry.registerGlobalDamageBonus({
+      id: "operator.estella.potential3.normalSkillDmgInc",
+      fn: ({ read, ev, sourceId, collector }) => {
+        if (sourceId !== selfId) return;
+        if (ev?.type !== "hit") return;
+
+        const parent = ev.ref ? read.getEvent(ev.ref) : null;
+        const isNormalSkillHit =
+          parent?.type === "castStart" && parent.skillType === "normalSkill";
+        if (!isNormalSkillHit) return;
+
+        const potentialRank = Number(read.getBuild(selfId)?.potentialRank ?? 0);
+        if (potentialRank < 3) return;
+
+        collector.addValue(
+          "dmgIncRatio",
+          0.4,
+          "operator.estella.potential3.normalSkillDmgInc(+40%)",
+        );
+      },
+    });
+
     registry.registerOnBuffApply({
       id: "operator.estella.combo.triggerOnSolidification",
       when: { buffId: "buff.solidification" },
@@ -226,13 +262,14 @@ class EstellaDef extends OperatorDef {
       when: { buffId: "buff.solidification" },
       cooldown: 60,
       fn: function* (ctx) {
-        const { read, ev, emit } = ctx;
+        const { read, ev } = ctx;
         if (ev?.type !== "buffApply") return;
         const build = read.getBuild(selfId);
         if (!build || build.potentialRank < 5) return;
         if (!read.env.entitiesById[selfId]) return;
 
         ctx.ops.gainUltimateEnergy(selfId, 5);
+        yield delay(0);
       },
     });
   }

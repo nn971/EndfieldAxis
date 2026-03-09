@@ -1,6 +1,10 @@
 import type { SimRegistry } from "../../simulator/listeners/registry";
 import { delay } from "../../simulator/scripts";
-import { OperatorDef, OperatorDefInit } from "./OperatorDef";
+import {
+  OperatorAttributeBonus,
+  OperatorDef,
+  OperatorDefInit,
+} from "./OperatorDef";
 
 const NS_DMG_MUL = [
   2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.2, 3.4, 3.6, 3.85, 4.15, 4.5,
@@ -212,6 +216,19 @@ class AleshDef extends OperatorDef {
         },
       },
     } satisfies OperatorDefInit);
+  }
+
+  override getPotentialAttributeBonus(
+    potentialRank?: number,
+  ): OperatorAttributeBonus {
+    if (!potentialRank || potentialRank < 2) {
+      return {};
+    }
+
+    return {
+      strength: 15,
+      intellect: 15,
+    };
   }
 
   override getComboCooldownSecondsByRank(

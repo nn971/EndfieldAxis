@@ -140,7 +140,7 @@ export const zhCNContent = {
       },
     },
     yvonne: {
-      name: "伊冯娜",
+      name: "伊冯",
       skill: {
         comboSkill: "速冻机 υ37",
         normalAttack: "旺盛的触发",

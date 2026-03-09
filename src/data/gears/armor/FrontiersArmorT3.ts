@@ -11,7 +11,7 @@ class FrontiersArmorT3Def extends FrontiersSetDef {
       bonusBuckets: {
         s1: "agility",
         s2: "intellect",
-        s3: "atkIncRatio",
+        s3: "secondaryAttribute",
       },
       bonusValuesByRank: {
         s1: [87, 95, 104, 113],

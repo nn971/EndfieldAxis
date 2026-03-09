@@ -189,13 +189,13 @@ export const zhCN = {
       operator_attribute_level:
         "{{operatorName}} 基础 {{attribute}}（等级 {{level}}）",
       trust_attribute_bonus: "信赖等级 {{rank}}（+{{addValue}} {{attribute}}）",
-      potential_attribute_bonus: "潜能等级 {{rank}}（+{{addValue}} {{attribute}}）",
+      potential_attribute_bonus:
+        "潜能等级 {{rank}}（+{{addValue}} {{attribute}}）",
       weapon_base_atk_level: "{{weaponName}} 基础攻击（等级 {{level}}）",
       weapon_skill_bonus:
         "{{weaponName}} {{skill}} {{skillId}}（等级 {{rank}}）",
       weapon_s3_bonus: "{{weaponName}} s3 {{skillId}}（等级 {{rank}}）",
-      gear_slot_bonus:
-        "{{gearName}} {{slotKey}} {{bonusKey}}（等级 {{rank}}）",
+      gear_slot_bonus: "{{gearName}} {{slotKey}} {{bonusKey}}（等级 {{rank}}）",
       gear_set_bonus: "{{gearSetName}} {{pieceCount}} 件套效果",
     },
     sim: {
@@ -255,7 +255,8 @@ export const zhCN = {
       dmg_breakdown_attack:
         "基础攻击 {{baseAttack}} + 武器 {{weaponAttack}}，攻击加成 {{atkIncRatio}}，属性加成 {{attributeBonusRatio}}，最终攻击 {{atkFinal}}。",
       dmg_breakdown_raw: "原始输出 {{rawOutcoming}}，原始伤害 {{rawDamage}}。",
-      dmg_breakdown_multiplier_header: "最终乘区 {{dmgFinalMultiplier}}，来源如下：",
+      dmg_breakdown_multiplier_header:
+        "最终乘区 {{dmgFinalMultiplier}}。加伤来源如下：",
       dmg_breakdown_bonus_line: "bucket={{bucket}}，+{{addValue}}，{{note}}",
     },
   },
