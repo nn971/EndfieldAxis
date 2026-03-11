@@ -4,7 +4,9 @@ import { WeaponDef } from "../WeaponDef";
 const ATK_BUFF_KEY = "weapon.objrazorhorn.atkBuff" as const;
 const ATK_BUFF_DURATION_FRAMES = 900;
 const ATK_BUFF_MAX_STACKS = 1;
-const ATK_BUFF_RATIO = 0.12;
+const ATK_BUFF_RATIO_BY_RANK = [
+  0.12, 0.144, 0.168, 0.192, 0.216, 0.24, 0.264, 0.288, 0.336,
+];
 
 const DMG_BONUS_BY_RANK = [
   0.08, 0.096, 0.112, 0.128, 0.144, 0.16, 0.176, 0.192, 0.224,
@@ -23,15 +25,15 @@ class OBJRazorhornDef extends WeaponDef {
         id: "inflictionconquestoficypeaks",
         cat: "infliction",
         name: "Conquest of Icy Peaks",
-        bonus: {
-          bucket: "physicalDmgIncRatio",
-          byRank: r => {
-            const values = [
-              0.224, 0.246, 0.268, 0.291, 0.313, 0.336, 0.358, 0.381, 0.403,
-            ];
-            return values[r] ?? 0.224;
-          },
-        },
+        // bonus: {
+        //   bucket: "physicalDmgIncRatio",
+        //   byRank: r => {
+        //     const values = [
+        //       0.224, 0.246, 0.268, 0.291, 0.313, 0.336, 0.358, 0.381, 0.403,
+        //     ];
+        //     return values[r] ?? 0.224;
+        //   },
+        // },
       },
     });
   }
@@ -57,11 +59,11 @@ class OBJRazorhornDef extends WeaponDef {
 
         if (hasCryo || hasSolidification) {
           const weaponRank = build.weapon.skillRanks.s3;
-          const bonusValue = DMG_BONUS_BY_RANK[weaponRank] ?? 0.08;
+          const bonusValue = DMG_BONUS_BY_RANK[weaponRank - 1] ?? 0.08;
           collector.addValue(
             "dmgIncRatio",
             bonusValue,
-            `Conquest of Icy Peaks (+${Math.round(bonusValue * 100)}% DMG vs Cryo/Solidified)`,
+            `Conquest of Icy Peaks (+${Math.round(bonusValue * 1000) / 10}% DMG vs Cryo/Solidified)`,
           );
         }
       },
@@ -76,7 +78,17 @@ class OBJRazorhornDef extends WeaponDef {
         if (!sourceId) return;
 
         const build = read.getBuild(sourceId);
+
+        // console.log(
+        //   `test, souceId: ${sourceId}, weapon id: ${build?.weapon.id}`,
+        // );
+
         if (!build || build.weapon.id !== selfId) return;
+
+        const weaponRank = build.weapon.skillRanks.s3;
+        const bonusValue = ATK_BUFF_RATIO_BY_RANK[weaponRank - 1] ?? 0.12;
+
+        // console.log(`test`);
 
         yield emit.buffApply({
           sourceId,
@@ -86,7 +98,7 @@ class OBJRazorhornDef extends WeaponDef {
           durationFrames: ATK_BUFF_DURATION_FRAMES,
           maxStacks: ATK_BUFF_MAX_STACKS,
           runtime: {
-            value: ATK_BUFF_RATIO,
+            value: bonusValue,
             role: "source",
           },
         });

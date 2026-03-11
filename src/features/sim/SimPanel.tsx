@@ -35,7 +35,8 @@ export default function SimPanel() {
       summarizeLog(
         lastRunResult.log,
         // ["sim", "act", "buff", "stat", "dmg", "SP", "dev"],
-        ["SP", "act"],
+        // ["SP", "act"],
+        ["dmg", "act", "buff", "stat"],
         true,
         (message, entry) =>
           formatSimLog({

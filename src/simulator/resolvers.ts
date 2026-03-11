@@ -366,9 +366,9 @@ function normalizeBuffDurationFrames(params: {
     return null;
   }
   if (durationFrames <= 0) {
-    console.warn(
-      `BuffId=${buffId} has non-positive durationFrames=${durationFrames}, defaulting to non-expiring`,
-    );
+    // console.warn(
+    //   `BuffId=${buffId} has non-positive durationFrames=${durationFrames}, defaulting to non-expiring`,
+    // );
     return null;
   }
 
@@ -510,6 +510,12 @@ export function resolveCastStart(
   self: SimWorld,
   ev: Extract<SimEvent, { type: "castStart" }>,
 ) {
+  const appendSoftInvalidReason = (reason: string) => {
+    ev.softInvalidReasons ??= [];
+    if (!ev.softInvalidReasons.includes(reason)) {
+      ev.softInvalidReasons.push(reason);
+    }
+  };
   const source = ev.sourceId
     ? (self.read.getEntity(ev.sourceId) as SimEntity)
     : null;
@@ -538,6 +544,7 @@ export function resolveCastStart(
       fakeSpent: spendRes.fakeSpent,
     });
     if (!spendRes.isLegal) {
+      appendSoftInvalidReason("soft:insufficient-team-sp");
       self.ops.log(
         "act",
         logMsg.actCastInsufficientSp({
@@ -553,6 +560,7 @@ export function resolveCastStart(
   if (ev.skillType === "ultimate") {
     const spendRes = self.spendUltimateEnergy(ev.sourceId);
     if (!spendRes.isLegal) {
+      appendSoftInvalidReason("soft:insufficient-ultimate-energy");
       self.ops.log(
         "act",
         logMsg.actCastInsufficientUltimate({
@@ -575,6 +583,7 @@ export function resolveCastStart(
     }
 
     if (combo.cooldown > 0) {
+      appendSoftInvalidReason("soft:combo-cooldown");
       const reason = `combo cooldown active (${combo.cooldown}f remaining)`;
       self.ops.log(
         "act",
@@ -586,9 +595,8 @@ export function resolveCastStart(
         }),
       );
       console.warn(
-        `Rejected comboSkill castStart sourceId=${ev.sourceId}: ${reason}`,
+        `Soft-invalid comboSkill castStart sourceId=${ev.sourceId}: ${reason}`,
       );
-      return;
     }
 
     const build = self.read.getBuild(ev.sourceId);
@@ -876,6 +884,7 @@ export function resolveStatusApplication(
   let shouldRemoveVulnerable = false;
 
   const current = (target as any).inflictions.vulnerable?.stacks ?? 0;
+  const isForced = ev.isForced === true;
   const inheritedStaggerOnHit = getStaggerOnHitFromAncestorEvent(
     self.read,
     sourceId,
@@ -883,7 +892,7 @@ export function resolveStatusApplication(
   );
   switch (statusType) {
     case "lift": {
-      if (current <= 0) break;
+      if (current <= 0 && !isForced) break;
 
       // Has vulnerable: add 1 stack (cap 4) and trigger Lift damage.
       // Schedule Lift damage as a hit event so it can interleave with other same-frame effects.
@@ -909,7 +918,7 @@ export function resolveStatusApplication(
       break;
     }
     case "knockDown": {
-      if (current <= 0) break;
+      if (current <= 0 && !isForced) break;
 
       self.ops.scheduleAtGameFrame(
         {
@@ -934,7 +943,7 @@ export function resolveStatusApplication(
     }
 
     case "crush": {
-      if (current <= 0) break;
+      if (current <= 0 && !isForced) break;
 
       // Has vulnerable: consume all stacks and trigger crush burst damage.
       shouldAddVulnerable = false;
@@ -968,7 +977,7 @@ export function resolveStatusApplication(
     case "breach": {
       // TODO: Add breached (or other name) debuff to enemy
 
-      if (current <= 0) break;
+      if (current <= 0 && !isForced) break;
 
       // Has vulnerable: consume all stacks and trigger breach burst damage.
       shouldRemoveVulnerable = true;
@@ -1259,61 +1268,65 @@ export function resolveInflictionApplication(
 
       const reactionConfig = reactionTypeMap[artsType];
       const reactionBuffId = reactionConfig.buffId;
-      const buffStacks =
-        reactionConfig.buffStacksOverride ?? consumedArtsStacks;
+      // const buffStacks =
+      //   reactionConfig.buffStacksOverride ?? consumedArtsStacks;
 
-      let buffMeta: Record<string, unknown> | undefined;
-      if (artsType === "heat") {
-        buffMeta = {
-          reactionSourceId: source.id,
-          combustionTickMultiplier:
-            COMBUSTION_DOT_BASE_MUL +
-            consumedArtsStacks * COMBUSTION_DOT_PER_STACK_MUL,
-        };
-      } else if (artsType === "nature") {
-        buffMeta = {
-          corrosionReductionPerSecond:
-            CORROSION_REDUCTION_PER_SECOND_BASE +
-            consumedArtsStacks * CORROSION_REDUCTION_PER_SECOND_PER_STACK,
-          corrosionMinResistanceMul:
-            CORROSION_MIN_RESISTANCE_BASE +
-            consumedArtsStacks * CORROSION_MIN_RESISTANCE_PER_STACK,
-        };
-      }
+      // let buffMeta: Record<string, unknown> | undefined;
+      // if (artsType === "heat") {
+      //   buffMeta = {
+      //     reactionSourceId: source.id,
+      //     combustionTickMultiplier:
+      //       COMBUSTION_DOT_BASE_MUL +
+      //       consumedArtsStacks * COMBUSTION_DOT_PER_STACK_MUL,
+      //   };
+      // } else if (artsType === "nature") {
+      //   buffMeta = {
+      //     corrosionReductionPerSecond:
+      //       CORROSION_REDUCTION_PER_SECOND_BASE +
+      //       consumedArtsStacks * CORROSION_REDUCTION_PER_SECOND_PER_STACK,
+      //     corrosionMinResistanceMul:
+      //       CORROSION_MIN_RESISTANCE_BASE +
+      //       consumedArtsStacks * CORROSION_MIN_RESISTANCE_PER_STACK,
+      //   };
+      // }
 
-      self.ops.scheduleAtRealFrame({
-        id: makeSimEventId(),
-        type: "hit",
-        frame: self.nowInFrames,
-        seq: self.ops.nextSeq(),
-        sourceId: source.id,
-        targetId: owner.id,
-        damageType: artsType,
-        staggerOnHit: getStaggerOnHitFromAncestorEvent(
-          self.read,
-          source.id,
-          ev,
-        ),
-        dmgMultiplier: computeArtsReactionMultiplier(
-          reactionConfig.reactionType,
-          consumedArtsStacks,
-          sourceBuild?.level ?? 1,
-          sourceBuild?.restStat?.artsIntensity ?? 0,
-        ),
-        ref: ev.id,
-      } as SimEvent);
+      self.ops.scheduleAtGameFrame(
+        {
+          id: makeSimEventId(),
+          type: "hit",
+          seq: self.ops.nextSeq(),
+          sourceId: source.id,
+          targetId: owner.id,
+          damageType: artsType,
+          staggerOnHit: getStaggerOnHitFromAncestorEvent(
+            self.read,
+            source.id,
+            ev,
+          ),
+          dmgMultiplier: computeArtsReactionMultiplier(
+            reactionConfig.reactionType,
+            consumedArtsStacks,
+            sourceBuild?.level ?? 1,
+            sourceBuild?.restStat?.artsIntensity ?? 0,
+          ),
+          ref: ev.id,
+        } as SimEvent,
+        self.nowGameInFrames,
+      );
 
-      self.ops.scheduleAtRealFrame({
-        id: makeSimEventId(),
-        type: "buffApply",
-        frame: ev.frame,
-        seq: self.ops.nextSeq(),
-        sourceId: source.id,
-        targetId: owner.id,
-        buffId: reactionBuffId,
-        isForced: false,
-        ref: ev.id,
-      } as Extract<SimEvent, { type: "buffApply" }>);
+      self.ops.scheduleAtGameFrame(
+        {
+          id: makeSimEventId(),
+          type: "buffApply",
+          seq: self.ops.nextSeq(),
+          sourceId: source.id,
+          targetId: owner.id,
+          buffId: reactionBuffId,
+          isForced: false,
+          ref: ev.id,
+        } as Extract<SimEvent, { type: "buffApply" }>,
+        self.nowGameInFrames,
+      );
 
       self.ops.log(
         "buff",
@@ -1353,22 +1366,24 @@ export function resolveInflictionApplication(
 
     const isBurstTrigger = current > 0;
     if (isBurstTrigger) {
-      self.ops.scheduleAtRealFrame({
-        id: makeSimEventId(),
-        type: "hit",
-        frame: self.read.nowGameInFrames + ARTS_BURST_DELAY_FRAMES,
-        seq: self.ops.nextSeq(),
-        sourceId: source.id,
-        targetId: owner.id,
-        damageType: artsType,
-        staggerOnHit: 0,
-        dmgMultiplier: computeArtsBurstMultiplier(
-          after,
-          sourceBuild?.level ?? 1,
-          sourceBuild?.restStat?.artsIntensity ?? 0,
-        ),
-        ref: ev.id,
-      } as SimEvent);
+      self.ops.scheduleAtGameFrame(
+        {
+          id: makeSimEventId(),
+          type: "hit",
+          seq: self.ops.nextSeq(),
+          sourceId: source.id,
+          targetId: owner.id,
+          damageType: artsType,
+          staggerOnHit: 0,
+          dmgMultiplier: computeArtsBurstMultiplier(
+            after,
+            sourceBuild?.level ?? 1,
+            sourceBuild?.restStat?.artsIntensity ?? 0,
+          ),
+          ref: ev.id,
+        } as SimEvent,
+        self.read.nowGameInFrames + ARTS_BURST_DELAY_FRAMES,
+      );
     }
   } else {
     const current = owner.inflictions[ev.inflictionType].stacks;

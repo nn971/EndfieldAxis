@@ -55,6 +55,8 @@ export type SimEvent =
         isLegal: boolean;
         reason?: string;
       };
+      skillBoxId?: string;
+      softInvalidReasons?: string[];
     })
   | (SimEventBase & {
       type: "castScriptStart";
@@ -84,6 +86,7 @@ export type SimEvent =
       sourceId: SimEntityId;
       targetId: SimEntityId;
       statusType: SimStatusType;
+      isForced?: boolean;
     })
   | (SimEventBase & {
       type: "inflictionApply";
@@ -100,6 +103,7 @@ export type SimEvent =
     })
   | (SimEventBase & {
       type: "inflictionRemove";
+      sourceId?: SimEntityId;
       targetId: SimEntityId;
       inflictionType: InflictionType;
     })
@@ -118,6 +122,7 @@ export type SimEvent =
     })
   | (SimEventBase & {
       type: "buffRemove";
+      sourceId?: SimEntityId;
       /** entity who owns the buff */
       targetId: SimEntityId;
       buffId: BuffId;

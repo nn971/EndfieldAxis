@@ -10,13 +10,11 @@ class RedeemerTagT1Def extends GearsDef {
       defend: 21,
       bonusBuckets: {
         s1: "agility",
-        s2: "physicalDmgIncRatio",
-        s3: "agility",
+        s2: "comboSkillDmgIncRatio",
       },
       bonusValuesByRank: {
         s1: [43, 47, 51, 55],
         s2: [43.2, 47.5, 51.8, 56.2],
-        s3: [21, 23, 25, 27],
       },
     });
   }

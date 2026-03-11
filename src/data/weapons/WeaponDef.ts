@@ -52,7 +52,7 @@ export type WeaponDefInit = {
     id: ThirdWeaponSkillId;
     cat: ThirdWeaponSkillCat;
     name: string;
-    bonus: {
+    bonus?: {
       bucket: RestStatBonusBucket;
       byRank: (rank: number) => number;
     };
@@ -78,7 +78,7 @@ export class WeaponDef {
     id: ThirdWeaponSkillId;
     cat: ThirdWeaponSkillCat;
     name: string;
-    bonus: {
+    bonus?: {
       bucket: RestStatBonusBucket;
       byRank: (rank: number) => number;
     };

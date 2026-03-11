@@ -23,7 +23,7 @@ import type {
   SkillBox,
   SolutionState,
 } from "../../types/editor";
-import type { DamageType } from "../../types/operator";
+import type { DamageType, OperatorBuild } from "../../types/operator";
 import {
   makeEmptySimDamageCache,
   type SimDamageCache,
@@ -47,6 +47,11 @@ export type RunSolutionSimResult = {
   hitDamageSnapshots: SimHitDamageSnapshot[];
 };
 
+type InvalidSkillBoxEntry = {
+  kind: "strict" | "soft";
+  reasons: string[];
+};
+
 function toSkillTypeOrNull(v: unknown): SkillType | null {
   if (
     v === "normalAttack" ||
@@ -65,6 +70,7 @@ function buildSimRenderCache(
   teamSpCap: number,
   enemyStaggerCapMilli: number,
   ultimateEnergyMaxByOperatorId: Record<string, number>,
+  invalidSkillBoxById: Record<string, InvalidSkillBoxEntry>,
 ): SimRenderCache {
   const bars: SimRenderBar[] = [];
   const markers: SimRenderMarker[] = [];
@@ -223,7 +229,136 @@ function buildSimRenderCache(
     ultimateEnergySeriesByOperatorId,
     ultimateEnergyMaxByOperatorId,
     simEndFrame,
+    invalidSkillBoxById,
   };
+}
+
+function clamp01(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value));
+}
+
+function clampInt(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, Math.floor(value)));
+}
+
+function appendSoftReason(
+  bySkillBoxId: Map<string, Set<string>>,
+  skillBoxId: string,
+  reason: string,
+) {
+  const reasons = bySkillBoxId.get(skillBoxId) ?? new Set<string>();
+  reasons.add(reason);
+  bySkillBoxId.set(skillBoxId, reasons);
+}
+
+function getComboCooldownFrames(
+  operatorId: string,
+  buildByOperatorId: Record<string, OperatorBuild>,
+): number {
+  const build = buildByOperatorId[operatorId];
+  const opDef = operatorsData[operatorId];
+  const cooldownByRank = opDef?.getComboCooldownSecondsByRank(
+    build?.potentialRank,
+  );
+  if (!cooldownByRank || cooldownByRank.length === 0) {
+    return 0;
+  }
+
+  const rank = clampInt(
+    build?.potentialRank ?? 0,
+    0,
+    cooldownByRank.length - 1,
+  );
+  const baseSeconds = Number(cooldownByRank[rank] ?? cooldownByRank[0] ?? 0);
+  const safeBaseSeconds = Number.isFinite(baseSeconds)
+    ? Math.max(0, baseSeconds)
+    : 0;
+  const reduction = clamp01(
+    Number(build?.restStat?.comboCooldownReduction ?? 0),
+  );
+  const effectiveSeconds = safeBaseSeconds * (1 - reduction);
+  return Math.max(0, Math.round(effectiveSeconds * 60));
+}
+
+function collectCompileSoftReasons(params: {
+  sortedSkillBoxes: SkillBox[];
+  illegalCastStartIds: Set<string>;
+  freezeTimeline: ReturnType<typeof buildFreezeTimeline>;
+  buildByOperatorId: Record<string, OperatorBuild>;
+}): Map<string, Set<string>> {
+  const {
+    sortedSkillBoxes,
+    illegalCastStartIds,
+    freezeTimeline,
+    buildByOperatorId,
+  } = params;
+  const { realToGame, gameToRealAtOrAfter } = freezeTimeline;
+
+  const groupedByOperatorId = new Map<string, SkillBox[]>();
+  for (const box of sortedSkillBoxes) {
+    if (illegalCastStartIds.has(box.id)) continue;
+    const grouped = groupedByOperatorId.get(box.operatorId) ?? [];
+    grouped.push(box);
+    groupedByOperatorId.set(box.operatorId, grouped);
+  }
+
+  const softReasonBySkillBoxId = new Map<string, Set<string>>();
+  for (const [operatorId, operatorBoxes] of groupedByOperatorId.entries()) {
+    let blockingEndReal = -1;
+    let cooldownUntilReal = -1;
+
+    for (const box of operatorBoxes) {
+      const operator = operatorsData[box.operatorId];
+      const skill = operator?.skills[box.skillType];
+      if (!skill) {
+        continue;
+      }
+
+      const startReal = box.startFrame;
+      const durationGame = getSkillDurationGameFrames(
+        box,
+        skill.durationFrames,
+      );
+      const startGame = realToGame(startReal);
+      const endGame = startGame + durationGame;
+      const endReal = gameToRealAtOrAfter(endGame, startReal);
+
+      if (startReal < blockingEndReal) {
+        appendSoftReason(
+          softReasonBySkillBoxId,
+          box.id,
+          "soft:overlap-prev-skill",
+        );
+      }
+
+      if (box.skillType !== "normalAttack") {
+        blockingEndReal = Math.max(blockingEndReal, endReal);
+      }
+
+      if (box.skillType === "comboSkill") {
+        if (startReal < cooldownUntilReal) {
+          appendSoftReason(
+            softReasonBySkillBoxId,
+            box.id,
+            "soft:combo-cooldown",
+          );
+        }
+
+        const cooldownFrames = getComboCooldownFrames(
+          operatorId,
+          buildByOperatorId,
+        );
+        cooldownUntilReal = Math.max(
+          cooldownUntilReal,
+          startReal + cooldownFrames,
+        );
+      }
+    }
+  }
+
+  return softReasonBySkillBoxId;
 }
 
 function compileSkillCast(params: {
@@ -279,6 +414,8 @@ function compileSkillCast(params: {
     sourceId,
     targetId,
     skillType,
+    skillBoxId: box.id,
+    softInvalidReasons: [],
   });
 
   const scriptStartReal =
@@ -314,10 +451,15 @@ function compileSkillCast(params: {
 function compileSkillBoxes(params: {
   skillBoxes: SkillBox[];
   freezeTimeline: ReturnType<typeof buildFreezeTimeline>;
+  buildByOperatorId: Record<string, OperatorBuild>;
   targetId: string;
   nextSeq: () => number;
-}): SimEvent[] {
-  const { skillBoxes, freezeTimeline, targetId, nextSeq } = params;
+}): {
+  events: SimEvent[];
+  strictInvalidSkillBoxById: Record<string, InvalidSkillBoxEntry>;
+} {
+  const { skillBoxes, freezeTimeline, buildByOperatorId, targetId, nextSeq } =
+    params;
 
   const sorted = [...skillBoxes].sort((a, b) => {
     if (a.startFrame !== b.startFrame) return a.startFrame - b.startFrame;
@@ -330,10 +472,26 @@ function compileSkillBoxes(params: {
 
   const {
     illegalCastStartIds,
+    illegalCastStartReasonById,
     scriptStartRealByCastStartId,
     realToGame,
     gameToRealAtOrAfter,
   } = freezeTimeline;
+
+  const strictInvalidSkillBoxById: Record<string, InvalidSkillBoxEntry> = {};
+  for (const [id, reasons] of illegalCastStartReasonById.entries()) {
+    strictInvalidSkillBoxById[id] = {
+      kind: "strict",
+      reasons: [...reasons],
+    };
+  }
+
+  const softReasonBySkillBoxId = collectCompileSoftReasons({
+    sortedSkillBoxes: sorted,
+    illegalCastStartIds,
+    freezeTimeline,
+    buildByOperatorId,
+  });
 
   const out: SimEvent[] = [];
   for (const box of sorted) {
@@ -347,9 +505,22 @@ function compileSkillBoxes(params: {
       gameToRealAtOrAfter,
       nextSeq,
     });
+    const castStartEvent = evs.find(
+      (ev): ev is Extract<SimEvent, { type: "castStart" }> =>
+        ev.type === "castStart" && ev.skillBoxId === box.id,
+    );
+    if (castStartEvent) {
+      const softReasons = softReasonBySkillBoxId.get(box.id);
+      if (softReasons) {
+        castStartEvent.softInvalidReasons = [...softReasons];
+      }
+    }
     out.push(...evs);
   }
-  return out;
+  return {
+    events: out,
+    strictInvalidSkillBoxById,
+  };
 }
 
 function getEmptyInfliction(): Record<InflictionType, SimInfliction> {
@@ -410,6 +581,61 @@ function extractHitDamageSnapshots(log: SimLog): SimHitDamageSnapshot[] {
   }
 
   return snapshots;
+}
+
+function collectSoftInvalidSkillBoxes(
+  processedEvents: SimEvent[],
+): Record<string, InvalidSkillBoxEntry> {
+  const reasonsBySkillBoxId = new Map<string, Set<string>>();
+
+  for (const ev of processedEvents) {
+    if (ev.type !== "castStart") continue;
+    if (!ev.skillBoxId) continue;
+    if (!ev.softInvalidReasons || ev.softInvalidReasons.length === 0) continue;
+
+    const reasons = reasonsBySkillBoxId.get(ev.skillBoxId) ?? new Set<string>();
+    for (const reason of ev.softInvalidReasons) {
+      reasons.add(reason);
+    }
+    reasonsBySkillBoxId.set(ev.skillBoxId, reasons);
+  }
+
+  const softInvalidSkillBoxById: Record<string, InvalidSkillBoxEntry> = {};
+  for (const [skillBoxId, reasons] of reasonsBySkillBoxId.entries()) {
+    if (reasons.size <= 0) continue;
+    softInvalidSkillBoxById[skillBoxId] = {
+      kind: "soft",
+      reasons: [...reasons],
+    };
+  }
+  return softInvalidSkillBoxById;
+}
+
+function mergeInvalidSkillBoxes(params: {
+  strictInvalidSkillBoxById: Record<string, InvalidSkillBoxEntry>;
+  softInvalidSkillBoxById: Record<string, InvalidSkillBoxEntry>;
+}): Record<string, InvalidSkillBoxEntry> {
+  const { strictInvalidSkillBoxById, softInvalidSkillBoxById } = params;
+  const merged: Record<string, InvalidSkillBoxEntry> = {
+    ...strictInvalidSkillBoxById,
+  };
+
+  for (const [skillBoxId, softEntry] of Object.entries(
+    softInvalidSkillBoxById,
+  )) {
+    const strictEntry = merged[skillBoxId];
+    const mergedReasons = new Set<string>(strictEntry?.reasons ?? []);
+    for (const reason of softEntry.reasons) {
+      mergedReasons.add(reason);
+    }
+
+    merged[skillBoxId] = {
+      kind: "soft",
+      reasons: [...mergedReasons],
+    };
+  }
+
+  return merged;
 }
 
 export function runSolutionSim(
@@ -479,15 +705,24 @@ export function runSolutionSim(
     controlledOperatorId,
   });
 
-  const events = compileSkillBoxes({
+  const { events, strictInvalidSkillBoxById } = compileSkillBoxes({
     skillBoxes,
     freezeTimeline,
+    buildByOperatorId,
     targetId,
     nextSeq: world.ops.nextSeq,
   });
   for (const ev of events) world.ops.scheduleAtRealFrame(ev);
 
   world.runSim();
+
+  const softInvalidSkillBoxById = collectSoftInvalidSkillBoxes(
+    world.processedEvents,
+  );
+  const invalidSkillBoxById = mergeInvalidSkillBoxes({
+    strictInvalidSkillBoxById,
+    softInvalidSkillBoxById,
+  });
 
   const ultimateEnergyMaxByOperatorId = Object.fromEntries(
     Object.entries(world.env.resources.ultimateByOperatorId).map(
@@ -501,6 +736,7 @@ export function runSolutionSim(
     Number(world.env.resources.teamSp.cap),
     Number(world.env.entitiesById[targetId]?.stagger?.capMilli ?? 0),
     ultimateEnergyMaxByOperatorId,
+    invalidSkillBoxById,
   );
   const hitDamageSnapshots = extractHitDamageSnapshots(world.log);
   const totalDamage = hitDamageSnapshots.reduce(

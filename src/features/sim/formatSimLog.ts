@@ -49,7 +49,7 @@ export function formatSimLog({
 
   try {
     const numberFormatter = new Intl.NumberFormat(language, {
-      maximumFractionDigits: 2,
+      maximumFractionDigits: 3,
     });
     const interpolation: Record<string, unknown> = {
       frame: entry.frame,

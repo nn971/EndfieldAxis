@@ -41,7 +41,11 @@ class AtkIncRatioBuffDef extends BuffDef {
         }
 
         if (delta !== 0) {
-          collector.addValue("atkIncRatio", delta, `${this.name} (+${Math.round(delta * 100)}%)`);
+          collector.addValue(
+            "atkIncRatio",
+            delta,
+            `${this.name} (+${Math.round(delta * 1000) / 10}%)`,
+          );
         }
       },
     });

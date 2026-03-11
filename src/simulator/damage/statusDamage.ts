@@ -73,7 +73,11 @@ export const ELECTRIFICATION_INITIAL_HIT_PER_STACK_MUL = 0.35;
 export const CORROSION_INITIAL_HIT_BASE_MUL = 0.5;
 export const CORROSION_INITIAL_HIT_PER_STACK_MUL = 0.35;
 
-export type ArtsReactionType = "solidification" | "combustion" | "electrification" | "corrosion";
+export type ArtsReactionType =
+  | "solidification"
+  | "combustion"
+  | "electrification"
+  | "corrosion";
 
 export function computeArtsReactionMultiplier(
   reactionType: ArtsReactionType,
@@ -91,16 +95,24 @@ export function computeArtsReactionMultiplier(
   let baseMul = 1;
   switch (reactionType) {
     case "solidification":
-      baseMul = SOLIDIFICATION_INITIAL_HIT_BASE_MUL + consumed * SOLIDIFICATION_INITIAL_HIT_PER_STACK_MUL;
+      baseMul =
+        SOLIDIFICATION_INITIAL_HIT_BASE_MUL +
+        consumed * SOLIDIFICATION_INITIAL_HIT_PER_STACK_MUL;
       break;
     case "combustion":
-      baseMul = COMBUSTION_INITIAL_HIT_BASE_MUL + consumed * COMBUSTION_INITIAL_HIT_PER_STACK_MUL;
+      baseMul =
+        COMBUSTION_INITIAL_HIT_BASE_MUL +
+        consumed * COMBUSTION_INITIAL_HIT_PER_STACK_MUL;
       break;
     case "electrification":
-      baseMul = ELECTRIFICATION_INITIAL_HIT_BASE_MUL + consumed * ELECTRIFICATION_INITIAL_HIT_PER_STACK_MUL;
+      baseMul =
+        ELECTRIFICATION_INITIAL_HIT_BASE_MUL +
+        consumed * ELECTRIFICATION_INITIAL_HIT_PER_STACK_MUL;
       break;
     case "corrosion":
-      baseMul = CORROSION_INITIAL_HIT_BASE_MUL + consumed * CORROSION_INITIAL_HIT_PER_STACK_MUL;
+      baseMul =
+        CORROSION_INITIAL_HIT_BASE_MUL +
+        consumed * CORROSION_INITIAL_HIT_PER_STACK_MUL;
       break;
     default: {
       const _exhaustiveCheck: never = reactionType;
@@ -134,8 +146,8 @@ export function computeArtsBurstMultiplier(
   return baseMul * levelMul * artsMul;
 }
 
-export const SOLIDIFICATION_SHATTER_BASE_MUL = 2.5;
-export const SOLIDIFICATION_SHATTER_PER_STACK_MUL = 1.5;
+export const SOLIDIFICATION_SHATTER_BASE_MUL = 1.2;
+export const SOLIDIFICATION_SHATTER_PER_STACK_MUL = 1.2;
 
 export function computeSolidificationShatterMultiplier(
   solidificationStacks: number,
@@ -148,8 +160,14 @@ export function computeSolidificationShatterMultiplier(
 
   const levelMul = computeArtsLevelMul(clampedLevel);
   const artsMul = computeArtsMul(clampedArts);
-  const baseMul = SOLIDIFICATION_SHATTER_BASE_MUL + stacks * SOLIDIFICATION_SHATTER_PER_STACK_MUL;
+  const baseMul =
+    SOLIDIFICATION_SHATTER_BASE_MUL +
+    stacks * SOLIDIFICATION_SHATTER_PER_STACK_MUL;
 
+  // console.log(
+  //   `level: ${level}, artsIntensity: ${artsIntensity}, solidificationStacks: ${solidificationStacks}`,
+  // );
+  // console.log(baseMul * levelMul * artsMul);
   return baseMul * levelMul * artsMul;
 }
 

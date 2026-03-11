@@ -4,8 +4,10 @@ import { WeaponDef } from "../WeaponDef";
 
 const BUFF_KEY = "weapon.thermitecutter.teamAtkBuff" as const;
 const BUFF_DURATION_FRAMES = 1200;
-const BUFF_MAX_STACKS = 1;
-const BUFF_BONUS_PER_STACK = 0.05;
+const BUFF_MAX_STACKS = 2;
+const BUFF_BONUS_BY_RANK = [
+  0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12, 0.14,
+] as const;
 
 class ThermiteCutterDef extends WeaponDef {
   constructor() {
@@ -18,7 +20,7 @@ class ThermiteCutterDef extends WeaponDef {
         level1: 50,
         level90: 490,
       },
-      s1: { id: "agilityboost", size: "L" },
+      s1: { id: "willboost", size: "L" },
       s2: { id: "attackboost", size: "L" },
       s3: {
         id: "thermalrelease",
@@ -27,11 +29,8 @@ class ThermiteCutterDef extends WeaponDef {
         bonus: {
           bucket: "atkIncRatio",
           byRank: r => {
-            const values = [
-              0.1, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.2,
-              0.22,
-            ];
-            return values[r] ?? 0.1;
+            const values = [0.1, 0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24, 0.28];
+            return values[r - 1] ?? 0.1;
           },
         },
       },
@@ -43,6 +42,7 @@ class ThermiteCutterDef extends WeaponDef {
 
     const applyTeamBuff = function* (
       ctx: Pick<SimScriptContext, "read" | "emit" | "sourceId">,
+      bonusPerStack: number,
     ) {
       const { read, emit, sourceId } = ctx;
       for (const entityId of Object.keys(read.env.entitiesById)) {
@@ -56,7 +56,7 @@ class ThermiteCutterDef extends WeaponDef {
             durationFrames: BUFF_DURATION_FRAMES,
             maxStacks: BUFF_MAX_STACKS,
             runtime: {
-              valuePerStack: BUFF_BONUS_PER_STACK,
+              valuePerStack: bonusPerStack,
               role: "source",
             },
           });
@@ -72,7 +72,9 @@ class ThermiteCutterDef extends WeaponDef {
         const sourceId = ev.sourceId;
         const build = read.getBuild(sourceId);
         if (!build || build.weapon.id !== selfId) return;
-        yield* applyTeamBuff({ read, emit, sourceId });
+        const weaponRank = build.weapon.skillRanks.s3;
+        const bonusPerStack = BUFF_BONUS_BY_RANK[weaponRank - 1] ?? 0.05;
+        yield* applyTeamBuff({ read, emit, sourceId }, bonusPerStack);
       },
     });
 
@@ -85,7 +87,9 @@ class ThermiteCutterDef extends WeaponDef {
         if (!sourceId) return;
         const build = read.getBuild(sourceId);
         if (!build || build.weapon.id !== selfId) return;
-        yield* applyTeamBuff({ read, emit, sourceId });
+        const weaponRank = build.weapon.skillRanks.s3;
+        const bonusPerStack = BUFF_BONUS_BY_RANK[weaponRank - 1] ?? 0.05;
+        yield* applyTeamBuff({ read, emit, sourceId }, bonusPerStack);
       },
     });
   }

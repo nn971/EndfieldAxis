@@ -90,7 +90,8 @@ export type OnBuffConsumedTriggerContext = {
   read: SimRead;
   ops: SimOps;
   ev: Extract<SimEvent, { type: "buffRemove" }>;
-  sourceId: SimEntityId;
+  sourceId?: SimEntityId;
+  targetId: SimEntityId;
 };
 export type OnBuffConsumedTrigger = SimScript;
 
@@ -482,7 +483,7 @@ export class SimRegistry {
     const stateKey = this.getCooldownStateKey(entry, ctx, bucket);
     const lastTriggeredFrame = this.lastTriggeredFrameByKey.get(stateKey);
     if (lastTriggeredFrame === undefined) return false;
-    return ctx.read.nowGameInFrames - lastTriggeredFrame < entry.cooldown;
+    return ctx.read.nowRealInFrames - lastTriggeredFrame < entry.cooldown;
   }
 
   private markCooldownTriggered<TCtx extends TriggerContext>(
@@ -492,7 +493,7 @@ export class SimRegistry {
   ): void {
     if (!entry.cooldown) return;
     const stateKey = this.getCooldownStateKey(entry, ctx, bucket);
-    this.lastTriggeredFrameByKey.set(stateKey, ctx.read.nowGameInFrames);
+    this.lastTriggeredFrameByKey.set(stateKey, ctx.read.nowRealInFrames);
   }
 
   private getCooldownStateKey<TCtx extends TriggerContext>(
@@ -539,7 +540,7 @@ export class SimRegistry {
       ev: ctx.ev,
       sourceId,
       targetId,
-      startFrame: ctx.read.nowGameInFrames,
+      startFrame: ctx.read.nowRealInFrames,
       startRealFrame: ctx.read.nowRealInFrames,
       skillType,
       defaultHitStaggerOnHit,

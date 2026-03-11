@@ -18,7 +18,11 @@ class RazorhornAtkBuffDef extends BuffDef {
       fn: ({ role, buff, collector }) => {
         if (role !== "source") return;
         const bonusValue = Number((buff as any).meta?.atkBonus ?? 0.12);
-        collector.addValue("atkIncRatio", bonusValue, `Conquest of Icy Peaks (+${Math.round(bonusValue * 100)}% ATK)`);
+        collector.addValue(
+          "atkIncRatio",
+          bonusValue,
+          `Conquest of Icy Peaks (+${Math.round(bonusValue * 1000) / 10}% ATK)`,
+        );
       },
     });
   }

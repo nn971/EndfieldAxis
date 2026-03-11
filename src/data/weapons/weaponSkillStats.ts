@@ -167,7 +167,11 @@ export function getWeaponSkillRestBonus(
       }
       case "artsdmgboost": {
         const addValue = evalSkillBoostValues("artsdmgboost", s, r, true);
-        return makeWeaponSkillEntry("artsDmgIncRatio", addValue, "artsdmgboost");
+        return makeWeaponSkillEntry(
+          "artsDmgIncRatio",
+          addValue,
+          "artsdmgboost",
+        );
       }
       case "naturedmgboost": {
         const addValue = evalSkillBoostValues("naturedmgboost", s, r, true);
@@ -179,11 +183,19 @@ export function getWeaponSkillRestBonus(
       }
       case "cryodmgboost": {
         const addValue = evalSkillBoostValues("cryodmgboost", s, r, true);
-        return makeWeaponSkillEntry("cryoDmgIncRatio", addValue, "cryodmgboost");
+        return makeWeaponSkillEntry(
+          "cryoDmgIncRatio",
+          addValue,
+          "cryodmgboost",
+        );
       }
       case "criticalrateboost": {
         const addValue = evalSkillBoostValues("criticalrateboost", s, r, true);
-        return makeWeaponSkillEntry("criticalRate", addValue, "criticalrateboost");
+        return makeWeaponSkillEntry(
+          "criticalRate",
+          addValue,
+          "criticalrateboost",
+        );
       }
       case "ultimategainefficiencyboost": {
         const addValue = evalSkillBoostValues(
@@ -206,6 +218,8 @@ export function getWeaponSkillRestBonus(
     }
   } else {
     const skillDef = weaponsData[weaponId].s3;
+    if (skillDef.bonus === undefined) return null;
+
     const addValue = skillDef.bonus.byRank(r);
     const bucket = skillDef.bonus.bucket as RestStatBonusBucket;
     return {

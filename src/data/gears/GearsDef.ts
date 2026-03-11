@@ -20,16 +20,17 @@ export type GearsDefInit = {
   bonusBuckets: {
     s1: RestStatBonusBucket;
     s2: RestStatBonusBucket;
-    s3: RestStatBonusBucket;
+    s3?: RestStatBonusBucket;
   };
   bonusValuesByRank: {
     s1: [number, number, number, number];
     s2: [number, number, number, number];
-    s3: [number, number, number, number];
+    s3?: [number, number, number, number];
   };
 };
 
 export type GearBonusKey = "s1" | "s2" | "s3";
+const GEAR_BONUS_KEYS: readonly GearBonusKey[] = ["s1", "s2", "s3"];
 
 export type GearRestBonus = {
   key: GearBonusKey;
@@ -49,12 +50,12 @@ export class GearsDef {
   public readonly bonusBuckets: {
     s1: RestStatBonusBucket;
     s2: RestStatBonusBucket;
-    s3: RestStatBonusBucket;
+    s3?: RestStatBonusBucket;
   };
   public readonly bonusValuesByRank: {
     s1: [number, number, number, number];
     s2: [number, number, number, number];
-    s3: [number, number, number, number];
+    s3?: [number, number, number, number];
   };
 
   constructor(init: GearsDefInit) {
@@ -84,13 +85,17 @@ export class GearsDef {
       s3: clamp(ranks[2]),
     };
 
-    const keys: GearBonusKey[] = ["s1", "s2", "s3"];
-    return keys.map(key => {
-      const rank = rk[key];
+    const bonuses: GearRestBonus[] = [];
+    for (const key of GEAR_BONUS_KEYS) {
+      const valueByRank = this.bonusValuesByRank[key];
       const bucket = this.bonusBuckets[key];
-      const addValue = this.bonusValuesByRank[key][rank] ?? 0;
-      return { key, bucket, rank, addValue };
-    });
+      if (!valueByRank || !bucket) continue;
+
+      const rank = rk[key];
+      const addValue = valueByRank[rank] ?? 0;
+      bonuses.push({ key, bucket, rank, addValue });
+    }
+    return bonuses;
   }
 
   /**

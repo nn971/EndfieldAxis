@@ -42,6 +42,7 @@ class SolidificationBuffDef extends BuffDef {
       emit: { buffRemove: (draft: any) => any; hit: (draft: any) => any },
     ) {
       yield emit.buffRemove({
+        sourceId: params.sourceId,
         targetId: params.targetId,
         buffId: SOLIDIFICATION_BUFF_ID,
         ref: params.ref,
@@ -59,41 +60,41 @@ class SolidificationBuffDef extends BuffDef {
       });
     };
 
-    registry.registerOnStatusApply({
-      id: "buff.solidification.shatter.onPhysicalStatus",
-      fn: function* (ctx) {
-        const { read, ev, sourceId, targetId, emit } = ctx;
-        if (ev?.type !== "statusApply" || !sourceId || !targetId) return;
-        if (
-          ev.statusType !== "lift" &&
-          ev.statusType !== "knockDown" &&
-          ev.statusType !== "crush" &&
-          ev.statusType !== "breach"
-        ) {
-          return;
-        }
+    // registry.registerOnStatusApply({
+    //   id: "buff.solidification.shatter.onPhysicalStatus",
+    //   fn: function* (ctx) {
+    //     const { read, ev, sourceId, targetId, emit } = ctx;
+    //     if (ev?.type !== "statusApply" || !sourceId || !targetId) return;
+    //     if (
+    //       ev.statusType !== "lift" &&
+    //       ev.statusType !== "knockDown" &&
+    //       ev.statusType !== "crush" &&
+    //       ev.statusType !== "breach"
+    //     ) {
+    //       return;
+    //     }
 
-        const target = read.getEntity(targetId);
-        const stacks = Number(
-          (target as any).buffs?.[SOLIDIFICATION_BUFF_ID]?.stacks ?? 0,
-        );
-        if (stacks <= 0) return;
+    //     const target = read.getEntity(targetId);
+    //     const stacks = Number(
+    //       (target as any).buffs?.[SOLIDIFICATION_BUFF_ID]?.stacks ?? 0,
+    //     );
+    //     if (stacks <= 0) return;
 
-        const sourceBuild = read.getBuild(sourceId);
+    //     const sourceBuild = read.getBuild(sourceId);
 
-        yield* spawnShatter(
-          {
-            sourceId,
-            targetId,
-            stacks,
-            level: sourceBuild?.level ?? 1,
-            artsIntensity: sourceBuild?.restStat?.artsIntensity ?? 0,
-            ref: ev.id,
-          },
-          emit,
-        );
-      },
-    });
+    //     yield* spawnShatter(
+    //       {
+    //         sourceId,
+    //         targetId,
+    //         stacks,
+    //         level: sourceBuild?.level ?? 1,
+    //         artsIntensity: sourceBuild?.restStat?.artsIntensity ?? 0,
+    //         ref: ev.id,
+    //       },
+    //       emit,
+    //     );
+    //   },
+    // });
 
     registry.registerOnInflictionApply({
       id: "buff.solidification.shatter.onVulnerable",

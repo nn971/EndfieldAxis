@@ -15,7 +15,7 @@ type BuffApplyEmitDraft = WithOptional<
 >;
 type BuffRemoveEmitDraft = WithOptional<
   Draft<Extract<SimEvent, { type: "buffRemove" }>>,
-  "targetId"
+  "sourceId" | "targetId"
 >;
 
 type EmitDraftByType = {
@@ -35,7 +35,7 @@ type EmitDraftByType = {
   >;
   inflictionRemove: WithOptional<
     Draft<Extract<SimEvent, { type: "inflictionRemove" }>>,
-    "targetId"
+    "sourceId" | "targetId"
   >;
   spRecover: WithOptional<
     Draft<Extract<SimEvent, { type: "spRecover" }>>,
@@ -156,6 +156,7 @@ function makeCtxEmit(
     buffRemove: draft =>
       emitCommand({
         ...draft,
+        sourceId: draft.sourceId ?? ctx.sourceId,
         targetId: draft.targetId ?? ctx.targetId,
         type: "buffRemove",
       } as DistOmit<SimEventDraft, "frame" | "ref">),
@@ -169,6 +170,7 @@ function makeCtxEmit(
     inflictionRemove: draft =>
       emitCommand({
         ...draft,
+        sourceId: draft.sourceId ?? ctx.sourceId,
         targetId: draft.targetId ?? ctx.targetId,
         type: "inflictionRemove",
       } as DistOmit<SimEventDraft, "frame" | "ref">),
