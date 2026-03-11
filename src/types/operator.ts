@@ -28,7 +28,8 @@ export const DAMAGE_TYPE_LIST = [
 export type RestStatBonusBucket =
   | "baseAtk" // only used for add operatorAtk and weaponAtk
   | OperatorAttributeType
-  | "secondaryAttribute"
+  | "mainAttribute"
+  | "subAttribute"
   | "atkIncRatio"
   | "atkIncFlat"
   | "artsIntensity"

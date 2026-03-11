@@ -37,7 +37,7 @@ function applyRestStatAddValue(
   snapshot: RestStatSnapshot,
   bucket: RestBonusEntry["bucket"],
   addValue: number,
-  secondaryAttribute?: OperatorAttributeType,
+  // secondaryAttribute?: OperatorAttributeType,
 ): void {
   // Attributes
   if (bucket in snapshot.attributes) {
@@ -45,12 +45,12 @@ function applyRestStatAddValue(
     return;
   }
 
-  if (bucket === "secondaryAttribute") {
-    if (secondaryAttribute) {
-      snapshot.attributes[secondaryAttribute] += addValue;
-    }
-    return;
-  }
+  // if (bucket === "secondaryAttribute") {
+  //   if (secondaryAttribute) {
+  //     snapshot.attributes[secondaryAttribute] += addValue;
+  //   }
+  //   return;
+  // }
 
   switch (bucket) {
     case "baseAtk": {
@@ -305,15 +305,24 @@ export function computeRestStat(build: OperatorBuild): RestStatSnapshot {
     );
   }
 
+  // ---- Attribute bonus ratio ----
+  let mainAttributeBonusRatio = 0;
+  let subAttributeBonusRatio = 0;
   for (const e of weaponAndGearBonuses) {
     if (!e.addValue) continue;
-    applyRestStatAddValue(snapshot, e.bucket, e.addValue, opDef.attributes.sub);
+    if (e.bucket === "mainAttribute") {
+      mainAttributeBonusRatio += e.addValue;
+    } else if (e.bucket === "subAttribute") {
+      subAttributeBonusRatio += e.addValue;
+    } else {
+      applyRestStatAddValue(snapshot, e.bucket, e.addValue);
+    }
     snapshot.log.push(e);
   }
-
-  // ---- Attribute bonus ratio ----
   const mainAttribute = opDef.attributes.main;
+  snapshot.attributes[mainAttribute] *= 1 + mainAttributeBonusRatio;
   const subAttribute = opDef.attributes.sub;
+  snapshot.attributes[subAttribute] *= 1 + subAttributeBonusRatio;
   snapshot.attributesBonusRatio =
     0.005 * snapshot.attributes[mainAttribute] +
     0.002 * snapshot.attributes[subAttribute];
